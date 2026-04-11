@@ -14,6 +14,8 @@ services:
       - pip-deps:/root/.cache/pip:rw
       - npm-deps:/root/.npm:rw
       - nvm-global:/usr/local/share/nvm:rw
+      - npm-global:/usr/local/lib/node_modules:rw
+      - npm-bin:/usr/local/bin:rw
       - ng-node-modules:/workspace/ui/node_modules:rw
       - gh-config:/root/.config/gh:rw
       - dotnet-nuget:/root/.nuget:rw
@@ -83,6 +85,8 @@ volumes:
   terraform-cache:
   azure-config:
   claude-config:
+  npm-global:
+  npm-bin:
 
 networks:
   ea-net:

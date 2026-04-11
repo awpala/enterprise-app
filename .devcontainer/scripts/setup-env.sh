@@ -41,10 +41,19 @@ trap on_error ERR
 # ---- Angular CLI: install globally ----
 echo "--- Installing Angular CLI globally ---"
 npm install -g @angular/cli 2>&1 || echo "Angular CLI global install failed (will retry manually)"
-echo "Angular CLI version: $(ng version 2>/dev/null | head -1 || echo 'not available')"
+echo "Angular CLI version: $(ng --version 2>/dev/null | head -1 || echo 'not available')"
+
+# ---- TypeScript CLI: install globally ----
+echo "--- Installing TypeScript globally ---"
+if command -v tsc >/dev/null 2>&1; then
+  echo "TypeScript already available: $(tsc --version 2>/dev/null || echo 'version unknown')"
+else
+  npm install -g typescript@latest 2>&1 || echo "TypeScript global install failed (will retry manually)"
+  echo "TypeScript version: $(tsc --version 2>/dev/null || echo 'not available')"
+fi
 
 # ---- Claude CLI: install globally via native install ----
-echo "--- Installing Claude CLI (attempt) ---"
+echo "--- Installing Claude CLI globally ---"
 if command -v claude >/dev/null 2>&1; then
   echo "claude CLI already available: $(claude --version 2>/dev/null || echo 'version unknown')"
 else
