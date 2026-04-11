@@ -20,10 +20,11 @@ services:
       - dotnet-tools:/root/.dotnet:rw
       - terraform-cache:/root/.terraform.d:rw
       - azure-config:/root/.azure:rw
+      - claude-config:/root/.claude:rw
     ports:
       - "4200:4200"
-      - "8080:8080"
       - "5000:5000"
+      - "8000:8000"
     command: sleep infinity
     restart: unless-stopped
     networks:
@@ -81,6 +82,7 @@ volumes:
   dotnet-tools:
   terraform-cache:
   azure-config:
+  claude-config:
 
 networks:
   ea-net:

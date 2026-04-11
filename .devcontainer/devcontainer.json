@@ -63,7 +63,7 @@
   "forwardPorts": [4200, 5000, 8000],
   "portsAttributes": {
     "4200": { "label": "Angular Dev Server", "onAutoForward": "notify" },
-    "5000": { "label": "Python Service", "onAutoForward": "notify" },
+    "5000": { "label": "Python Data Engine", "onAutoForward": "notify" },
     "8000": { "label": ".NET API", "onAutoForward": "notify" },
   },
 }
