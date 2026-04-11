@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "PostgreSQL 16 (Project DB)",
+      "Group": "Servers",
+      "Host": "ea-db",
+      "Port": 5432,
+      "MaintenanceDB": "postgres",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "PassFile": "/etc/pgadmin/pgpassfile"
+    }
+  }
+}

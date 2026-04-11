@@ -1,0 +1,69 @@
+{
+  "name": "Enterprise App - Development Environment",
+  "dockerComposeFile": "${localWorkspaceFolder}/compose.yaml",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "root",
+  "service": "ea-dev-env",
+  "shutdownAction": "stopCompose",
+  "runServices": [
+    "ea-db",
+    "ea-pgadmin4-ui",
+  ],
+
+  "features": {
+    "ghcr.io/devcontainers/features/dotnet:2": {},
+    "ghcr.io/devcontainers/features/python:1": {},
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/terraform:1": {},
+    "ghcr.io/devcontainers/features/azure-cli:1": {
+      "installBicep": true,
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {},
+  },
+
+  // run setup-env.sh companion script immediately upon container launch
+  "postCreateCommand": "chmod +x /scripts/setup-env.sh && bash /scripts/setup-env.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit",
+        "ms-dotnettools.vscode-dotnet-runtime",
+        "ms-vscode.powershell",
+        "angular.ng-template",
+        "ms-python.python",
+        "dbaeumer.vscode-eslint",
+        "mads-hartmann.bash-ide-vscode",
+        "rogalmic.bash-debug",
+        "yandeu.five-server",
+        "oderwat.indent-rainbow",
+        "mechatroner.rainbow-csv",
+        "gxl.git-graph-3",
+        "postman.postman-for-vscode",
+        "ms-vscode.vscode-node-azure-pack",
+        "ms-ossdata.vscode-pgsql",
+        "hashicorp.terraform",
+        "anthropic.claude-code",
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "editor.detectIndentation": false,
+        "[jsonc]": {
+          "editor.tabSize": 2,
+          "editor.insertSpaces": true,
+        },
+      },
+    },
+  },
+
+  "forwardPorts": [4200, 5000, 8000],
+  "portsAttributes": {
+    "4200": { "label": "Angular Dev Server", "onAutoForward": "notify" },
+    "5000": { "label": "Python Service", "onAutoForward": "notify" },
+    "8000": { "label": ".NET API", "onAutoForward": "notify" },
+  },
+}

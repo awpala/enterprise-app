@@ -1,0 +1,87 @@
+name: enterprise-app
+
+services:
+  ea-dev-env:
+    container_name: ea-dev-env
+    image: mcr.microsoft.com/devcontainers/base:bookworm
+    user: root
+    volumes:
+      # workspace (bind mount)
+      - .:/workspace:rw
+      # container environment setup script (bind mount)
+      - ./.devcontainer/scripts/setup-env.sh:/scripts/setup-env.sh
+      # cache dependencies across container (re)builds
+      - pip-deps:/root/.cache/pip:rw
+      - npm-deps:/root/.npm:rw
+      - nvm-global:/usr/local/share/nvm:rw
+      - ng-node-modules:/workspace/ui/node_modules:rw
+      - gh-config:/root/.config/gh:rw
+      - dotnet-nuget:/root/.nuget:rw
+      - dotnet-tools:/root/.dotnet:rw
+      - terraform-cache:/root/.terraform.d:rw
+      - azure-config:/root/.azure:rw
+    ports:
+      - "4200:4200"
+      - "8080:8080"
+      - "5000:5000"
+    command: sleep infinity
+    restart: unless-stopped
+    networks:
+      - ea-net
+
+  ea-db:
+    container_name: ea-db
+    image: postgres:16
+    user: root
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    volumes:
+      - postgres-data:/var/lib/postgresql/data:rw
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ea-net
+
+  ea-pgadmin4-ui:
+    container_name: ea-pgadmin4-ui
+    image: dpage/pgadmin4:latest
+    user: root
+    ports:
+      - "5050:5050"
+    env_file:
+      - .env
+    environment:
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+      PGADMIN_REPLACE_SERVERS_ON_STARTUP: "True"
+      PGPASSFILE: /etc/pgadmin/pgpassfile
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin:rw
+      - ./.devcontainer/pgadmin/pgadmin-servers.json:/pgadmin4/servers.json:ro
+      - ./.devcontainer/pgadmin/pgpassfile:/etc/pgadmin/pgpassfile:ro
+    depends_on:
+      ea-db:
+        condition: service_healthy
+    networks:
+      - ea-net
+
+volumes:
+  postgres-data:
+  pgadmin-data:
+  pip-deps:
+  npm-deps:
+  nvm-global:
+  ng-node-modules:
+  gh-config:
+  dotnet-nuget:
+  dotnet-tools:
+  terraform-cache:
+  azure-config:
+
+networks:
+  ea-net:
+    name: ea-net
