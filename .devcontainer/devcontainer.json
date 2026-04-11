@@ -1,6 +1,6 @@
 {
   "name": "Enterprise App - Development Environment",
-  "dockerComposeFile": "${localWorkspaceFolder}/compose.yaml",
+  "dockerComposeFile": "${localWorkspaceFolder}/compose.dev.yaml",
   "workspaceFolder": "/workspace",
   "remoteUser": "root",
   "service": "ea-dev-env",

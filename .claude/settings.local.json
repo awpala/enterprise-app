@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /workspace log --oneline --all)",
+      "Bash(git -C /workspace diff --name-only HEAD~3..HEAD)"
+    ]
+  }
+}
