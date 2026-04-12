@@ -12,17 +12,26 @@ terraform {
     }
   }
 
-  # NOTE: State is local for MVP. To migrate to azurerm backend later:
+  # Partial backend config — concrete values come from -backend-config=...
+  # at init time. The same terraform config then works for:
   #
-  #   backend "azurerm" {
-  #     resource_group_name  = "tfstate-rg"
-  #     storage_account_name = "eatfstate<suffix>"
-  #     container_name       = "tfstate"
-  #     key                  = "dev.tfstate"
-  #     use_oidc             = true
-  #   }
+  #   Local dev (dev state):
+  #     terraform init \
+  #       -backend-config=resource_group_name=<tfstate_rg> \
+  #       -backend-config=storage_account_name=<tfstate_account> \
+  #       -backend-config=container_name=tfstate \
+  #       -backend-config=key=dev.tfstate
   #
-  # Then run:  terraform init -migrate-state
+  #   CI (dev or production — workflow chooses the key):
+  #     Same flags, with key=dev.tfstate or key=production.tfstate.
+  #
+  # Both use_oidc and use_azuread_auth are on so the backend talks to the
+  # storage account using AAD (GitHub OIDC in CI, az CLI user locally) —
+  # no account keys, no SAS tokens.
+  backend "azurerm" {
+    use_oidc         = true
+    use_azuread_auth = true
+  }
 }
 
 provider "azurerm" {

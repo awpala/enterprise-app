@@ -1,0 +1,120 @@
+name: deploy
+
+# Branch → environment mapping:
+#   push to main               → production
+#   push to any other branch   → dev
+#
+# Image tagging:
+#   main       → sha-<sha7>
+#   non-main   → <branch-slug>-<sha7>  (slug = lower, /→-, stripped to [a-z0-9-])
+#
+# OIDC: the `environment:` on the deploy job is what the federated-credential
+# `subject` claim matches against in Entra ID. Do not remove it.
+on:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    # Route to the right GitHub Environment so OIDC picks the right
+    # federated credential (dev or production).
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'dev' }}
+
+    # Serialise production (no in-progress cancellation), coalesce dev
+    # (most recent push wins).
+    concurrency:
+      group: deploy-${{ github.ref == 'refs/heads/main' && 'production' || 'dev' }}
+      cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+    env:
+      TERRAFORM_VERSION: 1.9.8
+      # Exported to every step's shell. GitHub auto-masks secrets in logs.
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute environment, image tag, tfstate key, tfvars file
+        id: ctx
+        run: .github/scripts/compute-context.sh
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform init
+        working-directory: infra
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TFSTATE_CONTAINER }}" \
+            -backend-config="key=${TFSTATE_KEY}"
+
+      - name: Terraform validate
+        working-directory: infra
+        run: terraform validate
+
+      - name: Terraform apply — phase 1 (RG + ACR)
+        working-directory: infra
+        run: |
+          terraform apply -auto-approve \
+            -target=azurerm_resource_group.this \
+            -target=module.acr \
+            -var-file="${TFVARS_FILE}" \
+            -var "subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+
+      - name: Build and push images (az acr build)
+        run: .github/scripts/build-and-push-images.sh
+
+      - name: Terraform apply — phase 2 (full)
+        working-directory: infra
+        run: |
+          terraform apply -auto-approve \
+            -var-file="${TFVARS_FILE}" \
+            -var "subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+            -var "image_tag=${IMAGE_TAG}"
+
+      - name: Run EF Core migrations (Container Apps Job)
+        run: .github/scripts/run-migrations-job.sh
+
+      - name: Setup Node (for UI build)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install SWA CLI
+        run: npm install -g @azure/static-web-apps-cli
+
+      - name: Build UI
+        run: .github/scripts/build-ui.sh
+
+      - name: Deploy UI to Static Web Apps
+        run: .github/scripts/deploy-ui.sh
+
+      - name: Smoke test — /health/ready
+        run: .github/scripts/smoke-test.sh

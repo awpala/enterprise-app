@@ -58,7 +58,27 @@
       "Bash(git mv:*)",
       "Bash(grep -n \"allowed_origins\\\\|AllowedOrigins\\\\|Cors\" /workspace/infra/modules/container-apps/*.tf /workspace/infra/*.tf)",
       "Bash(curl -sS -o /dev/null -w 'HTTP %{http_code} | ACAO: %header{access-control-allow-origin} | ACAM: %header{access-control-allow-methods}\\\\n' -X OPTIONS https://ea-dev-api.whiteglacier-3900cffe.eastus.azurecontainerapps.io/api/v1/models -H 'Origin: https://brave-sea-042a03d0f.7.azurestaticapps.net' -H 'Access-Control-Request-Method: GET')",
-      "Bash(curl -sS -o /dev/null -w 'HTTP %{http_code} | ACAO: %header{access-control-allow-origin}\\\\n' 'https://ea-dev-api.whiteglacier-3900cffe.eastus.azurecontainerapps.io/api/v1/models?page=1&pageSize=1' -H 'Origin: https://brave-sea-042a03d0f.7.azurestaticapps.net')"
+      "Bash(curl -sS -o /dev/null -w 'HTTP %{http_code} | ACAO: %header{access-control-allow-origin}\\\\n' 'https://ea-dev-api.whiteglacier-3900cffe.eastus.azurecontainerapps.io/api/v1/models?page=1&pageSize=1' -H 'Origin: https://brave-sea-042a03d0f.7.azurestaticapps.net')",
+      "Bash(gh auth:*)",
+      "Bash(grep -rn -E \"\\(5eeebca2|subscription_id.*=.*\\\\\"[a-f0-9-]{20}\\)\" infra/envs/ infra/bootstrap/*.tf .github/)",
+      "Bash(ls -la terraform.tfstate*)",
+      "Bash(terraform destroy:*)",
+      "Bash(tee /tmp/destroy.log)",
+      "Bash(echo \"started destroy PID $!\")",
+      "Bash(ps -p 282008 -o pid,stat,etime,cmd)",
+      "Bash(ps -p 282008 -o pid,stat,etime)",
+      "Bash(kill 282008)",
+      "Bash(ls terraform.tfstate* _backend_override.tf)",
+      "Bash(kill -9 282008)",
+      "Bash(ps -p 282008 -o pid,stat,cmd)",
+      "Bash(az provider:*)",
+      "Bash(terraform output:*)",
+      "Bash(bash)",
+      "Bash(gh secret:*)",
+      "Bash(gh variable:*)",
+      "Bash(gh api:*)",
+      "Bash(chmod +x .github/scripts/*.sh)",
+      "Bash(git update-index:*)"
     ]
   }
 }

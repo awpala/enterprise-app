@@ -2,9 +2,9 @@
 .terraform.lock.hcl
 terraform.tfstate
 terraform.tfstate.backup
+*.tfstate
+*.tfstate.*
 terraform.tfvars
 *.auto.tfvars
-crash.log
-tfplan
 *.tfplan
-*.lock*
+crash.log
