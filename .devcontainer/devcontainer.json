@@ -1,5 +1,6 @@
 {
   "name": "Enterprise App - Development Environment",
+
   "dockerComposeFile": "${localWorkspaceFolder}/compose.dev.yaml",
   "workspaceFolder": "/workspace",
   "remoteUser": "root",

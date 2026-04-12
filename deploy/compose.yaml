@@ -6,7 +6,7 @@ services:
       context: ../api
       dockerfile: Dockerfile
     ports:
-      - "8000:8080"
+      - "8000:8000"
     environment:
       ConnectionStrings__DefaultConnection: "Host=ea-db;Port=5432;Database=demo;Username=demo;Password=demo"
       RabbitMQ__Host: ea-rabbitmq
@@ -19,7 +19,7 @@ services:
       ea-rabbitmq:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
