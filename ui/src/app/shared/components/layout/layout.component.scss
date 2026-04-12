@@ -1,0 +1,26 @@
+.app-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.toolbar-title {
+  margin-left: 8px;
+  font-size: 18px;
+}
+
+.sidenav-container {
+  height: calc(100vh - 64px);
+}
+
+.sidenav {
+  width: 220px;
+}
+
+.content {
+  padding: 0;
+}
+
+.active-link {
+  background-color: rgba(63, 81, 181, 0.08);
+}

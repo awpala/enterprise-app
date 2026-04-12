@@ -1,0 +1,84 @@
+<div class="page-container">
+  @if (loading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+  } @else if (run(); as r) {
+    <div class="page-header">
+      <h1 class="page-title">Run Detail</h1>
+      <button mat-button (click)="goBack()">
+        <mat-icon>arrow_back</mat-icon> Back to Runs
+      </button>
+    </div>
+
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Run Information</mat-card-title>
+      </mat-card-header>
+      <mat-card-content class="detail-content">
+        <div class="detail-row">
+          <span class="label">Status</span>
+          <app-status-badge [status]="r.status" />
+        </div>
+        <div class="detail-row">
+          <span class="label">Requested</span>
+          <span>{{ r.requestedAtUtc | date:'medium' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Started</span>
+          <span>{{ r.startedAtUtc ? (r.startedAtUtc | date:'medium') : '—' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Completed</span>
+          <span>{{ r.completedAtUtc ? (r.completedAtUtc | date:'medium') : '—' }}</span>
+        </div>
+        @if (r.errorMessage) {
+          <div class="detail-row error-row">
+            <span class="label">Error</span>
+            <span class="error-text">{{ r.errorMessage }}</span>
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    @if (r.metrics.length > 0) {
+      <mat-card class="mt-16">
+        <mat-card-header>
+          <mat-card-title>Computed Metrics</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <table mat-table [dataSource]="r.metrics" class="full-width">
+            <ng-container matColumnDef="metricName">
+              <th mat-header-cell *matHeaderCellDef>Metric</th>
+              <td mat-cell *matCellDef="let m">{{ m.metricName }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="metricValue">
+              <th mat-header-cell *matHeaderCellDef>Value</th>
+              <td mat-cell *matCellDef="let m">{{ m.metricValue | number:'1.0-6' }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="calculatedAtUtc">
+              <th mat-header-cell *matHeaderCellDef>Calculated</th>
+              <td mat-cell *matCellDef="let m">{{ m.calculatedAtUtc | date:'medium' }}</td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="metricColumns"></tr>
+            <tr mat-row *matRowDef="let m; columns: metricColumns"></tr>
+          </table>
+        </mat-card-content>
+      </mat-card>
+    }
+
+    @if (r.resultSummary) {
+      <mat-card class="mt-16">
+        <mat-card-header>
+          <mat-card-title>Result Summary</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <pre class="json-display">{{ r.resultSummary | json }}</pre>
+        </mat-card-content>
+      </mat-card>
+    }
+  }
+</div>

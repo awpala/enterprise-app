@@ -1,0 +1,62 @@
+<div class="page-container">
+  <div class="page-header">
+    <h1 class="page-title">{{ isEdit() ? 'Edit Model' : 'New Model' }}</h1>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+  } @else {
+    <mat-card>
+      <mat-card-content>
+        <form [formGroup]="form" (ngSubmit)="onSubmit()" class="model-form">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Name</mat-label>
+            <input matInput formControlName="name" placeholder="Enter model name" maxlength="200">
+            @if (form.controls.name.hasError('required')) {
+              <mat-error>Name is required</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Description</mat-label>
+            <textarea matInput formControlName="description" placeholder="Enter description"
+                      rows="3" maxlength="2000"></textarea>
+          </mat-form-field>
+
+          @if (isEdit()) {
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Status</mat-label>
+              <mat-select formControlName="status">
+                @for (s of statusOptions; track s) {
+                  <mat-option [value]="s">{{ s }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          }
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Parameters (JSON)</mat-label>
+            <textarea matInput formControlName="parameters"
+                      placeholder='{"sampleSize": 1000, "distribution": "normal"}'
+                      rows="5" class="json-input"></textarea>
+            <mat-hint>Optional JSON key-value pairs for model configuration</mat-hint>
+          </mat-form-field>
+
+          <div class="form-actions">
+            <button mat-button type="button" (click)="onCancel()">Cancel</button>
+            <button mat-flat-button color="primary" type="submit"
+                    [disabled]="form.invalid || saving()">
+              @if (saving()) {
+                <mat-spinner diameter="20"></mat-spinner>
+              } @else {
+                {{ isEdit() ? 'Update' : 'Create' }}
+              }
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

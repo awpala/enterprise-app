@@ -1,0 +1,19 @@
+.model-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 600px;
+  padding-top: 16px;
+}
+
+.json-input {
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}

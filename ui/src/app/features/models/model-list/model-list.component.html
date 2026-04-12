@@ -1,0 +1,86 @@
+<div class="page-container">
+  <div class="page-header">
+    <h1 class="page-title">Models</h1>
+    <button mat-flat-button color="primary" routerLink="/models/new">
+      <mat-icon>add</mat-icon> New Model
+    </button>
+  </div>
+
+  <div class="filter-bar mb-16">
+    <mat-chip-listbox aria-label="Status filter">
+      @for (status of statusOptions; track status) {
+        <mat-chip-option
+          [selected]="status === 'All' ? !statusFilter() : statusFilter() === status"
+          (click)="onStatusFilter(status)">
+          {{ status }}
+        </mat-chip-option>
+      }
+    </mat-chip-listbox>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+  } @else if (models().length === 0) {
+    <div class="empty-state">
+      <mat-icon>inbox</mat-icon>
+      <p>No models found.</p>
+      <button mat-flat-button color="primary" routerLink="/models/new">Create your first model</button>
+    </div>
+  } @else {
+    <mat-card>
+      <table mat-table [dataSource]="models()" class="full-width">
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Name</th>
+          <td mat-cell *matCellDef="let model">{{ model.name }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let model">
+            <app-status-badge [status]="model.status" />
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="version">
+          <th mat-header-cell *matHeaderCellDef>Version</th>
+          <td mat-cell *matCellDef="let model">v{{ model.version }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="createdBy">
+          <th mat-header-cell *matHeaderCellDef>Created By</th>
+          <td mat-cell *matCellDef="let model">{{ model.createdBy }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="updatedAtUtc">
+          <th mat-header-cell *matHeaderCellDef>Updated</th>
+          <td mat-cell *matCellDef="let model">{{ model.updatedAtUtc | date:'short' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let model">
+            <button mat-icon-button color="warn" (click)="deleteModel($event, model)"
+                    matTooltip="Archive">
+              <mat-icon>archive</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let model; columns: displayedColumns"
+            class="clickable-row" (click)="navigateToModel(model)"></tr>
+      </table>
+
+      <mat-paginator
+        [length]="totalCount()"
+        [pageSize]="pageSize()"
+        [pageIndex]="page() - 1"
+        [pageSizeOptions]="[10, 20, 50]"
+        (page)="onPageChange($event)"
+        showFirstLastButtons>
+      </mat-paginator>
+    </mat-card>
+  }
+</div>

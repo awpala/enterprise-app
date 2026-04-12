@@ -1,0 +1,87 @@
+name: enterprise-app
+
+services:
+  ea-api:
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8080"
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=ea-db;Port=5432;Database=demo;Username=demo;Password=demo"
+      RabbitMQ__Host: ea-rabbitmq
+      RabbitMQ__Username: guest
+      RabbitMQ__Password: guest
+      ASPNETCORE_ENVIRONMENT: Development
+    depends_on:
+      ea-db:
+        condition: service_healthy
+      ea-rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  ea-ui:
+    build:
+      context: ../ui
+      dockerfile: Dockerfile
+    ports:
+      - "4200:80"
+    depends_on:
+      - ea-api
+
+  ea-data-engine:
+    build:
+      context: ../data-engine
+      dockerfile: Dockerfile
+    environment:
+      RABBITMQ_HOST: ea-rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+      LOG_LEVEL: INFO
+    depends_on:
+      ea-rabbitmq:
+        condition: service_healthy
+
+  ea-db:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: demo
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+    volumes:
+      - ea-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d demo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  ea-rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - ea-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  ea-db-data:
+  ea-rabbitmq-data:

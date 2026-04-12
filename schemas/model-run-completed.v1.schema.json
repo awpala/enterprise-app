@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enterprise-app.local/schemas/model-run-completed.v1.schema.json",
+  "title": "ModelRunCompleted",
+  "description": "Published when the data engine completes a model run with computed metrics",
+  "type": "object",
+  "required": [
+    "messageId",
+    "correlationId",
+    "occurredAtUtc",
+    "modelRunId",
+    "modelId",
+    "metrics"
+  ],
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "occurredAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "modelRunId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "modelId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "resultSummary": {
+      "type": "object",
+      "description": "Aggregated computation results",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

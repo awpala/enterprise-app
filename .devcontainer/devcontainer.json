@@ -8,6 +8,7 @@
   "runServices": [
     "ea-db",
     "ea-pgadmin4-ui",
+    "ea-rabbitmq",
   ],
 
   "features": {
@@ -46,6 +47,7 @@
         "ms-ossdata.vscode-pgsql",
         "hashicorp.terraform",
         "anthropic.claude-code",
+        "docker.docker",
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash",
@@ -56,14 +58,17 @@
           "editor.tabSize": 2,
           "editor.insertSpaces": true,
         },
+        "python.defaultInterpreterPath": "/workspace/data-engine/.venv/bin/python",
+        "python.analysis.extraPaths": ["/workspace/data-engine/src"],
       },
     },
   },
 
-  "forwardPorts": [4200, 5000, 8000],
+  "forwardPorts": [4200, 5000, 8000, 15672],
   "portsAttributes": {
     "4200": { "label": "Angular Dev Server", "onAutoForward": "notify" },
     "5000": { "label": "Python Data Engine", "onAutoForward": "notify" },
     "8000": { "label": ".NET API", "onAutoForward": "notify" },
+    "15672": { "label": "RabbitMQ Management UI", "onAutoForward": "notify" },
   },
 }

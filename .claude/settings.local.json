@@ -2,7 +2,27 @@
   "permissions": {
     "allow": [
       "Bash(git -C /workspace log --oneline --all)",
-      "Bash(git -C /workspace diff --name-only HEAD~3..HEAD)"
+      "Bash(git -C /workspace diff --name-only HEAD~3..HEAD)",
+      "Bash(dotnet add:*)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet list:*)",
+      "Bash(npm install:*)",
+      "Bash(python3 -m venv .venv)",
+      "Bash(.venv/bin/pip install:*)",
+      "Read(//usr/bin/**)",
+      "Bash(/workspace/data-engine/.venv/bin/pip list:*)",
+      "Bash(dotnet test:*)",
+      "Bash(.venv/bin/pytest tests/ -v)",
+      "Bash(npx vitest:*)",
+      "Bash(npx ng:*)",
+      "Bash(.venv/bin/pytest tests/ -q)",
+      "Bash(.venv/bin/python -m ruff check src/data_engine/consumers/model_run_consumer.py)",
+      "Bash(.venv/bin/python -m pyright src/data_engine/consumers/model_run_consumer.py)",
+      "Bash(.venv/bin/python -m mypy src/data_engine/consumers/model_run_consumer.py)",
+      "Bash(.venv/bin/python -m ruff check --select ALL src/data_engine/consumers/model_run_consumer.py)",
+      "Bash(.venv/bin/pyright src/data_engine/consumers/model_run_consumer.py)",
+      "Bash(.venv/bin/pyright src/data_engine/consumers/model_run_consumer.py src/data_engine/producers/model_run_producer.py)",
+      "Bash(ls /workspace/api/*.sh /workspace/api/Makefile /workspace/ui/Makefile)"
     ]
   }
 }

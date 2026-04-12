@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enterprise-app.local/schemas/model-run-requested.v1.schema.json",
+  "title": "ModelRunRequested",
+  "description": "Published when a user requests a new model run",
+  "type": "object",
+  "required": [
+    "messageId",
+    "correlationId",
+    "occurredAtUtc",
+    "modelId",
+    "modelRunId",
+    "modelName"
+  ],
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "occurredAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "modelId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "modelRunId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "modelName": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "parameters": {
+      "type": "object",
+      "description": "Model-specific parameters for the run",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

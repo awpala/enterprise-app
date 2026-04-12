@@ -30,7 +30,7 @@ You are the testing specialist. You write, maintain, and improve tests across th
 
 - Component tests with Angular TestBed.
 - Service tests mock HttpClient via `HttpClientTestingModule`.
-- Use Vitest.
+- Use Vitest. Do NOT use Jasmine/Karma.
 
 ### Contract Testing
 

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enterprise-app.local/schemas/model-run-failed.v1.schema.json",
+  "title": "ModelRunFailed",
+  "description": "Published when a model run fails during processing",
+  "type": "object",
+  "required": [
+    "messageId",
+    "correlationId",
+    "occurredAtUtc",
+    "modelRunId",
+    "modelId",
+    "errorMessage"
+  ],
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "occurredAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "modelRunId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "modelId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "errorMessage": {
+      "type": "string",
+      "maxLength": 4000
+    }
+  },
+  "additionalProperties": false
+}

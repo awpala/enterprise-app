@@ -50,12 +50,32 @@ services:
     networks:
       - ea-net
 
+  ea-rabbitmq:
+    container_name: ea-rabbitmq
+    image: rabbitmq:4-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq:rw
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ea-net
+
   ea-pgadmin4-ui:
     container_name: ea-pgadmin4-ui
     image: dpage/pgadmin4:latest
     user: root
     ports:
-      - "5050:5050"
+      - "5050:80"
+      - "5443:443"
     env_file:
       - .env
     environment:
@@ -74,6 +94,7 @@ services:
 
 volumes:
   postgres-data:
+  rabbitmq-data:
   pgadmin-data:
   pip-deps:
   npm-deps:

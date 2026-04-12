@@ -52,7 +52,7 @@ else
   echo "TypeScript version: $(tsc --version 2>/dev/null || echo 'not available')"
 fi
 
-# ---- Claude CLI: install globally via native install ----
+# ---- Claude Code CLI: install globally via native install ----
 echo "--- Installing Claude CLI globally ---"
 if command -v claude >/dev/null 2>&1; then
   echo "claude CLI already available: $(claude --version 2>/dev/null || echo 'version unknown')"
@@ -80,7 +80,7 @@ else
     echo "claude CLI version: ${CLAUDE_VER:-available but version not reported}"
   else
     echo "claude CLI version: not available"
-    echo "If the installer reported '~/.local/bin' is not in PATH, run:" 
+    echo "If the installer reported '~/.local/bin' is not in PATH, run:"
     echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> $BASH_RC && source $BASH_RC"
   fi
 fi
@@ -95,6 +95,46 @@ if [ -f "${UI_DIR}/package.json" ]; then
   cd "${WORKSPACE_DIR}"
 else
   echo "No Angular frontend found at ${UI_DIR}/package.json — skipping npm install."
+fi
+
+# ---- Data Engine: create Python virtual environment and install dependencies ----
+DATA_ENGINE_DIR="${WORKSPACE_DIR}/data-engine"
+DATA_ENGINE_VENV="${DATA_ENGINE_DIR}/.venv"
+if [ -f "${DATA_ENGINE_DIR}/pyproject.toml" ]; then
+  echo "--- Setting up Python virtual environment for data-engine ---"
+
+  # Create the venv only if it does not already exist (idempotent)
+  if [ -d "${DATA_ENGINE_VENV}" ]; then
+    echo "Virtual environment already exists at ${DATA_ENGINE_VENV} — skipping creation."
+  else
+    echo "Creating virtual environment at ${DATA_ENGINE_VENV}..."
+    python3 -m venv "${DATA_ENGINE_VENV}" 2>&1 || echo "venv creation failed (will retry manually)"
+  fi
+
+  # Upgrade pip and install the package in editable mode with dev dependencies
+  if [ -x "${DATA_ENGINE_VENV}/bin/pip" ]; then
+    echo "Upgrading pip inside the virtual environment..."
+    "${DATA_ENGINE_VENV}/bin/pip" install --upgrade pip 2>&1 || echo "pip upgrade failed (non-fatal)"
+
+    echo "Installing data-engine package in editable mode with dev dependencies..."
+    cd "${DATA_ENGINE_DIR}"
+    "${DATA_ENGINE_VENV}/bin/pip" install -e ".[dev]" 2>&1 || echo "data-engine pip install failed (will retry manually)"
+    cd "${WORKSPACE_DIR}"
+    echo "Data-engine dependencies installed."
+  else
+    echo "pip not found in ${DATA_ENGINE_VENV} — virtual environment may be broken."
+  fi
+
+  # Add the venv bin directory to PATH in .bashrc (idempotent)
+  VENV_PATH_ENTRY="export PATH=\"${DATA_ENGINE_VENV}/bin:\$PATH\""
+  if ! grep -qF "${DATA_ENGINE_VENV}/bin" "$BASH_RC" 2>/dev/null; then
+    echo "${VENV_PATH_ENTRY}" >> "$BASH_RC"
+    echo "Added data-engine venv to PATH in $BASH_RC"
+  else
+    echo "Data-engine venv PATH entry already present in $BASH_RC — skipping."
+  fi
+else
+  echo "No data-engine project found at ${DATA_ENGINE_DIR}/pyproject.toml — skipping Python venv setup."
 fi
 
 echo "===== setup-env.sh DEBUG LOG END ====="

@@ -97,10 +97,11 @@ User → Angular SPA → (Bearer token) → ASP.NET Core API → PostgreSQL
 # Start full stack
 docker compose -f deploy/compose.yaml up --build
 
-# API:        http://localhost:8000
-# UI:         http://localhost:4200
-# RabbitMQ:   http://localhost:15672 (guest/guest)
-# Postgres:   localhost:5432 (demo/demo/demo)
+# API:         http://localhost:8000
+# UI:          http://localhost:4200
+# Data Engine: http://localhost:5000
+# RabbitMQ:    http://localhost:15672 (guest/guest)
+# Postgres:    localhost:5432 (ea-db/postgres/password)
 ```
 
 ### Running Tests

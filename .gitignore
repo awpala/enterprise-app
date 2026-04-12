@@ -6,3 +6,12 @@ dist
 coverage
 .vscode
 pgpassfile
+**/obj
+**/bin
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+.venv
+**/*.egg-info
+**/*.angular

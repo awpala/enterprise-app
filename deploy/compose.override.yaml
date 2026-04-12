@@ -1,0 +1,22 @@
+name: enterprise-app
+
+services:
+  ea-api:
+    volumes:
+      - ../api/src:/src
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+
+  ea-ui:
+    image: node:22-alpine
+    build: !reset null
+    working_dir: /app
+    command: npx ng serve --host 0.0.0.0 --port 4200 --proxy-config proxy.conf.json
+    volumes:
+      - ../ui:/app
+      - ui-node-modules:/app/node_modules
+    ports:
+      - "4200:4200"
+
+volumes:
+  ui-node-modules:

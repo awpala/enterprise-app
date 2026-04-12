@@ -21,7 +21,7 @@ You are the data engine specialist. You own all code in the `data-engine/` direc
 
 ## Technology & Patterns
 
-- **Python 3.12+**. Use type annotations throughout (`from __future__ import annotations` where needed).
+- **Python 3.12+**. Use type annotations throughout (do NOT use `from __future__ import annotations`, resolve package issues if they arise).
 - **aio-pika** (or **Pika**) for RabbitMQ connectivity; prefer async (`asyncio`) consumers.
 - **Pydantic v2** for message schema validation and settings management (`BaseSettings`).
 - **NumPy / SciPy / Pandas** for numerical computations (add only what the specific worker needs).

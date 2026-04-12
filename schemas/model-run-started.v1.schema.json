@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enterprise-app.local/schemas/model-run-started.v1.schema.json",
+  "title": "ModelRunStarted",
+  "description": "Published when the data engine begins processing a model run",
+  "type": "object",
+  "required": [
+    "messageId",
+    "correlationId",
+    "occurredAtUtc",
+    "modelRunId",
+    "modelId"
+  ],
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "occurredAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "modelRunId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "modelId": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "additionalProperties": false
+}

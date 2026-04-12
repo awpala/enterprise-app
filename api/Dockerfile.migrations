@@ -1,0 +1,16 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY src/EA.Api/EA.Api.csproj src/EA.Api/
+COPY src/EA.Domain/EA.Domain.csproj src/EA.Domain/
+COPY src/EA.Infrastructure/EA.Infrastructure.csproj src/EA.Infrastructure/
+COPY src/EA.Contracts/EA.Contracts.csproj src/EA.Contracts/
+RUN dotnet restore src/EA.Infrastructure/EA.Infrastructure.csproj
+COPY src/ src/
+RUN dotnet tool install --global dotnet-ef
+ENV PATH="$PATH:/root/.dotnet/tools"
+RUN dotnet ef migrations bundle -p src/EA.Infrastructure/EA.Infrastructure.csproj -s src/EA.Api/EA.Api.csproj -o /app/efbundle --self-contained
+
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/efbundle .
+ENTRYPOINT ["./efbundle"]
