@@ -49,6 +49,7 @@
         "hashicorp.terraform",
         "anthropic.claude-code",
         "docker.docker",
+        "tamasfe.even-better-toml",
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash",

@@ -8,7 +8,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      ConnectionStrings__DefaultConnection: "Host=ea-db;Port=5432;Database=demo;Username=demo;Password=demo"
+      ConnectionStrings__DefaultConnection: "Host=ea-db;Port=5432;Database=postgres;Username=postgres;Password=password"
       RabbitMQ__Host: ea-rabbitmq
       RabbitMQ__Username: guest
       RabbitMQ__Password: guest
@@ -53,13 +53,13 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: demo
-      POSTGRES_USER: demo
-      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
     volumes:
       - ea-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U demo -d demo"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
       timeout: 3s
       retries: 10
