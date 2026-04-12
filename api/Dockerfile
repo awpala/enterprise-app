@@ -16,5 +16,5 @@ COPY --from=build /app .
 # Path.Combine(AppContext.BaseDirectory, "seed") in SeedHostedService.DefaultSeedPath.
 COPY --chown=$APP_UID:$APP_UID seed/ /app/seed/
 USER $APP_UID
-EXPOSE 8080
+EXPOSE 8000
 ENTRYPOINT ["dotnet", "EA.Api.dll"]

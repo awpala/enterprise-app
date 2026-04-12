@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+
+subscription_id = "TODO_SUBSCRIPTION_ID" # `az account show --query id -o tsv`
+
+# 4-6 lowercase alphanumeric chars. Makes the tfstate storage account name
+# globally unique (final name: eatfstate<suffix>).
+name_suffix = "a1b2c3"
+
+# Optional overrides (defaults are sensible).
+# location                   = "eastus"
+# github_owner               = "awpala"
+# github_repo                = "enterprise-app"
+# github_environments        = ["dev", "production"]
+# tfstate_resource_group_name = "ea-tfstate-rg"
+# tfstate_container_name     = "tfstate"
+# oidc_app_display_name      = "ea-github-oidc"

@@ -58,7 +58,7 @@ variable "rabbitmq_username" {
 variable "api_target_port" {
   description = "Port the API container listens on (as defined by the Dockerfile EXPOSE / Kestrel default)."
   type        = number
-  default     = 8080
+  default     = 8000
 }
 
 variable "tags" {

@@ -46,7 +46,7 @@ variable "migrations_image" {
 variable "api_target_port" {
   description = "Port the API container listens on."
   type        = number
-  default     = 8080
+  default     = 8000
 }
 
 variable "postgres_connection_string" {

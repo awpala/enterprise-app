@@ -19,3 +19,9 @@ pgpassfile
 
 # Generated at build time from API_URL (see ui/scripts/generate-environment.mjs)
 ui/src/app/environments/environment.ts
+
+# Terraform bootstrap (local state + per-user config, never committed)
+infra/bootstrap/.terraform/
+infra/bootstrap/terraform.tfstate*
+infra/bootstrap/terraform.tfvars
+infra/bootstrap/*.tfplan

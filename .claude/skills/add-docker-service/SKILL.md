@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 - **Service name** (e.g., `api`, `worker`, `ui`)
 - **Technology** (e.g., `.NET 10`, `Angular 20`, `Python 3.12`)
-- **Exposed ports** (e.g., `8080`)
+- **Exposed ports** (e.g., `8000`)
 - **Dependencies** (e.g., `postgres`, `rabbitmq`)
 
 ## What It Produces

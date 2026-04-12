@@ -1,6 +1,11 @@
 # Infrastructure — Azure via Terraform (MVP)
 
-This folder contains the Terraform configuration for deploying the Enterprise App to Azure. It is **developer-driven** for now: you run `terraform apply` from the devcontainer CLI. No CI/CD, no Entra ID / MSAL auth (anonymous access), no custom domains.
+This folder contains the Terraform configuration for deploying the Enterprise App to Azure. Two operating modes are supported:
+
+1. **Local CLI** — run `terraform apply` from the devcontainer, targeting the `dev` environment. Used for bootstrapping and break-glass ops.
+2. **GitHub Actions CI/CD** — push to `main` deploys to `production`; pushes to any other branch deploy to `dev`. See [CI/CD via GitHub Actions](#cicd-via-github-actions) below.
+
+No custom domains, no MSAL auth yet (anonymous access).
 
 ## What gets deployed
 
@@ -31,11 +36,12 @@ Azure permits resources in a region different from their containing RG, so this 
 
 ## State
 
-State is **local** for MVP (`terraform.tfstate` in this folder — gitignored). To migrate to an Azure Blob backend later:
+State lives in an Azure Blob backend (`azurerm` with `use_oidc = true` + `use_azuread_auth = true`). The storage account is provisioned by the bootstrap module (`infra/bootstrap/`) and the concrete backend coordinates are supplied at init time via `-backend-config=...` so the same root config works for both environments and both local + CI.
 
-1. Create an `azurerm` storage account + container manually (or via a separate bootstrap config).
-2. Uncomment the `backend "azurerm" {}` block in `versions.tf` and fill in the names.
-3. Run `terraform init -migrate-state`.
+- `dev` uses the `dev.tfstate` blob key.
+- `production` uses the `production.tfstate` blob key.
+
+See [CI/CD via GitHub Actions](#cicd-via-github-actions) for bootstrap and migration steps.
 
 ## Credentials — what you need to bring
 
@@ -106,13 +112,19 @@ cp terraform.tfvars.example terraform.tfvars
 #   - leave image_tag = "latest" for the first run
 ```
 
-Then initialise:
+Then initialise. The root now uses a **partial backend**, so `terraform init` needs backend coordinates. For a brand-new dev deploy (no bootstrap yet), you can still run locally with explicit flags once the bootstrap module has created the storage account (see [CI/CD via GitHub Actions](#cicd-via-github-actions)); or keep using a local backend short-term by commenting the `backend "azurerm"` block out. For the standard path:
 
 ```bash
-terraform init
+terraform init \
+  -backend-config=resource_group_name=<tfstate_rg> \
+  -backend-config=storage_account_name=<tfstate_account> \
+  -backend-config=container_name=tfstate \
+  -backend-config=key=dev.tfstate
 terraform validate
 terraform fmt -recursive
 ```
+
+(The bootstrap outputs `backend_config_dev` and `backend_config_production` pre-composed for you — `terraform output -raw backend_config_dev`.)
 
 ### 4. Phase 1 — `-target` apply for ACR + RG
 
@@ -271,6 +283,76 @@ terraform destroy
 
 (Key Vault and Postgres soft-delete may linger a few days — if you recreate with the same `name_suffix` quickly, you may hit name-reservation conflicts. Pick a new suffix if so.)
 
+## CI/CD via GitHub Actions
+
+GitHub Actions handles everything the local runbook above covers, per environment, on every push.
+
+**Branch → environment mapping:**
+
+| Trigger | GitHub Environment | tfstate key | `environment` var | `name_suffix` | Image tag |
+|---|---|---|---|---|---|
+| push to `main` | `production` | `production.tfstate` | `prod` | `eaprd1` | `sha-<sha7>` |
+| push to any other branch | `dev` | `dev.tfstate` | `dev` | `entapp` | `<branch-slug>-<sha7>` |
+
+> The GitHub Environment is `production` while the Terraform `environment` variable is `prod` (kept short so generated resource names stay under Azure length limits). The OIDC federated credential is pinned to the GitHub Environment name — that's what matters.
+
+Auth is **OIDC federated credentials** — no client secret, no password. The Entra ID app + SP are created by `infra/bootstrap/`.
+
+### One-time bootstrap
+
+See [`infra/bootstrap/README.md`](bootstrap/README.md) for the full walkthrough. Short version:
+
+```bash
+cd /workspace/infra/bootstrap
+cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars: set subscription_id and a unique 4-6 char name_suffix
+
+terraform init
+terraform apply
+
+# Populate repo secrets, variables, and Environments via gh CLI:
+terraform output -raw gh_setup_commands | bash
+```
+
+The bootstrap outputs contain tenant/subscription/client IDs (treated as secrets for this project). They live **only** in the local `bootstrap/terraform.tfstate` (gitignored). If you need a value in your shell, `terraform output -raw <name>`; if you want it persisted locally, add it to `/workspace/.env` (gitignored). **Never** commit these values to any file.
+
+### Migrate existing local `dev` state to the blob backend
+
+Existing `dev` was deployed from local CLI — its state lives at `/workspace/infra/terraform.tfstate`. Before CI's first run for `dev`, migrate that state to the blob backend; otherwise CI will try to create duplicate globally-unique resources (ACR, KV, SWA, Postgres) and name-conflict.
+
+```bash
+cd /workspace/infra
+
+# Get the pre-composed backend config snippet from bootstrap.
+BACKEND=$(cd bootstrap && terraform output -raw backend_config_dev)
+
+# Migrate. You'll be prompted to confirm copying existing state to the new backend.
+terraform init -migrate-state $BACKEND
+```
+
+After migration, `terraform plan -var-file=envs/dev.tfvars` should be a no-op (modulo any drift).
+
+### Trigger a deploy
+
+Just push. The `deploy` workflow:
+
+1. Logs into Azure via OIDC (`azure/login@v2`) using repo secrets `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID`.
+2. `terraform init` with `-backend-config` populated from repo variables `TFSTATE_RESOURCE_GROUP` / `TFSTATE_STORAGE_ACCOUNT` / `TFSTATE_CONTAINER` and the computed tfstate key.
+3. `terraform apply` phase 1 (RG + ACR), then `az acr build` for each of the three images, then `terraform apply` phase 2 (full).
+4. Starts the migrations Container Apps Job and polls until `Succeeded` (600s timeout).
+5. Builds the Angular UI with `API_URL` set from `terraform output -raw api_url`, then `swa deploy` using the token from `terraform output -raw swa_deployment_token` (never written to an artifact, always masked).
+6. Smoke-tests `/health/ready` with retries.
+
+Concurrency:
+
+- `dev`: `cancel-in-progress: true` — latest push wins, older runs are cancelled.
+- `production`: `cancel-in-progress: false` — runs serialise, no cancellation.
+
+### Tear-down notes
+
+- Tearing down an environment means `terraform destroy` with the right `-var-file` and backend config — easier to do locally than via CI.
+- Tearing down `infra/bootstrap/` kills CI entirely. Only do it if you're retiring the project. After destroy, clean up repo secrets (`gh secret delete`), variables (`gh variable delete`), and Environments (Settings UI).
+
 ## Troubleshooting
 
 - **`terraform apply` fails creating a Container App with "image not found"** — you skipped phase 1 / phase 5. Build the images first.
@@ -279,3 +361,6 @@ terraform destroy
 - **Postgres create fails with `LocationIsOfferRestricted`** — your subscription doesn't have Postgres Flexible Server offered in the target region. The module already pins `eastus2`; don't override unless you've confirmed your sub has quota there.
 - **Static Web App create fails with "region not supported"** — SWA Free is GA only in a handful of regions; the module pins `eastus2`. Don't override unless you know it's supported.
 - **Migrations job `Failed`** — check Log Analytics for the `ContainerAppConsoleLogs_CL` table, filter by `ContainerAppName_s == "<migrations-job-name>"`.
+- **CI fails on `terraform init` with AAD auth error** — the OIDC SP is missing `Storage Blob Data Contributor` on the tfstate account. Re-run `infra/bootstrap/` apply.
+- **CI fails on `terraform apply` with "AuthorizationFailed" creating role assignments** — the OIDC SP is missing `User Access Administrator` at subscription scope. Re-run bootstrap apply.
+- **CI picks the wrong federated credential / OIDC fails in Actions** — confirm the `environment:` on the deploy job matches a federated-credential subject in the Entra ID app (`repo:<owner>/<repo>:environment:<name>`).
