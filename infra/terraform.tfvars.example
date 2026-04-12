@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+
+subscription_id = "TODO_SUBSCRIPTION_ID" # `az account show --query id -o tsv`
+
+project     = "ea"
+environment = "dev"
+location    = "eastus"
+
+# 4-6 lowercase alphanumeric chars. Makes ACR / Key Vault / SWA names globally unique.
+name_suffix = "a1b2c3"
+
+# Override per-deploy, e.g. -var image_tag=sha-abc1234
+image_tag = "latest"

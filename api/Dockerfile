@@ -12,6 +12,9 @@ RUN dotnet publish src/EA.Api/EA.Api.csproj -c Release -o /app
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
+# Seed data bundled for SeedHostedService (Seeding:Enabled=true); resolved via
+# Path.Combine(AppContext.BaseDirectory, "seed") in SeedHostedService.DefaultSeedPath.
+COPY --chown=$APP_UID:$APP_UID seed/ /app/seed/
 USER $APP_UID
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "EA.Api.dll"]

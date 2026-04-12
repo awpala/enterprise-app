@@ -15,3 +15,7 @@ pgpassfile
 .venv
 **/*.egg-info
 **/*.angular
+.claude/*.lock
+
+# Generated at build time from API_URL (see ui/scripts/generate-environment.mjs)
+ui/src/app/environments/environment.ts

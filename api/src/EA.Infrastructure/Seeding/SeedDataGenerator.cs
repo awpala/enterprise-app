@@ -65,7 +65,7 @@ public static class SeedDataGenerator
     /// under <paramref name="outputDirectory"/>. The directory is created if
     /// missing; existing model JSON files are overwritten.
     /// </summary>
-    /// <param name="outputDirectory">Root seed directory (e.g. <c>/workspace/seed</c>).</param>
+    /// <param name="outputDirectory">Root seed directory (e.g. <c>/workspace/api/seed</c>).</param>
     public static void Generate(string outputDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);

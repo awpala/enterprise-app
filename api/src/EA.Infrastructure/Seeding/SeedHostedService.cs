@@ -16,8 +16,14 @@ public sealed class SeedHostedService(
     IConfiguration configuration,
     ILogger<SeedHostedService> logger) : IHostedService
 {
-    /// <summary>Default seed root path when <c>Seeding:SeedPath</c> is not configured.</summary>
-    public const string DefaultSeedPath = "/workspace/seed";
+    /// <summary>
+    /// Default seed root path when <c>Seeding:SeedPath</c> is not configured.
+    /// Resolves to <c>{AppContext.BaseDirectory}/seed</c> so it works both in
+    /// the devcontainer (where the publish output sits under the repo) and in
+    /// the deployed container image (where <c>seed/</c> is copied to
+    /// <c>/app/seed</c> alongside the published assemblies).
+    /// </summary>
+    public static readonly string DefaultSeedPath = Path.Combine(AppContext.BaseDirectory, "seed");
 
     /// <inheritdoc />
     public async Task StartAsync(CancellationToken cancellationToken)

@@ -1,0 +1,15 @@
+/**
+ * Placeholder for environment.ts.
+ *
+ * The real environment.ts is auto-generated at install/build time by
+ * ui/scripts/generate-environment.mjs and is gitignored. This example exists
+ * so the Angular fileReplacements target in angular.json is visible in the
+ * repo and new contributors know where the value comes from.
+ *
+ * To regenerate manually:
+ *   API_URL="https://<api-fqdn>" node ui/scripts/generate-environment.mjs
+ */
+export const environment = {
+  production: true,
+  apiUrl: '',
+};

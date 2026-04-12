@@ -11,8 +11,9 @@ using Scalar.AspNetCore;
 
 // ---------------------------------------------------------------------------
 // CLI short-circuit: `--seed-generate` regenerates the on-disk seed JSON
-// under /workspace/seed (or the path passed after the flag) and exits
-// without building the web host.
+// under SeedHostedService.DefaultSeedPath (or the path passed after the flag)
+// and exits without building the web host. Typical dev invocation writes to
+// /workspace/api/seed so the files land in the repo for commit.
 // ---------------------------------------------------------------------------
 if (args.Contains("--seed-generate"))
 {
