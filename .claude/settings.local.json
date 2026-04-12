@@ -78,7 +78,10 @@
       "Bash(gh variable:*)",
       "Bash(gh api:*)",
       "Bash(chmod +x .github/scripts/*.sh)",
-      "Bash(git update-index:*)"
+      "Bash(git update-index:*)",
+      "Bash(gh run:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(az group:*)"
     ]
   }
 }
