@@ -1,0 +1,16 @@
+{
+  "id": "617bf920-ee83-4e59-97a3-e2528243e56c",
+  "name": "Inventory Optimization #13",
+  "description": "Attributes revenue across multi-touch campaign journeys.",
+  "status": "draft",
+  "version": 1,
+  "parameters": {
+    "distribution": "uniform",
+    "mean": 14.188,
+    "stddev": 4.47,
+    "iterations": 79437
+  },
+  "createdAtUtc": "2025-01-13T00:00:00Z",
+  "updatedAtUtc": "2025-01-28T23:00:00Z",
+  "createdBy": "alice@example.com"
+}

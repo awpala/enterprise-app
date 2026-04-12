@@ -1,0 +1,16 @@
+{
+  "id": "0bb3cd70-e27a-409b-2696-1c1aaa68376c",
+  "name": "Revenue Forecast Model #01",
+  "description": "Quarterly projection using Monte Carlo sampling.",
+  "status": "draft",
+  "version": 1,
+  "parameters": {
+    "distribution": "normal",
+    "mean": 52.276,
+    "stddev": 1.784,
+    "iterations": 26996
+  },
+  "createdAtUtc": "2025-01-01T00:00:00Z",
+  "updatedAtUtc": "2025-01-22T17:00:00Z",
+  "createdBy": "alice@example.com"
+}

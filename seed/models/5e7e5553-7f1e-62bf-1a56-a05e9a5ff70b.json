@@ -1,0 +1,16 @@
+{
+  "id": "5e7e5553-7f1e-62bf-1a56-a05e9a5ff70b",
+  "name": "Inventory Optimization #03",
+  "description": "Optimizes warehouse stock levels against demand variance.",
+  "status": "active",
+  "version": 2,
+  "parameters": {
+    "distribution": "lognormal",
+    "mean": 3.532,
+    "stddev": 8.241,
+    "iterations": 58143
+  },
+  "createdAtUtc": "2025-01-03T00:00:00Z",
+  "updatedAtUtc": "2025-01-14T22:00:00Z",
+  "createdBy": "carol@example.com"
+}

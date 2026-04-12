@@ -1,0 +1,16 @@
+{
+  "id": "3e9ae608-4d76-e189-c67a-b9b167adedec",
+  "name": "Demand Planning Model #06",
+  "description": null,
+  "status": "active",
+  "version": 5,
+  "parameters": {
+    "distribution": "normal",
+    "mean": 53.572,
+    "stddev": 8.152,
+    "iterations": 75088
+  },
+  "createdAtUtc": "2025-01-06T00:00:00Z",
+  "updatedAtUtc": "2025-01-17T12:00:00Z",
+  "createdBy": "bob@example.com"
+}

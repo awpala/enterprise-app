@@ -127,9 +127,11 @@ dotnet ef migrations add <MigrationName> -s ../EA.Api
 # Apply locally
 dotnet ef database update -s ../EA.Api
 
-# Generate idempotent SQL script (for CI/CD)
-dotnet ef migrations script --idempotent -s ../EA.Api -o ../../migrations.sql
+# Generate idempotent SQL script (for CI/CD, committed as a PR review artifact)
+dotnet ef migrations script --idempotent -s ../EA.Api -o Migrations/Scripts/{timestamp}_{Name}.sql
 ```
+
+The generated `.sql` pairs with the C# migration of the same stem (e.g. `20260412143913_InitialCreate.sql` next to `20260412143913_InitialCreate.cs`).
 
 ## Coding Standards & Conventions
 

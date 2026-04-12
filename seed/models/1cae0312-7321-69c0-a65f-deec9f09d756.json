@@ -1,0 +1,16 @@
+{
+  "id": "1cae0312-7321-69c0-a65f-deec9f09d756",
+  "name": "Price Elasticity Model #09",
+  "description": "Quarterly projection using Monte Carlo sampling.",
+  "status": "active",
+  "version": 3,
+  "parameters": {
+    "distribution": "lognormal",
+    "mean": 62.846,
+    "stddev": 2.284,
+    "iterations": 2312
+  },
+  "createdAtUtc": "2025-01-09T00:00:00Z",
+  "updatedAtUtc": "2025-01-19T22:00:00Z",
+  "createdBy": "alice@example.com"
+}

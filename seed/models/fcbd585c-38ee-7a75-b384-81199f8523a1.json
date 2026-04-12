@@ -1,0 +1,16 @@
+{
+  "id": "fcbd585c-38ee-7a75-b384-81199f8523a1",
+  "name": "Customer Churn Predictor #02",
+  "description": "Scores customer likelihood of churn over a 90-day window.",
+  "status": "active",
+  "version": 1,
+  "parameters": {
+    "distribution": "triangular",
+    "mean": 23.459,
+    "stddev": 2.673,
+    "iterations": 51055
+  },
+  "createdAtUtc": "2025-01-02T00:00:00Z",
+  "updatedAtUtc": "2025-01-11T14:00:00Z",
+  "createdBy": "bob@example.com"
+}

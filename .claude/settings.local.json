@@ -22,7 +22,13 @@
       "Bash(.venv/bin/python -m ruff check --select ALL src/data_engine/consumers/model_run_consumer.py)",
       "Bash(.venv/bin/pyright src/data_engine/consumers/model_run_consumer.py)",
       "Bash(.venv/bin/pyright src/data_engine/consumers/model_run_consumer.py src/data_engine/producers/model_run_producer.py)",
-      "Bash(ls /workspace/api/*.sh /workspace/api/Makefile /workspace/ui/Makefile)"
+      "Bash(ls /workspace/api/*.sh /workspace/api/Makefile /workspace/ui/Makefile)",
+      "Bash(dotnet new:*)",
+      "Bash(dotnet tool:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(ConnectionStrings__DefaultConnection=\"Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=password\" dotnet ef migrations add InitialCreate -s ../EA.Api)",
+      "Bash(ConnectionStrings__DefaultConnection=\"Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=password\" dotnet ef migrations script --idempotent -s ../EA.Api -o /workspace/api/migrations-initial.sql)",
+      "Bash(dotnet run:*)"
     ]
   }
 }

@@ -1,0 +1,16 @@
+{
+  "id": "25295baf-d6bd-3d4c-59ce-9c4204821482",
+  "name": "Supply Chain Simulator #18",
+  "description": "Scores customer likelihood of churn over a 90-day window.",
+  "status": "active",
+  "version": 2,
+  "parameters": {
+    "distribution": "triangular",
+    "mean": 2.714,
+    "stddev": 2.297,
+    "iterations": 27279
+  },
+  "createdAtUtc": "2025-01-18T00:00:00Z",
+  "updatedAtUtc": "2025-01-19T03:00:00Z",
+  "createdBy": "bob@example.com"
+}

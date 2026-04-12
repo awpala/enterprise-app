@@ -1,0 +1,16 @@
+{
+  "id": "0afe4fa5-8d61-ada3-1ce8-6eb499110160",
+  "name": "Sentiment Classifier #20",
+  "description": "Estimates portfolio exposure under stressed market scenarios.",
+  "status": "active",
+  "version": 2,
+  "parameters": {
+    "distribution": "triangular",
+    "mean": 82.583,
+    "stddev": 0.19,
+    "iterations": 5166
+  },
+  "createdAtUtc": "2025-01-20T00:00:00Z",
+  "updatedAtUtc": "2025-02-14T05:00:00Z",
+  "createdBy": "seed-user"
+}

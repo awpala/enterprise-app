@@ -1,0 +1,16 @@
+{
+  "id": "ecbcd2fb-6c1c-cef6-2b65-8a206d84872a",
+  "name": "Risk Exposure Model #14",
+  "description": null,
+  "status": "active",
+  "version": 2,
+  "parameters": {
+    "distribution": "triangular",
+    "mean": 58.674,
+    "stddev": 7.451,
+    "iterations": 2921
+  },
+  "createdAtUtc": "2025-01-14T00:00:00Z",
+  "updatedAtUtc": "2025-02-09T10:00:00Z",
+  "createdBy": "bob@example.com"
+}

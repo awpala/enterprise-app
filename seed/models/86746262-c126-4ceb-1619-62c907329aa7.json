@@ -1,0 +1,16 @@
+{
+  "id": "86746262-c126-4ceb-1619-62c907329aa7",
+  "name": "Marketing Attribution #05",
+  "description": "Attributes revenue across multi-touch campaign journeys.",
+  "status": "active",
+  "version": 5,
+  "parameters": {
+    "distribution": "lognormal",
+    "mean": 51.641,
+    "stddev": 1.964,
+    "iterations": 5109
+  },
+  "createdAtUtc": "2025-01-05T00:00:00Z",
+  "updatedAtUtc": "2025-01-14T05:00:00Z",
+  "createdBy": "alice@example.com"
+}

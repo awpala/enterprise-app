@@ -1,0 +1,16 @@
+{
+  "id": "87f75bb4-5f15-0cd6-b77d-f1d6b28c9b46",
+  "name": "Risk Exposure Model #04",
+  "description": "Estimates portfolio exposure under stressed market scenarios.",
+  "status": "active",
+  "version": 1,
+  "parameters": {
+    "distribution": "lognormal",
+    "mean": 81.618,
+    "stddev": 5.5,
+    "iterations": 5370
+  },
+  "createdAtUtc": "2025-01-04T00:00:00Z",
+  "updatedAtUtc": "2025-01-25T08:00:00Z",
+  "createdBy": "seed-user"
+}

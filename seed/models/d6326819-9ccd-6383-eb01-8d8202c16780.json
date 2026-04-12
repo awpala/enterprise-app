@@ -1,0 +1,16 @@
+{
+  "id": "d6326819-9ccd-6383-eb01-8d8202c16780",
+  "name": "Sentiment Classifier #10",
+  "description": "Scores customer likelihood of churn over a 90-day window.",
+  "status": "active",
+  "version": 1,
+  "parameters": {
+    "distribution": "lognormal",
+    "mean": 7.094,
+    "stddev": 4.741,
+    "iterations": 2191
+  },
+  "createdAtUtc": "2025-01-10T00:00:00Z",
+  "updatedAtUtc": "2025-02-02T22:00:00Z",
+  "createdBy": "bob@example.com"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "d2dab53b-cf1c-5d30-e8ee-6424adbe4fb6",
+  "name": "Supply Chain Simulator #08",
+  "description": null,
+  "status": "draft",
+  "version": 2,
+  "parameters": {
+    "distribution": "lognormal",
+    "mean": 14.365,
+    "stddev": 0.545,
+    "iterations": 60851
+  },
+  "createdAtUtc": "2025-01-08T00:00:00Z",
+  "updatedAtUtc": "2025-01-23T11:00:00Z",
+  "createdBy": "seed-user"
+}

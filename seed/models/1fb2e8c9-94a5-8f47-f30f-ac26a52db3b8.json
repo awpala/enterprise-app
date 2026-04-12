@@ -1,0 +1,16 @@
+{
+  "id": "1fb2e8c9-94a5-8f47-f30f-ac26a52db3b8",
+  "name": "Customer Churn Predictor #12",
+  "description": "Estimates portfolio exposure under stressed market scenarios.",
+  "status": "active",
+  "version": 4,
+  "parameters": {
+    "distribution": "normal",
+    "mean": 91.351,
+    "stddev": 9.39,
+    "iterations": 46658
+  },
+  "createdAtUtc": "2025-01-12T00:00:00Z",
+  "updatedAtUtc": "2025-01-23T06:00:00Z",
+  "createdBy": "seed-user"
+}

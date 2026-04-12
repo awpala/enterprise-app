@@ -1,0 +1,16 @@
+{
+  "id": "27ce05b4-0e38-d0ec-3646-db87c8f16614",
+  "name": "Marketing Attribution #15",
+  "description": "Baseline model pending review.",
+  "status": "archived",
+  "version": 2,
+  "parameters": {
+    "distribution": "lognormal",
+    "mean": 16.236,
+    "stddev": 1.131,
+    "iterations": 45763
+  },
+  "createdAtUtc": "2025-01-15T00:00:00Z",
+  "updatedAtUtc": "2025-01-24T23:00:00Z",
+  "createdBy": "carol@example.com"
+}
