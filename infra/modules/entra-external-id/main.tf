@@ -70,6 +70,12 @@ resource "azuread_application" "spa" {
   display_name     = "ea-spa-${var.environment}"
   sign_in_audience = "AzureADMyOrg"
 
+  # External ID tenants reject v1 tokens — every app reg must declare v2,
+  # including public-client SPAs that don't expose their own scopes.
+  api {
+    requested_access_token_version = 2
+  }
+
   single_page_application {
     redirect_uris = [
       "${var.swa_url}/auth/redirect",

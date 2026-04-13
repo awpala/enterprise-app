@@ -92,9 +92,11 @@ Run this twice - once in each External ID tenant.
    - Leave redirect URI blank.
 4. Click **Register**.
 5. From the new app's blade, open **API permissions -> Add a permission -> Microsoft Graph -> Application permissions** and add each of the following:
-   - `Application.ReadWrite.OwnedBy`
+   - `Application.ReadWrite.All`
    - `IdentityProvider.ReadWrite.All`
    - `Policy.ReadWrite.AuthenticationFlows`
+
+   **Why `Application.ReadWrite.All` and not `.OwnedBy`**: `Application.ReadWrite.OwnedBy` reads as sufficient in the Microsoft Graph permission docs (it creates app registrations the SP owns), but in practice it cannot patch `identifierUris` on an app post-create and cannot create a service principal for a just-created app registration even when the app is single-tenant - both operations return `403 Authorization_RequestDenied`. This is a known Graph quirk, not a bug in the module. `Application.ReadWrite.All` (application permission, tenant-wide) is the CIAM-safe choice and the one the module expects.
 6. Click **Grant admin consent for \<tenant\>** and confirm. All three permissions should show a green check.
 7. Open **Certificates & secrets -> Client secrets -> New client secret**.
    - **Description**: `terraform-ci`
@@ -103,6 +105,17 @@ Run this twice - once in each External ID tenant.
 8. Open **Overview** and record:
    - **Application (client) ID** -> `EXTERNAL_TENANT_CLIENT_ID`
    - Client secret value -> `EXTERNAL_TENANT_CLIENT_SECRET`
+
+> **True-up for operators who already ran Part B**
+>
+> If you previously followed this runbook when it prescribed `Application.ReadWrite.OwnedBy`, the `ea-terraform-deployer` SP needs a one-time permission upgrade. Terraform apply will fail on `azuread_application_identifier_uri` and `azuread_service_principal` under the old permission - see the new rows in [Section 10](#10-troubleshooting). To true up:
+>
+> 1. Switch to the External ID tenant in the Azure Portal and open **Entra ID -> App registrations -> `ea-terraform-deployer` -> API permissions**.
+> 2. Remove the existing `Application.ReadWrite.OwnedBy` row.
+> 3. Click **+ Add a permission -> Microsoft Graph -> Application permissions** and add `Application.ReadWrite.All`.
+> 4. Click **Grant admin consent for \<tenant\>** and confirm all three rows (`Application.ReadWrite.All`, `IdentityProvider.ReadWrite.All`, `Policy.ReadWrite.AuthenticationFlows`) show green checkmarks under **Status**.
+>
+> No other Part B artifacts need to change - the client secret, any federated credential, and the captured tenant ID / client ID stay as-is. Run this true-up once per External ID tenant (dev and production).
 
 ---
 
@@ -272,7 +285,7 @@ Note: the user flow, Google IDP, Email one-time passcode method, Microsoft Accou
 
 **If the plan is clean**: commit and push the branch. CI picks up the GitHub Environment secrets (wired through `deploy.yml` into the same `TF_VAR_*` names) and runs the identical apply.
 
-**If the plan is NOT clean**: stop. Capture the full plan output, investigate before pushing. Likely causes include stale remote state, a missing or mistyped `TF_VAR_*` export, an un-populated `infra/envs/<env>.tfvars` (placeholder strings still in place - see the prerequisites above), or provider drift against the External ID tenant. Do **not** push the branch until the plan is clean - CI will auto-apply whatever it sees.
+**If the plan is NOT clean**: stop. Capture the full plan output, investigate before pushing. Likely causes include stale remote state, a missing or mistyped `TF_VAR_*` export, an un-populated `infra/envs/<env>.tfvars` (placeholder strings still in place - see the prerequisites above), provider drift against the External ID tenant, a `400 InvalidAccessTokenVersion` on an `azuread_application.*` resource (missing `api { requested_access_token_version = 2 }` - see [Section 10](#10-troubleshooting)), or a `403 Authorization_RequestDenied` on `azuread_application_identifier_uri` / `azuread_service_principal` (deployer SP still on `Application.ReadWrite.OwnedBy` instead of `.All` - see the Part B true-up callout and the matching rows in [Section 10](#10-troubleshooting)). Do **not** push the branch until the plan is clean - CI will auto-apply whatever it sees.
 
 > **First-apply reminder**: On the very first `terraform apply` against a new tenant, the app registrations land but the tenant still has no user flow and no identity providers configured. [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) (portal-configure user flow + IDPs) must run immediately after this apply succeeds and before Step 3's end-to-end sign-in smoke test. On subsequent applies Part G is already in place and nothing more is required.
 
@@ -390,6 +403,9 @@ Repeat Steps 1-4 for the `production` tenant after its first `terraform apply`.
 | `idp` claim absent on an ID token | User signed in via email OTP (local account) - this is expected | Backend defaults `ICurrentUser.Idp` to `"email"` for absent claims - see the [SSO plan](../../) phase 2A notes. |
 | `azuread.external` provider fails with `cannot unmarshal response: invalid character '<' looking for beginning of value` | `infra/envs/<env>.tfvars` still has `<PLACEHOLDER: ...>` for `external_tenant_id` (and/or `tenant_subdomain`). `-var-file` beats `TF_VAR_*`, so Terraform is trying to authenticate against the literal placeholder string instead of the real GUID. | Paste the real values per the final step of [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env), commit the tfvars change, then re-run `bash docs/runbooks/plan-infra.sh <env>`. |
 | `terraform plan` aborts during refresh with `ForbiddenByRbac` reading a Key Vault secret | Your `az login` identity does not currently hold the `deployer_officer` role, so data-source refresh cannot read Key Vault Secrets. | Use [`docs/runbooks/plan-infra.sh`](./plan-infra.sh) (which passes `-refresh=false`) for a local preview - refresh-free plans are advisory and sufficient for the safety check. Full-refresh plans are performed by CI under the platform SP. **Do not** attempt to grant yourself `deployer_officer` manually just to run a preview. |
+| `400 InvalidAccessTokenVersion: Unable to create application. Access Token Accepted Version may not be 1 or null` on `azuread_application.*` | The app registration is missing `api { requested_access_token_version = 2 }`. External ID tenants reject v1 tokens, so every app reg - including public-client SPAs that do not themselves issue access tokens - must declare v2 up front, or the create call is rejected. | Verify the module's SPA app reg has the `api {}` block with `requested_access_token_version = 2`. This is resolved in the infra module as of the [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) pivot; if you are still seeing it, pull the latest module and re-plan. |
+| `403 Authorization_RequestDenied: Insufficient privileges to complete the operation` on `azuread_application_identifier_uri` | The `ea-terraform-deployer` SP has `Application.ReadWrite.OwnedBy` rather than `Application.ReadWrite.All`. `.OwnedBy` can create an app registration but cannot patch `identifierUris` on it post-create - a known Graph quirk. | Upgrade the permission per the true-up callout at the end of [Part B](#4-part-b---create-the-terraform-service-principal-inside-the-external-id-tenant), then re-run the apply. |
+| `403 Authorization_RequestDenied: When using this permission, the backing application of the service principal being created must in the local tenant` on `azuread_service_principal` | Same `.OwnedBy` vs `.All` gap - creating a service principal for a just-created app registration is gated behind `Application.ReadWrite.All` even when the app is single-tenant. | Upgrade the permission per the true-up callout at the end of [Part B](#4-part-b---create-the-terraform-service-principal-inside-the-external-id-tenant), then re-run the apply. |
 
 ---
 
