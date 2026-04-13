@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using EA.Contracts.Messages;
 using EA.Domain.Entities;
@@ -17,6 +18,8 @@ public class ModelFacade(
     IPublishEndpoint publishEndpoint,
     ILogger<ModelFacade> logger) : IModelFacade
 {
+    private static readonly ActivitySource ActivitySource = new("EA.Api.Facade");
+
     /// <inheritdoc />
     public async Task<(IReadOnlyList<Model> Items, int TotalCount)> GetModelsAsync(
         int page,
@@ -24,6 +27,8 @@ public class ModelFacade(
         ModelStatus? status,
         CancellationToken cancellationToken = default)
     {
+        using var activity = ActivitySource.StartActivity(nameof(GetModelsAsync));
+
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(pageSize, 100);
@@ -37,6 +42,8 @@ public class ModelFacade(
     /// <inheritdoc />
     public async Task<Model?> GetModelByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
+        using var activity = ActivitySource.StartActivity(nameof(GetModelByIdAsync));
+
         ArgumentOutOfRangeException.ThrowIfEqual(id, Guid.Empty);
 
         logger.LogInformation("Retrieving model {ModelId}", id);
@@ -53,6 +60,8 @@ public class ModelFacade(
         string? createdByName,
         CancellationToken cancellationToken = default)
     {
+        using var activity = ActivitySource.StartActivity(nameof(CreateModelAsync));
+
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         // createdBy may be Guid.Empty from HTTP call sites — the audit-stamping
@@ -90,6 +99,8 @@ public class ModelFacade(
         JsonDocument? parameters,
         CancellationToken cancellationToken = default)
     {
+        using var activity = ActivitySource.StartActivity(nameof(UpdateModelAsync));
+
         ArgumentOutOfRangeException.ThrowIfEqual(id, Guid.Empty);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
@@ -127,6 +138,8 @@ public class ModelFacade(
     /// <inheritdoc />
     public async Task<bool> ArchiveModelAsync(Guid id, CancellationToken cancellationToken = default)
     {
+        using var activity = ActivitySource.StartActivity(nameof(ArchiveModelAsync));
+
         ArgumentOutOfRangeException.ThrowIfEqual(id, Guid.Empty);
 
         var model = await repository.GetModelByIdAsync(id, cancellationToken);
@@ -156,6 +169,8 @@ public class ModelFacade(
     /// <inheritdoc />
     public async Task<ModelRun?> RequestModelRunAsync(Guid modelId, CancellationToken cancellationToken = default)
     {
+        using var activity = ActivitySource.StartActivity(nameof(RequestModelRunAsync));
+
         ArgumentOutOfRangeException.ThrowIfEqual(modelId, Guid.Empty);
 
         var model = await repository.GetModelByIdAsync(modelId, cancellationToken);
@@ -207,6 +222,8 @@ public class ModelFacade(
     /// <inheritdoc />
     public async Task<IReadOnlyList<ModelRun>> GetModelRunsAsync(Guid modelId, CancellationToken cancellationToken = default)
     {
+        using var activity = ActivitySource.StartActivity(nameof(GetModelRunsAsync));
+
         ArgumentOutOfRangeException.ThrowIfEqual(modelId, Guid.Empty);
 
         logger.LogInformation("Retrieving runs for model {ModelId}", modelId);
@@ -217,6 +234,8 @@ public class ModelFacade(
     /// <inheritdoc />
     public async Task<ModelRun?> GetModelRunByIdAsync(Guid modelId, Guid runId, CancellationToken cancellationToken = default)
     {
+        using var activity = ActivitySource.StartActivity(nameof(GetModelRunByIdAsync));
+
         ArgumentOutOfRangeException.ThrowIfEqual(modelId, Guid.Empty);
         ArgumentOutOfRangeException.ThrowIfEqual(runId, Guid.Empty);
 

@@ -17,8 +17,6 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
-    otel_exporter_otlp_endpoint: str = ""
-
     # Reconnect behaviour.
     reconnect_delay_initial: float = 1.0
     reconnect_delay_max: float = 60.0

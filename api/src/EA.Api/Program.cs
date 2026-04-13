@@ -1,3 +1,4 @@
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using EA.Api.Auth;
 using EA.Contracts.Messages;
 using EA.Domain.Interfaces;
@@ -15,6 +16,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
+using OpenTelemetry;
+using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 
 // ---------------------------------------------------------------------------
@@ -37,6 +40,44 @@ if (args.Contains("--seed-generate"))
 }
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ---------------------------------------------------------------------------
+// Observability — Azure Monitor OpenTelemetry distro
+// ---------------------------------------------------------------------------
+// When a connection string is configured (Terraform injects
+// APPLICATIONINSIGHTS_CONNECTION_STRING as a secret env var in deployed
+// envs; AzureMonitor:ConnectionString also works via IConfiguration), the
+// distro:
+//   - exports ASP.NET Core / HttpClient / SqlClient / EF Core / MassTransit
+//     v8 traces automatically (no per-span code needed);
+//   - bridges ILogger to App Insights `traces` table;
+//   - exports runtime metrics.
+// Local (docker compose, `dotnet run`, tests) does not set the connection
+// string. The distro does NOT silently no-op in that case — it throws
+// InvalidOperationException at host start — so we gate `UseAzureMonitor`
+// on connection-string presence and fall back to stdout logging only.
+// The `EA.Api.Facade` ActivitySource is registered unconditionally so call
+// sites can create custom spans uniformly; spans are simply not exported
+// when the distro is skipped.
+//
+// Sampling: 100% in Development, 20% in non-Dev to control ingestion cost.
+// Any outbound MassTransit/HTTP spans respect parent sampling so the
+// data-engine traces stay correlated with what the API sampled.
+// ---------------------------------------------------------------------------
+var azureMonitorConnectionString =
+    builder.Configuration["AzureMonitor:ConnectionString"]
+    ?? Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
+
+var otelBuilder = builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing => tracing.AddSource("EA.Api.Facade"));
+
+if (!string.IsNullOrWhiteSpace(azureMonitorConnectionString))
+{
+    otelBuilder.UseAzureMonitor(options =>
+    {
+        options.SamplingRatio = builder.Environment.IsDevelopment() ? 1.0f : 0.2f;
+    });
+}
 
 // ---------------------------------------------------------------------------
 // Database

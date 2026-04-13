@@ -135,7 +135,15 @@
       "Bash(bash -n /workspace/docs/runbooks/verify-deployer-sp.sh)",
       "Bash(git -C /workspace checkout HEAD -- docs/runbooks/verify-deployer-sp.sh)",
       "Bash(git -C /workspace diff docs/runbooks/verify-deployer-sp.sh)",
-      "Bash(bash -n /workspace/docs/runbooks/validate-sso-snapshot.sh)"
+      "Bash(bash -n /workspace/docs/runbooks/validate-sso-snapshot.sh)",
+      "Bash(find /workspace/api -name \"*.cs\" -exec grep -l \"Azure.Monitor\\\\|OpenTelemetry\\\\|ApplicationInsights\" {} \\\\;)",
+      "Bash(ls -la /workspace/api/src/EA.Api/*.cs)",
+      "Bash(grep -i \"telemetry\\\\|monitor\\\\|insights\" /workspace/api/src/EA.Api/*.cs)",
+      "Bash(python -m py_compile src/data_engine/main.py src/data_engine/config.py)",
+      "Bash(terraform get:*)",
+      "Bash(terraform providers:*)",
+      "Bash(npm view:*)",
+      "Bash(API_URL=https://example.test npm run build:prod)"
     ]
   }
 }

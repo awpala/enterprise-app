@@ -1,0 +1,73 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "## Enterprise App — Overview\n\nApp-level signals from the .NET API and Python data-engine via Application Insights. Time range is controlled by the workbook's default parameter.\n"
+      },
+      "name": "header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| summarize count() by bin(timestamp, 1m), cloud_RoleName\n| render timechart",
+        "size": 0,
+        "title": "Requests per minute, per role",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{ApplicationInsights}"
+        ]
+      },
+      "name": "rps"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| summarize avg(duration), percentile(duration, 95) by bin(timestamp, 5m), cloud_RoleName\n| render timechart",
+        "size": 0,
+        "title": "Latency — avg + p95 (ms)",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{ApplicationInsights}"
+        ]
+      },
+      "name": "latency"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "dependencies\n| where type in (\"Queue\", \"postgresql\", \"SQL\")\n| summarize count(), avg(duration) by type, target\n| order by count_ desc",
+        "size": 0,
+        "title": "Dependencies — RabbitMQ + Postgres",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{ApplicationInsights}"
+        ]
+      },
+      "name": "deps"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where severityLevel >= 3\n| summarize count() by bin(timestamp, 5m), cloud_RoleName\n| render timechart",
+        "size": 0,
+        "title": "Warning-or-above log volume per role",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{ApplicationInsights}"
+        ]
+      },
+      "name": "warns"
+    }
+  ],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}

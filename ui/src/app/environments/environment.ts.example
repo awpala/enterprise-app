@@ -14,6 +14,7 @@
  *   AAD_API_SCOPE="api://<api-app-client-id>/access_as_user" \
  *   ENABLE_DEV_AUTH="false" \
  *   ENABLE_GUEST_AUTH="false" \
+ *   APPLICATIONINSIGHTS_CONNECTION_STRING="InstrumentationKey=...;IngestionEndpoint=..." \
  *     node ui/scripts/generate-environment.mjs
  */
 export const environment = {
@@ -25,4 +26,5 @@ export const environment = {
   aadApiScope: '',
   enableDevAuth: false,
   enableGuestAuth: false,
+  applicationInsightsConnectionString: '',
 };

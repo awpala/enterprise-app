@@ -1,9 +1,10 @@
 import {
   ApplicationConfig,
   APP_INITIALIZER,
+  ErrorHandler,
   provideZoneChangeDetection,
 } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideHttpClient, withInterceptorsFromDi, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import {
@@ -24,6 +25,8 @@ import {
   msalInterceptorConfigFactory,
 } from './auth/msal.config';
 import { BearerAuthInterceptor } from './auth/bearer-auth.interceptor';
+import { AppInsightsService } from './core/app-insights.service';
+import { AppInsightsErrorHandler } from './core/app-insights-error-handler';
 
 /**
  * When AAD_* values are empty (no real External ID tenant), MSAL cannot
@@ -62,6 +65,15 @@ function msalInitializerFactory(msalInstance: IPublicClientApplication): () => P
   };
 }
 
+function appInsightsInitializerFactory(
+  appInsights: AppInsightsService,
+  router: Router,
+): () => void {
+  return () => {
+    appInsights.initialize(router);
+  };
+}
+
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
@@ -86,6 +98,16 @@ export const appConfig: ApplicationConfig = {
     MsalService,
     MsalBroadcastService,
     MsalGuard,
+    {
+      provide: ErrorHandler,
+      useExisting: AppInsightsErrorHandler,
+    },
+    {
+      provide: APP_INITIALIZER,
+      useFactory: appInsightsInitializerFactory,
+      deps: [AppInsightsService, Router],
+      multi: true,
+    },
     ...(isMsalConfigured
       ? [
           // Custom session-aware Bearer interceptor replaces MsalInterceptor.

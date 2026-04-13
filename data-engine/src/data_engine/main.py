@@ -4,6 +4,7 @@ Starts the RabbitMQ consumer and blocks until a shutdown signal is received.
 """
 
 import logging
+import os
 import signal
 import sys
 import time
@@ -25,6 +26,22 @@ def _configure_logging(settings: Settings) -> None:
 
 def main() -> None:
     """Bootstrap and run the data engine consumer."""
+    # Ordered at the top of main() -- must run BEFORE any logger is used so the
+    # AzureMonitor handler is attached to the root logger ahead of log records.
+    # Conditional on the env var being set: local docker-compose does not set
+    # APPLICATIONINSIGHTS_CONNECTION_STRING, and configure_azure_monitor() would
+    # raise without one. Imports are lazy so local dev + unit tests don't need
+    # these packages installed.
+    if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
+        from azure.monitor.opentelemetry import configure_azure_monitor
+        from opentelemetry.instrumentation.pika import PikaInstrumentor
+
+        configure_azure_monitor(
+            logger_name="data_engine",
+            enable_live_metrics=False,
+        )
+        PikaInstrumentor().instrument()
+
     settings = load_settings()
     _configure_logging(settings)
 

@@ -200,3 +200,16 @@ module "container_apps" {
 
   tags = local.common_tags
 }
+
+#-------------------------------------------------------------------------
+# Platform diagnostic settings — Postgres / SWA / ACR logs + metrics → LAW.
+# Container App Environment logs are already routed via module.container_apps.
+#-------------------------------------------------------------------------
+module "diagnostics" {
+  source = "./modules/diagnostics"
+
+  log_analytics_workspace_id = module.observability.log_analytics_workspace_id
+  postgres_server_id         = module.postgres.id
+  static_web_app_id          = module.swa.id
+  container_registry_id      = module.acr.id
+}
