@@ -90,7 +90,7 @@ while IFS=$'\t' read -r label end_iso; do
   else
     echo "  [EXPIRED] $label_display  ends $end_iso"
   fi
-done < <(jq -r '.passwordCredentials[] | [.displayName, .endDateTime] | @tsv' <<<"$app_json")
+done < <(jq -r '.passwordCredentials[] | [(.displayName // ""), .endDateTime] | @tsv' <<<"$app_json")
 
 if (( has_live_secret == 0 )); then
   echo "FAIL: no unexpired client secret on the deployer SP." >&2

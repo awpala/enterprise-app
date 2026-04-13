@@ -28,7 +28,7 @@ jobs:
     # federated credential (dev or production).
     environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'dev' }}
 
-    # Serialise production (no in-progress cancellation), coalesce dev
+    # Serialize production (no in-progress cancellation), coalesce dev
     # (most recent push wins).
     concurrency:
       group: deploy-${{ github.ref == 'refs/heads/main' && 'production' || 'dev' }}
@@ -43,16 +43,18 @@ jobs:
       ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # Customer SSO (Entra External ID + Google OAuth)
+      # Customer SSO (Entra External ID deployer SP)
       # Environment-scoped secrets/variable flow in automatically via the
       # `environment:` selector above. Mapped here to the TF_VAR_* names
-      # that the root module's variables.tf expects.
+      # that the root module's variables.tf expects. Google OAuth client
+      # credentials are NOT listed here — the Google IDP moved from
+      # Terraform-managed to portal-managed (see Part G of
+      # docs/runbooks/sso-manual-bootstrap.md); the root module no longer
+      # reads google_oidc_* vars.
       TF_VAR_external_tenant_id:            ${{ secrets.EXTERNAL_TENANT_ID }}
       TF_VAR_tenant_subdomain:              ${{ vars.TENANT_SUBDOMAIN }}
       TF_VAR_external_tenant_client_id:     ${{ secrets.EXTERNAL_TENANT_CLIENT_ID }}
       TF_VAR_external_tenant_client_secret: ${{ secrets.EXTERNAL_TENANT_CLIENT_SECRET }}
-      TF_VAR_google_oidc_client_id:         ${{ secrets.GOOGLE_OIDC_CLIENT_ID }}
-      TF_VAR_google_oidc_client_secret:     ${{ secrets.GOOGLE_OIDC_CLIENT_SECRET }}
 
       # Exposes the "Log in as Dev" synthetic-session affordance on the SPA
       # landing page. Enabled in dev so engineers can smoke-test without
