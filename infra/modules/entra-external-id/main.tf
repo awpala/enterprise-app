@@ -61,8 +61,20 @@ resource "azuread_service_principal" "api" {
 #
 # - Single-page-application platform (triggers PKCE + implicit-less auth
 #   code flow in MSAL.js v3).
-# - Redirect URIs cover both the SWA FQDN and local dev (localhost:4200),
-#   each with a matching post-logout URI at the origin root.
+# - Each entry in single_page_application.redirect_uris does double duty:
+#     1. As an MSAL `redirectUri` target at login. In practice only the
+#        `/auth/redirect` variants are navigated to on the return leg of
+#        loginRedirect() (that's the path MSAL is configured with in the
+#        SPA's auth config).
+#     2. As a valid `postLogoutRedirectUri` target at sign-out. External
+#        ID validates the `post_logout_redirect_uri` query param against
+#        the same registered redirect URI list — so the origin root MUST
+#        be registered here for logoutRedirect() to return cleanly.
+#        MSAL.js sets postLogoutRedirectUri = window.location.origin
+#        (i.e. no path), which is why the bare SWA FQDN and
+#        http://localhost:4200 appear alongside their `/auth/redirect`
+#        siblings. Omitting the origin root is what caused the sign-out
+#        redirect loop.
 # - required_resource_access wires the SPA up with the API's
 #   access_as_user delegated scope so MSAL can request it at sign-in.
 #-------------------------------------------------------------------------
@@ -78,15 +90,16 @@ resource "azuread_application" "spa" {
 
   single_page_application {
     redirect_uris = [
+      var.swa_url,
       "${var.swa_url}/auth/redirect",
+      "http://localhost:4200",
       "http://localhost:4200/auth/redirect",
     ]
   }
 
-  # Post-logout URIs live on the web{} block per MSAL/AAD convention, not
-  # on single_page_application{}. The SPA platform block above is what
-  # MSAL inspects for redirect_uris; post_logout_redirect_uris are
-  # platform-agnostic and accepted on either.
+  # web{} is retained only to explicitly disable implicit-grant flows; all
+  # redirect URIs (login + logout) live on the single_page_application{}
+  # block above.
   web {
     redirect_uris = []
     logout_url    = null

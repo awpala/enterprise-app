@@ -44,14 +44,15 @@ const isMsalConfigured = Boolean(
  * before any other API call).
  *
  * IMPORTANT: this factory intentionally does NOT call `handleRedirectPromise()`.
- * Redirect-response processing is owned by `MsalRedirectComponent`, which is
- * mounted at the `/auth/redirect` route (see app.routes.ts) and is also
- * bootstrapped into `<app-redirect>` via main.ts. Calling
- * `handleRedirectPromise()` here would race that component and silently
- * consume the URL fragment first, leaving MsalRedirectComponent with `null`
- * and breaking the post-redirect navigation back to the originally-requested
- * URL — manifesting as a stuck `/auth/redirect` page or a perpetual sign-in
- * loop on the return hop from External ID.
+ * Redirect-response processing is owned by `MsalRedirectComponent`, which the
+ * router mounts at the `/auth/redirect` route (see app.routes.ts). There is a
+ * single MSAL instance and a single bootstrap — we no longer separately
+ * bootstrap `MsalRedirectComponent` into an `<app-redirect>` host element
+ * (that dual-bootstrap model caused a double-consumption race and was removed).
+ * Calling `handleRedirectPromise()` here would race the routed
+ * `MsalRedirectComponent`, silently consume the URL fragment first, and leave
+ * the component with `null` — manifesting as a stuck `/auth/redirect` page or
+ * a perpetual sign-in loop on the return hop from External ID.
  */
 function msalInitializerFactory(msalInstance: IPublicClientApplication): () => Promise<void> {
   return async () => {

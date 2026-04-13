@@ -168,7 +168,23 @@ export class AuthService {
     void this.router.navigate(['/dashboard']);
   }
 
-  /** Signs out of whichever session is active. */
+  /**
+   * Signs out of whichever session is active.
+   *
+   * MSAL branch: we eagerly clear `activeAccount` + `isAuthenticated` BEFORE
+   * calling `msalService.logoutRedirect()`. The return hop from External ID is
+   * a full page reload, so in theory MSAL's cache is gone by the time we
+   * re-hydrate. In practice, though, there is a synchronous window between
+   * this call and the browser actually starting to navigate, and reactive
+   * views (e.g. `LandingComponent`'s auth-aware effect) can re-render during
+   * that window. If those views still see `isAuthenticated=true`, they will
+   * route the user back into the authenticated area, which re-triggers
+   * `MsalGuard`, which — with the cache now mid-clear — can fall through to
+   * `loginFailedRoute`. Clearing here prevents that stale-signal render and
+   * avoids the sign-out-becomes-sign-in-failure loop.
+   *
+   * Dev branch already clears signals synchronously before navigating.
+   */
   logoutRedirect(): void {
     if (this.isDevSession()) {
       this.persistDevSession(false);
@@ -179,6 +195,8 @@ export class AuthService {
       return;
     }
     if (this.isMsalConfigured) {
+      this.activeAccount.set(null);
+      this.isAuthenticated.set(false);
       this.msalService.logoutRedirect();
       return;
     }

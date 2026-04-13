@@ -1,26 +1,25 @@
 import { bootstrapApplication } from '@angular/platform-browser';
-import { MsalRedirectComponent } from '@azure/msal-angular';
 
 import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
 
 /**
- * Standard MSAL Angular standalone bootstrap pattern.
+ * Single-bootstrap MSAL Angular pattern.
  *
- * `AppComponent` renders into `<app-root>` as usual. `MsalRedirectComponent`
- * renders into `<app-redirect>` in index.html and is responsible for handling
- * the implicit/auth-code redirect response hop inside a hidden iframe —
- * without it, redirect-mode login cannot complete silent token acquisition.
+ * `AppComponent` is the sole bootstrapped component; it renders into
+ * `<app-root>` in index.html. The redirect-response hop is handled by the
+ * router activating the `/auth/redirect` route (see `app.routes.ts`), which
+ * mounts `MsalRedirectComponent` inside the same application injector.
  *
- * Both bootstraps share the same `appConfig` providers so MSAL singletons
- * (MsalService, MsalBroadcastService, MSAL_INSTANCE) are consistent.
+ * We intentionally do NOT call `bootstrapApplication(MsalRedirectComponent, ...)`
+ * separately. Doing so spins up a second, independent Angular injector tree,
+ * which produces a second `MsalService` / `MSAL_INSTANCE` pair. Both instances
+ * race to call `handleRedirectPromise()` on the same URL fragment, leading to
+ * "interaction in progress" errors, lost tokens, and redirect loops on logout.
+ * Owning the redirect via the route keeps everything on one injector and one
+ * MSAL singleton.
  */
 bootstrapApplication(AppComponent, appConfig).catch((err) =>
-  // eslint-disable-next-line no-console
-  console.error(err),
-);
-
-bootstrapApplication(MsalRedirectComponent, appConfig).catch((err) =>
   // eslint-disable-next-line no-console
   console.error(err),
 );
