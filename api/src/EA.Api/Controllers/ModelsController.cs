@@ -1,6 +1,7 @@
 using EA.Contracts.Models;
 using EA.Domain.Enums;
 using EA.Domain.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EA.Api.Controllers;
@@ -9,8 +10,12 @@ namespace EA.Api.Controllers;
 /// REST API controller for Model CRUD operations and Model Run management.
 /// </summary>
 [ApiController]
+[Authorize]
 [Route("api/v1/[controller]")]
-public class ModelsController(IModelFacade facade, ILogger<ModelsController> logger) : ControllerBase
+public class ModelsController(
+    IModelFacade facade,
+    ICurrentUser currentUser,
+    ILogger<ModelsController> logger) : ControllerBase
 {
     /// <summary>
     /// Retrieves a paged list of models, optionally filtered by status.
@@ -32,7 +37,7 @@ public class ModelsController(IModelFacade facade, ILogger<ModelsController> log
 
         var dtos = items.Select(m => new ModelDto(
             m.Id, m.Name, m.Description, m.Status.ToString(),
-            m.Version, m.CreatedAtUtc, m.UpdatedAtUtc, m.CreatedBy)).ToList();
+            m.Version, m.CreatedAtUtc, m.UpdatedAtUtc, FormatCreatedBy(m.CreatedByName, m.CreatedBy))).ToList();
 
         return Ok(new PagedResult<ModelDto>(dtos, totalCount, page, pageSize));
     }
@@ -61,7 +66,7 @@ public class ModelsController(IModelFacade facade, ILogger<ModelsController> log
         var dto = new ModelDetailDto(
             model.Id, model.Name, model.Description, model.Status.ToString(),
             model.Version, model.Parameters,
-            model.CreatedAtUtc, model.UpdatedAtUtc, model.CreatedBy, latestRunDto);
+            model.CreatedAtUtc, model.UpdatedAtUtc, FormatCreatedBy(model.CreatedByName, model.CreatedBy), latestRunDto);
 
         return Ok(dto);
     }
@@ -80,12 +85,18 @@ public class ModelsController(IModelFacade facade, ILogger<ModelsController> log
         if (!ModelState.IsValid)
             return ValidationProblem();
 
+        // Pass Guid.Empty / null; the AuditStampingInterceptor fills the audit
+        // columns from ICurrentUser before SaveChanges. Seeder call sites pass
+        // explicit non-default values so the interceptor leaves them alone.
+        var createdBy = currentUser.Oid ?? Guid.Empty;
+        var createdByName = currentUser.Name;
+
         var model = await facade.CreateModelAsync(
-            request.Name, request.Description, request.Parameters, "system", cancellationToken);
+            request.Name, request.Description, request.Parameters, createdBy, createdByName, cancellationToken);
 
         var dto = new ModelDto(
             model.Id, model.Name, model.Description, model.Status.ToString(),
-            model.Version, model.CreatedAtUtc, model.UpdatedAtUtc, model.CreatedBy);
+            model.Version, model.CreatedAtUtc, model.UpdatedAtUtc, FormatCreatedBy(model.CreatedByName, model.CreatedBy));
 
         return CreatedAtAction(nameof(GetModel), new { id = model.Id }, dto);
     }
@@ -117,7 +128,7 @@ public class ModelsController(IModelFacade facade, ILogger<ModelsController> log
 
         var dto = new ModelDto(
             model.Id, model.Name, model.Description, model.Status.ToString(),
-            model.Version, model.CreatedAtUtc, model.UpdatedAtUtc, model.CreatedBy);
+            model.Version, model.CreatedAtUtc, model.UpdatedAtUtc, FormatCreatedBy(model.CreatedByName, model.CreatedBy));
 
         return Ok(dto);
     }
@@ -203,4 +214,14 @@ public class ModelsController(IModelFacade facade, ILogger<ModelsController> log
 
         return Ok(dto);
     }
+
+    /// <summary>
+    /// Renders the Phase 2A/2B audit columns as a single string for the wire
+    /// format. Prefers the captured display name; falls back to the Entra
+    /// object identifier for rows created by principals with no name claim.
+    /// </summary>
+    private static string FormatCreatedBy(string? createdByName, Guid createdBy) =>
+        !string.IsNullOrWhiteSpace(createdByName)
+            ? createdByName
+            : createdBy == Guid.Empty ? "unknown" : createdBy.ToString();
 }

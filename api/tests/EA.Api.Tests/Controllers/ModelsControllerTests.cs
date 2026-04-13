@@ -1,4 +1,5 @@
 using EA.Api.Controllers;
+using EA.Api.Tests.TestDoubles;
 using EA.Domain.Entities;
 using EA.Domain.Enums;
 using EA.Domain.Interfaces;
@@ -15,6 +16,7 @@ public class ModelsControllerTests
 {
     private Mock<IModelFacade> _facadeMock = null!;
     private Mock<ILogger<ModelsController>> _loggerMock = null!;
+    private FakeCurrentUser _currentUser = null!;
     private ModelsController _sut = null!;
 
     [SetUp]
@@ -22,7 +24,8 @@ public class ModelsControllerTests
     {
         _facadeMock = new Mock<IModelFacade>();
         _loggerMock = new Mock<ILogger<ModelsController>>();
-        _sut = new ModelsController(_facadeMock.Object, _loggerMock.Object);
+        _currentUser = new FakeCurrentUser();
+        _sut = new ModelsController(_facadeMock.Object, _currentUser, _loggerMock.Object);
     }
 
     [Test]
@@ -30,7 +33,15 @@ public class ModelsControllerTests
     {
         var models = new List<Model>
         {
-            new() { Id = Guid.NewGuid(), Name = "Test Model", Status = ModelStatus.Active, Version = 1, CreatedBy = "test" }
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Test Model",
+                Status = ModelStatus.Active,
+                Version = 1,
+                CreatedBy = Guid.NewGuid(),
+                CreatedByName = "test"
+            }
         };
         _facadeMock.Setup(f => f.GetModelsAsync(1, 20, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((models.AsReadOnly() as IReadOnlyList<Model>, 1));
@@ -60,7 +71,8 @@ public class ModelsControllerTests
             Name = "Test",
             Status = ModelStatus.Draft,
             Version = 1,
-            CreatedBy = "test",
+            CreatedBy = Guid.NewGuid(),
+            CreatedByName = "test",
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -121,5 +133,45 @@ public class ModelsControllerTests
         var result = await _sut.RequestRun(run.ModelId, CancellationToken.None);
 
         result.Should().BeOfType<CreatedAtActionResult>();
+    }
+
+    [Test]
+    public async Task CreateModel_PassesCurrentUserOidAndNameToFacade()
+    {
+        var createdModel = new Model
+        {
+            Id = Guid.NewGuid(),
+            Name = "New",
+            Status = ModelStatus.Draft,
+            Version = 1,
+            CreatedBy = _currentUser.Oid!.Value,
+            CreatedByName = _currentUser.Name,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        _facadeMock
+            .Setup(f => f.CreateModelAsync(
+                "New",
+                null,
+                null,
+                _currentUser.Oid!.Value,
+                _currentUser.Name,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(createdModel);
+
+        var request = new EA.Contracts.Models.CreateModelRequest("New", null, null);
+        var result = await _sut.CreateModel(request, CancellationToken.None);
+
+        result.Should().BeOfType<CreatedAtActionResult>();
+        _facadeMock.Verify(
+            f => f.CreateModelAsync(
+                "New",
+                null,
+                null,
+                _currentUser.Oid!.Value,
+                _currentUser.Name,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }

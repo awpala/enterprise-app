@@ -1,0 +1,41 @@
+<div class="landing-shell">
+  <section class="landing-card">
+    <mat-icon class="brand-icon">hub</mat-icon>
+    <h1 class="brand-title">Enterprise App</h1>
+    <p class="brand-subtitle">
+      Model-driven workflows, async job processing, and enterprise observability.
+    </p>
+
+    @if (authService.isMsalConfigured) {
+      <button
+        mat-raised-button
+        color="primary"
+        class="sign-in-button"
+        (click)="signIn()">
+        <mat-icon class="mr-8">login</mat-icon>
+        <span>Sign in</span>
+      </button>
+    }
+
+    @if (authService.isDevModeEnabled) {
+      <button
+        mat-stroked-button
+        color="accent"
+        class="sign-in-button"
+        (click)="signInAsDev()">
+        <mat-icon class="mr-8">developer_mode</mat-icon>
+        <span>Log in as Dev</span>
+      </button>
+      <p class="config-hint">
+        Non-production: the dev session is a synthetic principal matching the
+        backend's DevAuthHandler sentinel. Not available in prod builds.
+      </p>
+    }
+
+    @if (!authService.isMsalConfigured && !authService.isDevModeEnabled) {
+      <p class="config-hint">
+        No sign-in is available: MSAL is unconfigured and dev auth is disabled.
+      </p>
+    }
+  </section>
+</div>

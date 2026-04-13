@@ -81,7 +81,11 @@
       "Bash(git update-index:*)",
       "Bash(gh run:*)",
       "Bash(git ls-tree:*)",
-      "Bash(az group:*)"
+      "Bash(az group:*)",
+      "Bash(npm run:*)",
+      "Bash(chmod +x /workspace/docs/runbooks/sample.push-sso-secrets.sh)",
+      "Bash(bash -n /workspace/docs/runbooks/sample.push-sso-secrets.sh)",
+      "Bash(chmod +x /workspace/docs/runbooks/plan-infra.sh)"
     ]
   }
 }

@@ -55,7 +55,17 @@ public class ModelConfiguration : IEntityTypeConfiguration<Model>
 
         builder.Property(m => m.CreatedBy)
             .HasColumnName("created_by")
-            .IsRequired()
+            .IsRequired();
+
+        builder.Property(m => m.CreatedByName)
+            .HasColumnName("created_by_name")
+            .HasMaxLength(200);
+
+        builder.Property(m => m.UpdatedBy)
+            .HasColumnName("updated_by");
+
+        builder.Property(m => m.UpdatedByName)
+            .HasColumnName("updated_by_name")
             .HasMaxLength(200);
 
         builder.HasMany(m => m.Runs)

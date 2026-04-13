@@ -84,6 +84,32 @@ variable "api_allowed_origins" {
   default     = []
 }
 
+#-------------------------------------------------------------------------
+# Entra External ID wiring — plain envvars on the API container,
+# consumed by Microsoft.Identity.Web's AzureAd:* configuration section.
+# None of these are secrets (tenant/client IDs are public identifiers);
+# the API validates bearer tokens against JWKS it fetches from authority.
+#-------------------------------------------------------------------------
+variable "aad_authority" {
+  description = "OIDC authority URL surfaced to the API as AzureAd__Authority (e.g. https://<subdomain>.ciamlogin.com/<tenant-id>/v2.0)."
+  type        = string
+}
+
+variable "aad_audience" {
+  description = "JwtBearer audience surfaced to the API as AzureAd__Audience. For v2 tokens this equals the API app's client ID."
+  type        = string
+}
+
+variable "aad_client_id" {
+  description = "Client ID of the API app registration, surfaced to the API as AzureAd__ClientId."
+  type        = string
+}
+
+variable "aad_tenant_id" {
+  description = "External ID tenant ID, surfaced to the API as AzureAd__TenantId."
+  type        = string
+}
+
 variable "tags" {
   description = "Tags to apply."
   type        = map(string)

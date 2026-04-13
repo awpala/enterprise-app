@@ -38,8 +38,15 @@ public sealed record SeedModelDto
     /// <summary>Gets the UTC last-updated timestamp.</summary>
     public required DateTime UpdatedAtUtc { get; init; }
 
-    /// <summary>Gets the creator identifier.</summary>
-    public required string CreatedBy { get; init; }
+    /// <summary>
+    /// Gets the deterministic fake Entra object identifier of the seed creator.
+    /// Derived from <see cref="CreatedByName"/> so regenerating the seed produces
+    /// the same Guid.
+    /// </summary>
+    public required Guid CreatedBy { get; init; }
+
+    /// <summary>Gets the display name captured at seed-creation time.</summary>
+    public required string CreatedByName { get; init; }
 }
 
 /// <summary>

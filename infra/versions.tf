@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 4.14"
     }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 3.0"
+    }
     random = {
       source  = "hashicorp/random"
       version = "~> 3.6"
@@ -49,3 +53,27 @@ provider "azurerm" {
 }
 
 provider "random" {}
+
+#-------------------------------------------------------------------------
+# azuread — default alias targets the workforce tenant used by the
+# GitHub Actions OIDC service principal (no configuration needed — it
+# inherits ARM_TENANT_ID / OIDC from the environment, same as azurerm).
+#-------------------------------------------------------------------------
+provider "azuread" {
+  # Workforce tenant (CI OIDC SP). Auto-detected from ARM_TENANT_ID / OIDC env.
+}
+
+#-------------------------------------------------------------------------
+# azuread.external — aliased provider pinned to the External ID (CIAM)
+# tenant. External ID tenants cannot use the same OIDC federated identity
+# the workforce tenant uses, so we authenticate via a dedicated
+# client_id + client_secret created inside the External ID tenant. Both
+# credentials are sensitive and flow in via TF_VAR_* envvars in CI.
+#-------------------------------------------------------------------------
+provider "azuread" {
+  alias         = "external"
+  tenant_id     = var.external_tenant_id
+  client_id     = var.external_tenant_client_id
+  client_secret = var.external_tenant_client_secret
+  use_oidc      = false
+}

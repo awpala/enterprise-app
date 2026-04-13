@@ -77,3 +77,27 @@ output "swa_deployment_token" {
   value       = module.swa.api_key
   sensitive   = true
 }
+
+#-------------------------------------------------------------------------
+# Entra External ID — consumed by .github/scripts/build-ui.sh to bake
+# the MSAL config into the SPA bundle at build time.
+#-------------------------------------------------------------------------
+output "aad_authority" {
+  description = "OIDC authority URL (AAD_AUTHORITY in the SPA build)."
+  value       = module.entra_external_id.authority
+}
+
+output "aad_client_id" {
+  description = "Client ID of the SPA app registration (AAD_CLIENT_ID in the SPA build)."
+  value       = module.entra_external_id.spa_client_id
+}
+
+output "aad_tenant_id" {
+  description = "External ID tenant ID (AAD_TENANT_ID in the SPA build)."
+  value       = module.entra_external_id.tenant_id
+}
+
+output "aad_api_scope" {
+  description = "Fully-qualified API scope URI (AAD_API_SCOPE in the SPA build, passed to msal.loginRedirect)."
+  value       = module.entra_external_id.api_scope_uri
+}

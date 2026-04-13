@@ -49,6 +49,13 @@ public class ModelRunConfiguration : IEntityTypeConfiguration<ModelRun>
             .HasColumnName("error_message")
             .HasMaxLength(4000);
 
+        builder.Property(r => r.RequestedBy)
+            .HasColumnName("requested_by");
+
+        builder.Property(r => r.RequestedByName)
+            .HasColumnName("requested_by_name")
+            .HasMaxLength(200);
+
         builder.HasMany(r => r.Metrics)
             .WithOne(m => m.ModelRun)
             .HasForeignKey(m => m.ModelRunId)

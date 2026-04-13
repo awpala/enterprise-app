@@ -66,3 +66,35 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+#-------------------------------------------------------------------------
+# Entra External ID (CIAM) tenant — customer SSO.
+#
+# The External ID tenant itself is created manually in the Azure Portal
+# (there is no Terraform/ARM resource for it). Once it exists, a human
+# records the tenant ID + tenant subdomain in the env tfvars files, and
+# creates a client-secret-based app registration inside the External ID
+# tenant for Terraform itself to authenticate as; that app's client ID +
+# secret flow in via TF_VAR_external_tenant_client_id and
+# TF_VAR_external_tenant_client_secret (set via `gh secret set`).
+#-------------------------------------------------------------------------
+variable "external_tenant_id" {
+  description = "Tenant ID (GUID) of the Entra External ID (CIAM) tenant used for customer SSO. Created manually via the Azure Portal; recorded in envs/*.tfvars."
+  type        = string
+}
+
+variable "tenant_subdomain" {
+  description = "Subdomain of the Entra External ID tenant (the prefix in <subdomain>.ciamlogin.com, e.g. 'eacustomerdev' or 'eacustomerprod'). Chosen at tenant creation time; recorded in envs/*.tfvars. Azure's tenant-creation UI restricts this to alphanumerics only (no hyphens)."
+  type        = string
+}
+
+variable "external_tenant_client_id" {
+  description = "Client ID of the app registration inside the External ID tenant that Terraform authenticates as (used by the azuread.external provider). Flows in via TF_VAR_external_tenant_client_id."
+  type        = string
+}
+
+variable "external_tenant_client_secret" {
+  description = "Client secret paired with external_tenant_client_id. Flows in via TF_VAR_external_tenant_client_secret from GitHub Environment secrets."
+  type        = string
+  sensitive   = true
+}

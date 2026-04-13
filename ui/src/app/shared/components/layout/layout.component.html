@@ -3,6 +3,23 @@
     <mat-icon>menu</mat-icon>
   </button>
   <span class="toolbar-title">Enterprise App</span>
+  <span class="spacer"></span>
+
+  <button mat-button [matMenuTriggerFor]="accountMenu" class="account-button">
+    <mat-icon class="mr-8">account_circle</mat-icon>
+    <span>{{ authService.displayName() }}</span>
+    <mat-icon>arrow_drop_down</mat-icon>
+  </button>
+  <mat-menu #accountMenu="matMenu">
+    <button mat-menu-item disabled>
+      <mat-icon>verified_user</mat-icon>
+      <span>Signed in via {{ authService.idp() }}</span>
+    </button>
+    <button mat-menu-item (click)="signOut()">
+      <mat-icon>logout</mat-icon>
+      <span>Sign out</span>
+    </button>
+  </mat-menu>
 </mat-toolbar>
 
 <mat-sidenav-container class="sidenav-container">

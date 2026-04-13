@@ -37,14 +37,23 @@ public interface IModelFacade
     /// <param name="name">The model name.</param>
     /// <param name="description">Optional description.</param>
     /// <param name="parameters">Optional JSON parameters.</param>
-    /// <param name="createdBy">The creator's identifier.</param>
+    /// <param name="createdBy">
+    /// The creator's Entra object identifier. Pass <see cref="Guid.Empty"/>
+    /// from HTTP paths to let the <c>AuditStampingInterceptor</c> fill it
+    /// from <see cref="ICurrentUser"/>; seeders pass explicit fake Guids.
+    /// </param>
+    /// <param name="createdByName">
+    /// The creator's display name. <c>null</c> from HTTP paths defers to the
+    /// interceptor; seeders pass explicit values.
+    /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The newly created model entity.</returns>
     Task<Model> CreateModelAsync(
         string name,
         string? description,
         System.Text.Json.JsonDocument? parameters,
-        string createdBy,
+        Guid createdBy,
+        string? createdByName,
         CancellationToken cancellationToken = default);
 
     /// <summary>

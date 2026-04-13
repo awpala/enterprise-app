@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="8.*" />
+    <PackageReference Include="MassTransit" Version="8.*" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
     <PackageReference Include="Moq" Version="4.*" />
     <PackageReference Include="NUnit" Version="4.*" />
@@ -24,6 +26,7 @@
     <ProjectReference Include="..\..\src\EA.Api\EA.Api.csproj" />
     <ProjectReference Include="..\..\src\EA.Contracts\EA.Contracts.csproj" />
     <ProjectReference Include="..\..\src\EA.Domain\EA.Domain.csproj" />
+    <ProjectReference Include="..\..\src\EA.Infrastructure\EA.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

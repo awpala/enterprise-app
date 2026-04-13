@@ -114,6 +114,45 @@ module "postgres" {
 }
 
 #-------------------------------------------------------------------------
+# Static Web App for the Angular UI
+#
+# SWA is GA only in a subset of regions; pin to eastus2 regardless of
+# var.location to keep this deployable everywhere.
+#
+# Declared before container_apps because the SPA redirect URI depends on
+# module.swa.url via module.entra_external_id.
+#-------------------------------------------------------------------------
+module "swa" {
+  source = "./modules/static-web-app"
+
+  name                = "${local.name_prefix}-swa-${var.name_suffix}"
+  resource_group_name = azurerm_resource_group.this.name
+  location            = "eastus2"
+  sku_tier            = "Free"
+  tags                = local.common_tags
+}
+
+#-------------------------------------------------------------------------
+# Entra External ID (CIAM) — customer SSO app registrations, user flow,
+# and identity providers. All resources live in the External ID tenant
+# (not the workforce tenant), so this module is pinned to the `.external`
+# aliased azuread provider.
+#-------------------------------------------------------------------------
+module "entra_external_id" {
+  source = "./modules/entra-external-id"
+
+  providers = {
+    azuread = azuread.external
+  }
+
+  environment        = var.environment
+  swa_url            = module.swa.url
+  external_tenant_id = var.external_tenant_id
+  tenant_subdomain   = var.tenant_subdomain
+  tags               = local.common_tags
+}
+
+#-------------------------------------------------------------------------
 # Container Apps (API, data-engine, RabbitMQ, migrations job)
 #-------------------------------------------------------------------------
 locals {
@@ -148,21 +187,12 @@ module "container_apps" {
 
   api_allowed_origins = [module.swa.url]
 
+  # Entra External ID wiring — plain envvars on the API container
+  # (tenantId / clientId / authority / audience are not secrets).
+  aad_authority = module.entra_external_id.authority
+  aad_audience  = module.entra_external_id.api_audience
+  aad_client_id = module.entra_external_id.api_client_id
+  aad_tenant_id = module.entra_external_id.tenant_id
+
   tags = local.common_tags
-}
-
-#-------------------------------------------------------------------------
-# Static Web App for the Angular UI
-#
-# SWA is GA only in a subset of regions; pin to eastus2 regardless of
-# var.location to keep this deployable everywhere.
-#-------------------------------------------------------------------------
-module "swa" {
-  source = "./modules/static-web-app"
-
-  name                = "${local.name_prefix}-swa-${var.name_suffix}"
-  resource_group_name = azurerm_resource_group.this.name
-  location            = "eastus2"
-  sku_tier            = "Free"
-  tags                = local.common_tags
 }

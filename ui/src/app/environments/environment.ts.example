@@ -7,9 +7,20 @@
  * repo and new contributors know where the value comes from.
  *
  * To regenerate manually:
- *   API_URL="https://<api-fqdn>" node ui/scripts/generate-environment.mjs
+ *   API_URL="https://<api-fqdn>" \
+ *   AAD_AUTHORITY="https://<tenant>.ciamlogin.com/<tenantId>" \
+ *   AAD_CLIENT_ID="<spa-app-client-id>" \
+ *   AAD_TENANT_ID="<tenantId>" \
+ *   AAD_API_SCOPE="api://<api-app-client-id>/access_as_user" \
+ *   ENABLE_DEV_AUTH="false" \
+ *     node ui/scripts/generate-environment.mjs
  */
 export const environment = {
   production: true,
   apiUrl: '',
+  aadAuthority: '',
+  aadClientId: '',
+  aadTenantId: '',
+  aadApiScope: '',
+  enableDevAuth: false,
 };

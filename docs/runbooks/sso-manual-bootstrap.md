@@ -1,0 +1,429 @@
+# Runbook: Customer SSO Manual Bootstrap (Entra External ID)
+
+## 1. Overview
+
+This runbook stands up the one-time resources that Terraform **cannot** create for our customer SSO slice (Microsoft Entra External ID + Google federation). It covers both environments: `dev` and `production`. Run every step once per environment unless noted.
+
+These steps are manual because:
+
+- **External ID tenants** are provisioned through a dedicated Azure Portal experience, not the AzureRM provider. The tenant must exist before any `azuread`/`azapi` provider can authenticate against it.
+- **Google Cloud OAuth 2.0 clients** live in Google Cloud Console and cannot be managed by Terraform.
+- **Admin consent** for Microsoft Graph permissions is a portal-only action (Terraform can assign the permission; it cannot click "Grant admin consent").
+- **The External ID user flow and its attached identity providers** (Microsoft Entra ID multi-tenant, Microsoft Account, Google, Email one-time passcode) are configured through the External ID portal as a one-time bootstrap per tenant - see [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers). Terraform no longer manages these objects.
+
+**Who runs this**: a single operator who holds both
+
+- Entra **Global Administrator** in the workforce tenant (for cross-tenant federation + CI SP consent), and
+- **Owner** of the Google Cloud project used for OAuth client registration,
+- plus **Contributor** on the Azure subscription that will bill the External ID tenant.
+
+Once this runbook is complete, the infra agent's Terraform work ([`infra/modules/entra-external-id/`](../../infra/modules/entra-external-id/)) can apply cleanly.
+
+---
+
+## 2. Prerequisites checklist
+
+Before starting, confirm:
+
+- [ ] You can sign in to [https://portal.azure.com](https://portal.azure.com) with an account that is **Global Admin** on the workforce tenant and **Contributor** on the target Azure subscription.
+- [ ] You can sign in to [https://console.cloud.google.com](https://console.cloud.google.com) and create new projects + OAuth clients.
+- [ ] GitHub CLI is authenticated with write access to the repo:
+
+  ```bash
+  gh auth status
+  ```
+
+- [ ] The GitHub repo already has Environments named `dev` and `production` (Settings -> Environments).
+- [ ] You have decided on the tenant display names and subdomains (defaults used below: `eacustomerdev` / `eacustomerprod`).
+- [ ] You have a terminal open in `/workspace` so you can run `gh` commands.
+- [ ] You are aware that [`docs/runbooks/source-sso-env.sh`](./source-sso-env.sh) is a tracked companion helper that exports `TF_VAR_*` values from the populated `push-sso-secrets.sh` (no secrets baked in; DRY with Part D).
+- [ ] You are aware that [`docs/runbooks/plan-infra.sh`](./plan-infra.sh) is a tracked companion helper that wraps the full local-plan workflow (source env + `az account show` + `terraform init/plan`) into a single command, used in [Part F](#8-part-f---verification). It passes `-refresh=false` to `terraform plan` by default so the local preview is advisory and does not require the operator's `az login` identity to hold every data-source read permission (notably Key Vault Secrets); the full-refresh plan is done by CI under the platform SP.
+- [ ] As the final step of [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env), the captured tenant GUID + subdomain must be pasted into the committed `infra/envs/<env>.tfvars` file for that environment. `-var-file` beats `TF_VAR_*`, so without this step `terraform plan` silently uses the placeholder strings. Tenant GUIDs and subdomains are public identifiers, not secrets.
+- [ ] You are aware that [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) is a separate one-time portal step that runs **after** Part F's first successful `terraform apply` (same out-of-band pattern as Part A's tenant creation). The end-to-end sign-in smoke test in Part F Step 3 will not pass until Part G is complete.
+
+---
+
+## 3. Part A - Create the Entra External ID tenant (one per env)
+
+Repeat this section twice: once for `dev`, once for `production`.
+
+1. Sign in to [https://portal.azure.com](https://portal.azure.com) with your Global Admin account.
+2. In the top search bar, type **"Microsoft Entra External ID"** and select the service.
+3. Click **Create a tenant**.
+4. On the **Basics** step, choose **Configure a customer tenant**. Do **not** pick "Extend workforce tenant" - that produces a workforce Entra tenant, which is the wrong product for CIAM.
+5. On the **Configuration** step, fill in:
+   - **Tenant name** (display): `EA Customer (Dev)` or `EA Customer (Prod)`
+   - **Domain name**: `eacustomerdev` or `eacustomerprod` (this becomes `eacustomerdev.onmicrosoft.com` / `eacustomerprod.onmicrosoft.com`). Note: the portal restricts this field to **alphanumeric characters only** - hyphens are rejected, so the domain cannot match the hyphenated resource-group style used elsewhere.
+   - **Location**: pick the same region used for the rest of the platform (e.g. `United States`).
+6. On the **Billing** step, link the existing Azure subscription and resource group.
+7. Click **Review + create**, then **Create**. Provisioning takes approximately 5 minutes.
+8. When provisioning completes, use the top-right **tenant switcher** to switch into the new External ID tenant, then open **Entra ID -> Overview** and record:
+   - **Tenant ID** (GUID) -> goes into `EXTERNAL_TENANT_ID` secret below.
+   - **Primary domain** (e.g. `eacustomerdev.onmicrosoft.com`).
+   - **CIAM login subdomain** (e.g. `eacustomerdev.ciamlogin.com`) -> this forms the MSAL authority `https://eacustomerdev.ciamlogin.com/<tenantId>`. The subdomain prefix alone (`eacustomerdev`) goes into the `TENANT_SUBDOMAIN` variable.
+9. **Paste the captured values into the committed tfvars file for this environment.** These are tenant-level identifiers, **not secrets** - tenant GUIDs and subdomains are public (the subdomain is literally part of the sign-in URL). They belong in the committed tfvars alongside other non-secret tenant config, *not* in GitHub Environment secrets. Concretely:
+   - For `dev`, edit [`infra/envs/dev.tfvars`](../../infra/envs/dev.tfvars) and set:
+
+     ```hcl
+     external_tenant_id = "<paste tenant GUID here>"
+     tenant_subdomain   = "<paste subdomain prefix here, e.g. eacustomerdev>"
+     ```
+
+   - For `production`, make the equivalent edit in [`infra/envs/production.tfvars`](../../infra/envs/production.tfvars).
+   - Commit these changes on the same feature branch as the infra module work and include them in the PR.
+
+   Why committed tfvars and not a GitHub Environment secret: Terraform's `-var-file=envs/<env>.tfvars` has **higher precedence than `TF_VAR_*` environment variables**. If the tfvars file still holds a `<PLACEHOLDER: ...>` string, `terraform plan` silently uses the placeholder even when the operator populated `push-sso-secrets.sh` correctly, and the `azuread.external` provider fails with an opaque unmarshal error.
+
+Reference: [What is Microsoft Entra External ID?](https://learn.microsoft.com/en-us/entra/external-id/customers/overview-customers-ciam)
+
+---
+
+## 4. Part B - Create the Terraform service principal inside the External ID tenant
+
+Terraform needs credentials **inside** the External ID tenant to manage app registrations and user flows. The workforce-tenant CI service principal cannot reach in; this is the standard "dedicated deployment SP" pattern.
+
+Run this twice - once in each External ID tenant.
+
+1. In the Azure Portal, use the top-right tenant switcher to switch into the **External ID tenant** just created.
+2. Open **Entra ID -> App registrations -> New registration**.
+3. Fill in:
+   - **Name**: `ea-terraform-deployer`
+   - **Supported account types**: *Accounts in this organizational directory only (single tenant)*
+   - Leave redirect URI blank.
+4. Click **Register**.
+5. From the new app's blade, open **API permissions -> Add a permission -> Microsoft Graph -> Application permissions** and add each of the following:
+   - `Application.ReadWrite.OwnedBy`
+   - `IdentityProvider.ReadWrite.All`
+   - `Policy.ReadWrite.AuthenticationFlows`
+6. Click **Grant admin consent for \<tenant\>** and confirm. All three permissions should show a green check.
+7. Open **Certificates & secrets -> Client secrets -> New client secret**.
+   - **Description**: `terraform-ci`
+   - **Expires**: 24 months (track expiry; see [Section 10](#10-secret-rotation)).
+   - Click **Add**, then immediately copy the secret **Value** (not the Secret ID). It is only shown once.
+8. Open **Overview** and record:
+   - **Application (client) ID** -> `EXTERNAL_TENANT_CLIENT_ID`
+   - Client secret value -> `EXTERNAL_TENANT_CLIENT_SECRET`
+
+---
+
+## 5. Part C - Register the Google OAuth 2.0 client (one per env)
+
+Repeat twice (dev project + prod project). Keeping dev and prod in **separate Google Cloud projects** is required for independent consent screens and secret rotation.
+
+1. Go to [https://console.cloud.google.com](https://console.cloud.google.com).
+2. In the top project selector, click **New Project**:
+   - **Project name**: `ea-customer-dev` or `ea-customer-prd`
+   - Leave organization/billing defaults.
+3. After creation, select the new project.
+4. Open **APIs & Services -> OAuth consent screen**.
+   - **User Type**:
+     - Choose **External** if your Google account is not part of a Google Workspace org.
+     - Choose **Internal** if you are in a Google Workspace org and want to restrict to internal accounts (not useful for this demo - leave **External**).
+   - Click **Create**.
+5. On the **App information** step:
+   - **App name**: `EA Customer (Dev)` or `EA Customer (Prod)`
+   - **User support email**: your email.
+   - **Developer contact email**: your email.
+   - Leave logo, homepage, and privacy policy blank for dev.
+6. On the **Scopes** step, click **Add or Remove Scopes** and select `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`. Save and continue.
+7. On the **Test users** step (dev only): add the Gmail addresses that will sign in during smoke tests. Publish status stays **Testing**.
+8. **Production only**: click **Publish app** and submit for verification. Verification can take several weeks - plan ahead.
+9. Open **APIs & Services -> Credentials -> Create Credentials -> OAuth client ID**.
+   - **Application type**: *Web application*
+   - **Name**: `EA Dev External ID` or `EA Prod External ID`
+   - **Authorized redirect URIs**: add the External ID federation callback URL. The format is:
+
+     ```
+     https://<tenant-subdomain>.ciamlogin.com/<external-tenant-id>/federation/oauth2
+     ```
+
+     For example: `https://eacustomerdev.ciamlogin.com/11111111-2222-3333-4444-555555555555/federation/oauth2`.
+
+     Confirm the exact URL by switching to the External ID tenant in Azure Portal -> **External Identities -> All identity providers -> + Google** - the wizard shows the callback URL that must be registered.
+10. Click **Create**. Copy the **Client ID** and **Client Secret** immediately. Store both in your password manager; the portal-side [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) paste and all future rotations read from there.
+
+Reference: [Add Google as an identity provider](https://learn.microsoft.com/en-us/entra/external-id/customers/how-to-google-federation-customers).
+
+---
+
+## 6. Part D - Push secrets and variables to GitHub
+
+Set secrets/variables into each GitHub Environment. Tenant subdomain is **not sensitive** and goes in as a variable; everything else is a secret.
+
+Rather than running the `gh` commands by hand per environment, use the companion script at [`docs/runbooks/sample.push-sso-secrets.sh`](./sample.push-sso-secrets.sh). It takes a single positional argument (`dev` or `production`) and runs the same `gh secret set` / `gh variable set` calls under the hood.
+
+1. Copy the sample to a local, populated copy (the destination filename drops the `sample.` prefix):
+
+   ```bash
+   cd docs/runbooks
+   cp sample.push-sso-secrets.sh push-sso-secrets.sh
+   ```
+
+   The repo's `.gitignore` excludes `docs/runbooks/push-sso-secrets.sh` as belt-and-suspenders - the populated copy must **never** be committed.
+
+2. Open `push-sso-secrets.sh` in an editor and replace each `<PASTE ...>` placeholder with the real value recorded during Parts A-B. The `TENANT_SUBDOMAIN` values (`eacustomerdev` / `eacustomerprod`) are already inlined in the script and do not need populating.
+
+3. Run the script once per environment:
+
+   ```bash
+   cd docs/runbooks
+   chmod +x push-sso-secrets.sh   # if needed
+   ./push-sso-secrets.sh dev
+   ./push-sso-secrets.sh production
+   ```
+
+Verify with:
+
+```bash
+gh secret list   --env dev
+gh variable list --env dev
+gh secret list   --env production
+gh variable list --env production
+```
+
+Once verification passes, delete your local populated copy - the values now live in GitHub Environment storage:
+
+```bash
+rm docs/runbooks/push-sso-secrets.sh
+```
+
+> **Note on inert GitHub objects**: the `EXTERNAL_TENANT_ID` secret and the `TENANT_SUBDOMAIN` variable pushed by `push-sso-secrets.sh` are now **functionally inert** - Terraform / CI reads both of these values from the committed `infra/envs/<env>.tfvars` file (populated per the final step of [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env)) because `-var-file` beats `TF_VAR_*`. They remain in `push-sso-secrets.sh` for reference and so the script keeps a complete picture of what Parts A/B capture; you do not need to remove them. This is the same pattern as the existing "orphaned in GitHub Environment secrets" callout for `GOOGLE_OIDC_CLIENT_ID` / `GOOGLE_OIDC_CLIENT_SECRET` in [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers).
+>
+> Correspondingly, [`docs/runbooks/source-sso-env.sh`](./source-sso-env.sh) now exports just the **two** external-tenant SP credentials as `TF_VAR_*` values (`TF_VAR_external_tenant_client_id`, `TF_VAR_external_tenant_client_secret`). The `external_tenant_id` and `tenant_subdomain` values used to be exported here as well; they have been dropped because the tfvars file is authoritative.
+
+> **Note to infra agent**: [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) still supplies `TF_VAR_external_tenant_client_id` and `TF_VAR_external_tenant_client_secret` from the GitHub Environment secrets. `external_tenant_id` and `tenant_subdomain` come from the committed tfvars and no longer need to be wired through `TF_VAR_*`. The Google client ID / secret are no longer Terraform inputs (user flow + Google IDP moved to portal-managed via [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers)); that wiring is Terraform work, not part of this manual runbook.
+
+---
+
+## 7. Part E - Grant workforce-tenant Graph permissions (one-time)
+
+Once the infra agent ships the updated bootstrap ([`infra/bootstrap/main.tf`](../../infra/bootstrap/main.tf)), the existing CI service principal in the **workforce** tenant needs two new Graph permissions:
+
+- `Application.ReadWrite.OwnedBy`
+- `IdentityProvider.ReadWrite.All`
+
+Steps:
+
+1. Pull the bootstrap change and apply it locally:
+
+   ```bash
+   cd /workspace/infra/bootstrap
+   terraform init
+   terraform apply
+   ```
+
+   The bootstrap uses `azuread_app_role_assignment` resources to attach each Graph app role directly to the CI SP via the Microsoft Graph `appRoleAssignedTo` endpoint - which **is** the admin-consent operation. As a result, both permissions appear immediately as *Granted for \<tenant\>* on the SP as soon as `terraform apply` completes; no separate portal "Grant admin consent" click is required. The portal steps below are verification-only.
+
+2. In the Azure Portal, switch to the **workforce** tenant and open **Entra ID -> Enterprise applications**. Search for `ea-github-oidc`.
+
+   If the SP does not appear, the Enterprise applications blade's default **Application Type** filter hides custom app-registration SPs. Change the filter to **All Applications**, or use the **App registrations** blade instead. (This was discovered during a real bootstrap run.)
+
+3. Open the `ea-github-oidc` SP and navigate to **Permissions**. Confirm both `Application.ReadWrite.OwnedBy` and `IdentityProvider.ReadWrite.All` show a green *Granted for \<tenant\>*. Do **not** click **Grant admin consent** - the Terraform apply has already performed that operation, and clicking it is unnecessary.
+
+4. While on the SP, note that the portal exposes three distinct GUIDs, all of which are legitimate and refer to different objects:
+   - **Application (client) ID** on the SP's Overview -> the OIDC `client_id` the workflow uses to authenticate. This matches `azuread_application.github_oidc.client_id`.
+   - **Object ID** shown on the **Enterprise applications** blade -> the **service principal's** object ID. This is what `azuread_service_principal.github_oidc.object_id` emits and what the `azuread_app_role_assignment` resources target as `principal_object_id`.
+   - **Object ID** shown on the **App registrations** blade -> the **application** object's object ID, which is different from the SP's object ID.
+
+   Every app registration has two object IDs in Microsoft Graph (one on the application object, one on its service principal). An operator comparing Terraform output to the portal will see what looks like a mismatch; it is not.
+
+---
+
+## 8. Part F - Verification
+
+After Parts A through E, and after the infra agent's Terraform lands:
+
+### Optional: local-plan preview (recommended for the first apply)
+
+**Rationale**: [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) runs `terraform apply -auto-approve` - CI never pauses on the plan. On the **first** deployment of the External ID module against a new tenant, a dry-run plan executed locally is the only safety net before CI commits to the apply. Once the module has successfully applied once and the resource shape is known-good, subsequent runs can skip this preview and rely on CI. Treat this subsection as a one-time / first-deployment safety check, not a routine operation.
+
+**Prerequisites** for this preview:
+
+- You have completed [Parts A-E](#3-part-a---create-the-entra-external-id-tenant-one-per-env).
+- `infra/envs/<env>.tfvars` has been populated with the real `external_tenant_id` (GUID) and `tenant_subdomain` values captured in [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env). **This is the key gating step** - if the tfvars still holds `<PLACEHOLDER: ...>` strings, `-var-file` beats `TF_VAR_*` and the plan silently uses the placeholder, which then blows up inside the `azuread.external` provider.
+- You have populated `docs/runbooks/push-sso-secrets.sh` (from [Part D](#6-part-d---push-secrets-and-variables-to-github)) and pushed the values into the GitHub Environment secrets. (The local file is the DRY source that `source-sso-env.sh` reuses; if you already deleted it after Part D, restore it from your password manager or re-copy from `sample.push-sso-secrets.sh` and repopulate.)
+- You have authenticated against the **workforce** tenant with `az login` so the AzureRM and AzureAD providers can initialize. Note: `plan-infra.sh` passes `-refresh=false` to `terraform plan` by default, so the local preview is advisory and does **not** require your `az login` identity to hold every data-source read permission (notably Key Vault Secrets - those typically require the `deployer_officer` role). The full-refresh plan is done by CI under the platform SP.
+
+**Command**:
+
+Run the tracked wrapper [`docs/runbooks/plan-infra.sh`](./plan-infra.sh) with the target environment:
+
+```bash
+bash docs/runbooks/plan-infra.sh dev
+```
+
+To save the plan binary for a later apply, pass `--out`:
+
+```bash
+bash docs/runbooks/plan-infra.sh dev --out /tmp/dev.tfplan
+```
+
+`plan-infra.sh` is a tracked wrapper over `eval "$(source-sso-env.sh <env>)"` + `az account show --query id -o tsv` + `terraform init`/`terraform plan`, so the operator does not have to assemble those steps by hand. It resolves its own location and can be invoked from any working directory, sources `TF_VAR_*` via [`docs/runbooks/source-sso-env.sh`](./source-sso-env.sh) (no duplication), fetches the current subscription ID from `az account show`, runs `terraform init -upgrade` against the env-specific backend key (`dev.tfstate` / `production.tfstate`) with the fixed backend config (resource group `ea-tfstate-rg`, storage account `eatfstateeaboot`, container `tfstate`), and runs `terraform plan -var-file=envs/<env>.tfvars -var subscription_id="<resolved>" -refresh=false`. Omit `--out` for a read-only preview.
+
+**What to expect in a clean first-run plan**:
+
+- `module.entra_external_id.azuread_application.api` and `module.entra_external_id.azuread_application.spa` - the two app registrations - appearing as **additions**.
+- The matching `azuread_service_principal` resources for each app registration - also **additions**.
+- The API app registration's **identifier URI** (`api://<client-id>`) and the **SPA pre-authorization** entry on the API app's exposed scope - **additions** on the API app reg.
+- `module.container_apps.*` updates where the API container app gets new `AzureAd__*` environment variables populated from `module.entra_external_id` outputs.
+- **Zero destroys of unrelated resources.** If the plan shows destroys outside `module.entra_external_id`, **stop** and investigate - that indicates state drift, not expected change.
+
+Note: the user flow, Google IDP, Email one-time passcode method, Microsoft Account, and Microsoft Entra ID (multi-tenant) providers are **not** in the plan - those are portal-managed via [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers).
+
+**If the plan is clean**: commit and push the branch. CI picks up the GitHub Environment secrets (wired through `deploy.yml` into the same `TF_VAR_*` names) and runs the identical apply.
+
+**If the plan is NOT clean**: stop. Capture the full plan output, investigate before pushing. Likely causes include stale remote state, a missing or mistyped `TF_VAR_*` export, an un-populated `infra/envs/<env>.tfvars` (placeholder strings still in place - see the prerequisites above), or provider drift against the External ID tenant. Do **not** push the branch until the plan is clean - CI will auto-apply whatever it sees.
+
+> **First-apply reminder**: On the very first `terraform apply` against a new tenant, the app registrations land but the tenant still has no user flow and no identity providers configured. [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) (portal-configure user flow + IDPs) must run immediately after this apply succeeds and before Step 3's end-to-end sign-in smoke test. On subsequent applies Part G is already in place and nothing more is required.
+
+### Step 1. Confirm the CI apply
+
+1. After pushing the branch (with a clean local plan, or directly if this is not the first apply), the normal deploy pipeline ([`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml)) runs `terraform apply -auto-approve` against the dev backend. Confirm the workflow run succeeds and the apply log matches what the local preview showed.
+
+   For the **first** apply, this is the step that commits to the change you previewed above. For subsequent applies, this is the routine path - no local preview required.
+
+### Step 2. Verify External ID tenant resources
+
+2. Switch to the External ID tenant in the Azure Portal and verify:
+   - **Entra ID -> App registrations**: `ea-api-dev` and `ea-spa-dev` exist (and the prod pair after prod apply).
+   - **Entra ID -> Enterprise applications**: matching SPs exist for both.
+   - The API app reg's **Expose an API** blade shows the identifier URI `api://<api-client-id>` and lists `ea-spa-<env>` under **Authorized client applications** (SPA pre-authorization).
+
+   If this is the first apply on this tenant, the user flow and identity providers are **not** expected yet - those arrive in [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers).
+
+### Step 3. Smoke test end-to-end sign-in
+
+3. Smoke test the end-to-end sign-in flow. **Prerequisite**: on the first apply, [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) must be complete - without the user flow and IDPs configured in the portal, the SPA sign-in will surface a tenant-level error (no user flow attached) rather than the IDP picker.
+   - Browse to the dev SWA URL (e.g. `https://<swa-dev>.azurestaticapps.net`).
+   - Click **Sign in**.
+   - Confirm the Microsoft-hosted sign-in page renders all four IDP options.
+   - Sign in with each option in turn and confirm a round-trip to the SPA with a valid session.
+
+---
+
+## 9. Part G - Portal-configure the user flow and identity providers
+
+Run this **once per tenant**, immediately after the first successful `terraform apply` in [Part F](#8-part-f---verification) - that apply is what creates the `ea-spa-<env>` app registration and its redirect URIs, which the user flow needs to exist before it can be attached. Repeat once for `dev`, once for `production`.
+
+> **True-up for operators who already ran Parts A-E**
+>
+> The move from Terraform-managed user flow / IDPs to portal-managed user flow / IDPs does **not** invalidate prior bootstrap work. Specifically:
+>
+> - **Still valid, no action**:
+>   - **Part A** - the External ID tenant itself. Keep.
+>   - **Part B** - the `ea-terraform-deployer` SP and its client secret. Terraform still uses these to manage the `ea-api-<env>` / `ea-spa-<env>` app registrations, SPs, identifier URI, and SPA pre-authorization.
+>   - **Part C** - the Google Cloud OAuth client and its client ID / client secret. These are now consumed by the portal paste in [Step 2](#step-2) below rather than by Terraform. Keep them in your password manager; all future rotations go portal-side (see [Section 10](#10-secret-rotation)).
+>   - **Part E** - workforce-tenant Graph consent (`Application.ReadWrite.OwnedBy`, `IdentityProvider.ReadWrite.All`). Still required for `azuread` app-registration management in CI.
+> - **You likely have NOT yet populated `infra/envs/dev.tfvars` (and/or `production.tfvars`) with real `external_tenant_id` + `tenant_subdomain`.** The runbook previously did not instruct this. Do it now - see the extended final step of [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env) - before re-running `bash docs/runbooks/plan-infra.sh <env>`. Without this, `-var-file` wins over `TF_VAR_*` and the plan blows up inside the `azuread.external` provider with an opaque unmarshal error.
+> - **`source-sso-env.sh` no longer exports `TF_VAR_external_tenant_id` or `TF_VAR_tenant_subdomain`.** Those two values now live in the committed tfvars (see above). `push-sso-secrets.sh` still contains them for reference and for the (now-inert) GitHub secret / variable push; those GitHub objects are harmless and may be left in place.
+> - **Now orphaned in GitHub Environment secrets**: `GOOGLE_OIDC_CLIENT_ID` and `GOOGLE_OIDC_CLIENT_SECRET` under **both** the `dev` and `production` environments. Terraform no longer reads these. Options:
+>   - Leave them in place - harmless; they are simply unused.
+>   - Or remove them for hygiene:
+>
+>     ```bash
+>     gh secret remove GOOGLE_OIDC_CLIENT_ID     --env dev
+>     gh secret remove GOOGLE_OIDC_CLIENT_SECRET --env dev
+>     gh secret remove GOOGLE_OIDC_CLIENT_ID     --env production
+>     gh secret remove GOOGLE_OIDC_CLIENT_SECRET --env production
+>     ```
+>
+>   Either way, the Google client ID / secret must still live in your **password manager** for future portal rotation.
+> - **`push-sso-secrets.sh`** - if you still have a populated local copy (not the tracked `sample.*` template), the two `GOOGLE_OIDC_CLIENT_ID` and `GOOGLE_OIDC_CLIENT_SECRET` assignments and the trailing `gh secret set GOOGLE_OIDC_*` invocations are now no-ops against Terraform. You may delete those lines from your local copy, or ignore them - they do not break anything. The tracked `sample.push-sso-secrets.sh` has already been updated to the four-value shape.
+
+### Step 1. Create the user flow
+
+1. Switch into the External ID tenant (top-right tenant switcher).
+2. Open **External Identities -> User flows -> + New user flow**.
+3. Configure:
+   - **Name**: `ea-<env>-signup-signin` (e.g. `ea-dev-signup-signin`). The `B2C_1_` prefix is prepended automatically by the portal in some UIs - match whichever label the current portal version shows; the resulting flow name is the same.
+   - **Type**: *Sign up and sign in*.
+   - Attributes collected at sign-up: pick the minimum set that the SPA consumes (typically email + display name).
+4. Click **Create**.
+5. On the new flow's **Applications** blade, click **+ Add application** and attach `ea-spa-<env>`. This is the binding that tells the Microsoft-hosted sign-in page to render this flow when the SPA initiates auth.
+
+### Step 2. Configure the four tenant-level identity providers
+
+Under **External Identities -> All identity providers**, configure each of the following. These are **tenant-level** providers; enabling them here makes them *available* to user flows, but each flow still has to opt in (Step 3).
+
+- **Microsoft Entra ID (multi-tenant)** - social/work provider. Enable. **No credentials required** - the External ID tenant federates with Microsoft's shared authority directly.
+- **Microsoft Account** - social provider for personal MSA accounts. Enable. **No credentials required**.
+- **Google**:
+  1. Click **+ Google**.
+  2. **Name**: `Google`.
+  3. **Client ID**: paste the Google OAuth client ID captured in [Part C](#5-part-c---register-the-google-oauth-20-client-one-per-env) (from your password manager).
+  4. **Client secret**: paste the Google OAuth client secret from the same password-manager entry.
+  5. Save.
+- **Email one-time passcode**: the exact portal location has shifted between External ID portal versions - check both **External Identities -> Email and phone signup** and **External Identities -> Authentication methods** and use whichever blade the current portal version exposes. Enable the setting named something like "Email with one-time passcode" or "Email OTP for guests" (the label differs slightly between portal versions; match whatever is currently rendered).
+
+### Step 3. Enable all four providers on the user flow
+
+1. Return to **External Identities -> User flows -> `ea-<env>-signup-signin`**.
+2. Open the **Identity providers** blade.
+3. Enable all four: **Microsoft Entra ID**, **Microsoft Account**, **Google**, **Email one-time passcode**.
+4. Save.
+
+This is the step that makes the Microsoft-hosted sign-in page actually render the full four-tile picker. Without it, the tenant-level providers from Step 2 exist but will not appear in the flow.
+
+### Step 4. Validate the picker renders
+
+1. Still on the user flow blade, click **Run user flow**. In the preview pane, select the `ea-spa-<env>` application and the SPA's reply URL, then click **Run user flow**.
+2. Alternatively, hit the real SPA sign-in (the same URL used in [Part F Step 3](#step-3-smoke-test-end-to-end-sign-in)).
+3. Confirm that all four IDP tiles render on the Microsoft-hosted sign-in page.
+4. Optionally, complete a sign-in through each IDP to confirm the round-trip.
+
+Repeat Steps 1-4 for the `production` tenant after its first `terraform apply`.
+
+---
+
+## 10. Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `AADSTS50011: Reply URL mismatch` | SPA redirect URI not registered on the SPA app reg | Confirm the SWA FQDN (including trailing slash behavior) and `http://localhost:4200/auth/redirect` are in the SPA app reg's redirect URIs. Terraform owns this; update the module input and re-apply. |
+| Microsoft-hosted sign-in page errors out with "no user flow" or "application is not configured" | Part G has not been run on this tenant, or the user flow is not attached to `ea-spa-<env>` | Complete [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) Step 1.5 (attach the SPA app to the user flow). |
+| Sign-in page renders fewer than four IDP tiles | The tenant-level provider is enabled but the user flow is not opted in, or vice versa | Check both [Part G Step 2](#step-2-configure-the-four-tenant-level-identity-providers) (tenant-level) and [Step 3](#step-3-enable-all-four-providers-on-the-user-flow) (flow-level). Both are required. |
+| Google sign-in returns `Error 403: access_denied` for non-test users | Google consent screen still in **Testing** mode | Add the account to the test user list, or submit the app for verification (see [Part C](#5-part-c---register-the-google-oauth-20-client-one-per-env)). |
+| Google sign-in returns `invalid_client` or `unauthorized_client` | Google OAuth client ID/secret in the External ID Google IDP config is wrong or rotated out-of-band | Re-paste the current client ID and secret into **External Identities -> All identity providers -> Google** (Part G Step 2). |
+| API returns `401 invalid_token` with `aud` claim mismatch | `accessTokenAcceptedVersion` on the API app reg is not `2` | Confirm `accessTokenAcceptedVersion = 2` in the API app reg manifest. Terraform's `api` block should set this; if set to `null` or `1`, tokens are v1 and will not match the v2 authority. |
+| `Insufficient privileges to complete the operation` during `terraform apply` | Terraform deployer SP (Part B) missing admin consent | Return to [Part B](#4-part-b---create-the-terraform-service-principal-inside-the-external-id-tenant) step 6 and click **Grant admin consent**. |
+| CI pipeline fails with `AADSTS700016` when touching External ID | CI SP missing Graph permissions or admin consent in workforce tenant | Rerun [Part E](#7-part-e---grant-workforce-tenant-graph-permissions-one-time). |
+| `idp` claim absent on an ID token | User signed in via email OTP (local account) - this is expected | Backend defaults `ICurrentUser.Idp` to `"email"` for absent claims - see the [SSO plan](../../) phase 2A notes. |
+| `azuread.external` provider fails with `cannot unmarshal response: invalid character '<' looking for beginning of value` | `infra/envs/<env>.tfvars` still has `<PLACEHOLDER: ...>` for `external_tenant_id` (and/or `tenant_subdomain`). `-var-file` beats `TF_VAR_*`, so Terraform is trying to authenticate against the literal placeholder string instead of the real GUID. | Paste the real values per the final step of [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env), commit the tfvars change, then re-run `bash docs/runbooks/plan-infra.sh <env>`. |
+| `terraform plan` aborts during refresh with `ForbiddenByRbac` reading a Key Vault secret | Your `az login` identity does not currently hold the `deployer_officer` role, so data-source refresh cannot read Key Vault Secrets. | Use [`docs/runbooks/plan-infra.sh`](./plan-infra.sh) (which passes `-refresh=false`) for a local preview - refresh-free plans are advisory and sufficient for the safety check. Full-refresh plans are performed by CI under the platform SP. **Do not** attempt to grant yourself `deployer_officer` manually just to run a preview. |
+
+---
+
+## 11. Secret rotation
+
+Secrets to rotate, and how:
+
+### External ID tenant SP client secret (from Part B)
+
+1. In the External ID tenant portal: **Entra ID -> App registrations -> `ea-terraform-deployer` -> Certificates & secrets -> New client secret**.
+2. Copy the new secret value immediately.
+3. Push to GitHub:
+
+   ```bash
+   gh secret set EXTERNAL_TENANT_CLIENT_SECRET --env dev        --body "<new-value>"
+   gh secret set EXTERNAL_TENANT_CLIENT_SECRET --env production --body "<new-value>"
+   ```
+
+4. Re-run the deploy workflow to confirm Terraform still authenticates.
+5. Delete the old secret from the app reg **Certificates & secrets** blade.
+
+### Google OAuth client secret (from Part C)
+
+Rotation is now **portal-only** - Terraform does not consume the Google secret, so there is no GitHub secret push and no re-apply.
+
+1. In Google Cloud Console: **APIs & Services -> Credentials -> \<the OAuth client\> -> Reset secret**. Copy the new client secret.
+2. Switch to the External ID tenant in the Azure Portal and open **External Identities -> All identity providers -> Google**.
+3. Paste the new client secret into the **Client secret** field (the client ID stays the same unless you also rotated that). Save.
+4. Update the entry in your password manager so future rotations read the current value.
+5. Confirm sign-in still works end-to-end via the SPA. Google invalidates the old secret automatically after reset.
+
+> If stale `GOOGLE_OIDC_CLIENT_ID` / `GOOGLE_OIDC_CLIENT_SECRET` entries still exist in GitHub Environment secrets from the pre-portal era, they are inert - no consumer reads them. See the true-up callout at the top of [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) for optional removal.
+
+### Cadence
+
+- Rotate both secrets **annually** at minimum, or immediately on suspected compromise or operator departure.
+- Track expiry of the External ID SP secret (24 months from creation) - set a calendar reminder.
