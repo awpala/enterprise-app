@@ -9,6 +9,12 @@
 # routed to LAW via the `log_analytics_workspace_id` argument on
 # azurerm_container_app_environment in modules/container-apps. Adding a
 # diagnostic_setting on top would duplicate ingestion.
+#
+# Postgres Flexible Server: we ship only the always-on log categories
+# (PostgreSQLLogs, PostgreSQLFlexSessions). The Query Store categories
+# (PostgreSQLFlexQueryStoreRuntime, PostgreSQLFlexQueryStoreWaitStatistics)
+# are gated on the `pg_qs.query_capture_mode` server parameter being set
+# to TOP or ALL; enable Query Store first, then re-add those categories.
 #-------------------------------------------------------------------------
 
 resource "azurerm_monitor_diagnostic_setting" "postgres" {
@@ -18,8 +24,6 @@ resource "azurerm_monitor_diagnostic_setting" "postgres" {
 
   enabled_log { category = "PostgreSQLLogs" }
   enabled_log { category = "PostgreSQLFlexSessions" }
-  enabled_log { category = "PostgreSQLFlexQueryStoreRuntime" }
-  enabled_log { category = "PostgreSQLFlexQueryStoreWaitStatistics" }
 
   enabled_metric {
     category = "AllMetrics"
