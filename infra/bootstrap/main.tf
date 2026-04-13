@@ -7,6 +7,8 @@
 #     for GitHub Actions OIDC (per environment)
 #   - Role assignments (Contributor + UAA at subscription scope, Storage
 #     Blob Data Contributor on the tfstate account)
+#   - Microsoft Graph app-role assignments on the CI SP so the root
+#     infra's azuread provider can manage Entra External ID app regs
 #
 # State is LOCAL (see versions.tf) and gitignored. Outputs include
 # `gh_setup_commands` which the user pipes into bash to populate repo
@@ -16,6 +18,16 @@
 data "azurerm_subscription" "current" {}
 data "azurerm_client_config" "current" {}
 data "azuread_client_config" "current" {}
+
+#-------------------------------------------------------------------------
+# Microsoft Graph — the "resource app" the CI SP needs app-roles on so
+# Terraform can manage app registrations (for Entra External ID).
+# The client_id 00000003-0000-0000-c000-000000000000 is Microsoft Graph's
+# well-known global app ID. Every tenant has a service principal for it.
+#-------------------------------------------------------------------------
+data "azuread_service_principal" "msgraph" {
+  client_id = "00000003-0000-0000-c000-000000000000"
+}
 
 #-------------------------------------------------------------------------
 # tfstate RG + storage account + container
@@ -89,6 +101,40 @@ resource "azuread_application_federated_identity_credential" "gh_env" {
   audiences      = ["api://AzureADTokenExchange"]
   issuer         = "https://token.actions.githubusercontent.com"
   subject        = "repo:${var.github_owner}/${var.github_repo}:environment:${each.key}"
+}
+
+#-------------------------------------------------------------------------
+# Microsoft Graph app-role assignments on the CI SP.
+#
+# These grant the GitHub OIDC service principal the Graph permissions
+# needed for the root infra's `azuread` provider (default alias,
+# workforce tenant) to manage app registrations owned by the SP.
+#
+# NOTE: These only cover the workforce-tenant path. The External ID
+# (`.external`) provider alias authenticates as a SEPARATE app
+# registration inside the External ID tenant (client_id + secret
+# delivered via TF_VAR_external_tenant_client_id /
+# TF_VAR_external_tenant_client_secret). That app registration must be
+# granted the same Graph permissions inside the External ID tenant, and
+# admin-consented there. See the runbook for the one-time manual step.
+#
+# App-role IDs are Microsoft Graph constants:
+#   Application.ReadWrite.OwnedBy = 18a4783c-866b-4cc7-a460-3d5e5662c884
+#   IdentityProvider.ReadWrite.All = 90db2b9a-d928-4d33-a4dd-8442ae3d41e4
+#
+# After `terraform apply`, admin consent must be granted ONCE per tenant:
+#   az ad app permission admin-consent --id <azure_client_id>
+#-------------------------------------------------------------------------
+resource "azuread_app_role_assignment" "graph_application_readwrite_ownedby" {
+  principal_object_id = azuread_service_principal.github_oidc.object_id
+  resource_object_id  = data.azuread_service_principal.msgraph.object_id
+  app_role_id         = "18a4783c-866b-4cc7-a460-3d5e5662c884"
+}
+
+resource "azuread_app_role_assignment" "graph_identityprovider_readwrite_all" {
+  principal_object_id = azuread_service_principal.github_oidc.object_id
+  resource_object_id  = data.azuread_service_principal.msgraph.object_id
+  app_role_id         = "90db2b9a-d928-4d33-a4dd-8442ae3d41e4"
 }
 
 #-------------------------------------------------------------------------

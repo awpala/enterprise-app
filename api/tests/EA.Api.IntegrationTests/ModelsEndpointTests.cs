@@ -19,6 +19,15 @@ public class ModelsEndpointTests
         _factory = new ApiWebApplicationFactory();
         await _factory.InitializeContainersAsync();
         _client = _factory.CreateClient();
+        // Attach a default synthetic principal so the guarded controller
+        // actions exercised by this fixture are authorized. Per-test identity
+        // control lives in AuditStampingTests.
+        _client.WithUser(
+            oid: Guid.NewGuid(),
+            tid: Guid.NewGuid(),
+            idp: "test",
+            name: "Integration Fixture",
+            email: "fixture@example.com");
     }
 
     [OneTimeTearDown]

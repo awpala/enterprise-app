@@ -15,6 +15,7 @@ public static class SeedDataGenerator
 {
     private const int ModelCount = 20;
     private const string GuidNamespace = "ea-seed-model";
+    private const string CreatorGuidNamespace = "ea-seed-creator";
     private static readonly DateTime BaseDateUtc = new(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     private static readonly string[] NamePool =
@@ -43,13 +44,13 @@ public static class SeedDataGenerator
         null
     ];
 
-    private static readonly string[] CreatedByPool =
-    [
-        "alice@example.com",
-        "bob@example.com",
-        "carol@example.com",
-        "seed-user"
-    ];
+    /// <summary>
+    /// Fixed pool of (fake-oid, display-name) pairs used to stamp seeded rows.
+    /// The Guids are derived from the display names via <see cref="DeterministicGuid"/>
+    /// so reseeds always produce the same identifiers — handy for comparing
+    /// audit queries across environments.
+    /// </summary>
+    private static readonly (Guid FakeOid, string DisplayName)[] CreatedByPool = BuildCreatedByPool();
 
     private static readonly string[] Distributions = ["normal", "uniform", "lognormal", "triangular"];
 
@@ -106,7 +107,7 @@ public static class SeedDataGenerator
         var createdAt = BaseDateUtc.AddDays(index);
         var updatedAt = createdAt.AddHours(rng.Next(0, 30 * 24));
 
-        var createdBy = CreatedByPool[index % CreatedByPool.Length];
+        var (fakeOid, displayName) = CreatedByPool[index % CreatedByPool.Length];
 
         return new SeedModelDto
         {
@@ -118,7 +119,8 @@ public static class SeedDataGenerator
             Parameters = parameters,
             CreatedAtUtc = createdAt,
             UpdatedAtUtc = updatedAt,
-            CreatedBy = createdBy
+            CreatedBy = fakeOid,
+            CreatedByName = displayName
         };
     }
 
@@ -147,6 +149,21 @@ public static class SeedDataGenerator
             ["stddev"] = stddev,
             ["iterations"] = iterations
         };
+    }
+
+    private static (Guid, string)[] BuildCreatedByPool()
+    {
+        string[] names =
+        [
+            "alice@example.com",
+            "bob@example.com",
+            "carol@example.com",
+            "seed-user"
+        ];
+
+        return names
+            .Select(n => (DeterministicGuid($"{CreatorGuidNamespace}-{n}"), n))
+            .ToArray();
     }
 
     private static Guid DeterministicGuid(string key)

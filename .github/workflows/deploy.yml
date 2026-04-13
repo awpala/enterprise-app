@@ -43,6 +43,31 @@ jobs:
       ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # Customer SSO (Entra External ID + Google OAuth)
+      # Environment-scoped secrets/variable flow in automatically via the
+      # `environment:` selector above. Mapped here to the TF_VAR_* names
+      # that the root module's variables.tf expects.
+      TF_VAR_external_tenant_id:            ${{ secrets.EXTERNAL_TENANT_ID }}
+      TF_VAR_tenant_subdomain:              ${{ vars.TENANT_SUBDOMAIN }}
+      TF_VAR_external_tenant_client_id:     ${{ secrets.EXTERNAL_TENANT_CLIENT_ID }}
+      TF_VAR_external_tenant_client_secret: ${{ secrets.EXTERNAL_TENANT_CLIENT_SECRET }}
+      TF_VAR_google_oidc_client_id:         ${{ secrets.GOOGLE_OIDC_CLIENT_ID }}
+      TF_VAR_google_oidc_client_secret:     ${{ secrets.GOOGLE_OIDC_CLIENT_SECRET }}
+
+      # Exposes the "Log in as Dev" synthetic-session affordance on the SPA
+      # landing page. Enabled in dev so engineers can smoke-test without
+      # provisioning a real External ID session; disabled in prod.
+      ENABLE_DEV_AUTH: ${{ github.ref == 'refs/heads/main' && 'false' || 'true' }}
+
+      # Exposes the "Log in as Guest" prod-only demo/prospecting failsafe
+      # on the SPA landing page. Inverse of ENABLE_DEV_AUTH: ON for prod,
+      # OFF everywhere else. The UI build script (build-ui.sh) forwards
+      # this into ng build; generate-environment.mjs reads it alongside
+      # ENABLE_DEV_AUTH. Authoritative Terraform tfvar for the API side
+      # lives in infra/envs/*.tfvars (allow_guest_auth), so no matching
+      # TF_VAR_* is needed here.
+      ENABLE_GUEST_AUTH: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4

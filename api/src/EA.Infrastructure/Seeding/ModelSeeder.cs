@@ -130,7 +130,8 @@ public sealed class ModelSeeder(ILogger<ModelSeeder> logger)
             Parameters = parameters,
             CreatedAtUtc = DateTime.SpecifyKind(dto.CreatedAtUtc, DateTimeKind.Utc),
             UpdatedAtUtc = DateTime.SpecifyKind(dto.UpdatedAtUtc, DateTimeKind.Utc),
-            CreatedBy = dto.CreatedBy
+            CreatedBy = dto.CreatedBy,
+            CreatedByName = dto.CreatedByName
         };
     }
 }

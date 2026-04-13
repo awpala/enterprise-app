@@ -1,12 +1,13 @@
 using System.Text.Json;
 using EA.Domain.Enums;
+using EA.Domain.Interfaces;
 
 namespace EA.Domain.Entities;
 
 /// <summary>
 /// Represents a model entity — the primary domain object for data model definitions.
 /// </summary>
-public class Model
+public class Model : ICreatedAuditable, IUpdatedAuditable
 {
     /// <summary>Gets or sets the unique identifier.</summary>
     public Guid Id { get; set; }
@@ -32,8 +33,17 @@ public class Model
     /// <summary>Gets or sets the UTC timestamp when the model was last updated.</summary>
     public DateTime UpdatedAtUtc { get; set; }
 
-    /// <summary>Gets or sets the identifier of the user who created the model.</summary>
-    public string CreatedBy { get; set; } = string.Empty;
+    /// <summary>Gets or sets the Entra object identifier of the user who created the model.</summary>
+    public Guid CreatedBy { get; set; }
+
+    /// <summary>Gets or sets the display name of the user who created the model, captured at creation time.</summary>
+    public string? CreatedByName { get; set; }
+
+    /// <summary>Gets or sets the Entra object identifier of the user who last updated the model.</summary>
+    public Guid? UpdatedBy { get; set; }
+
+    /// <summary>Gets or sets the display name of the user who last updated the model, captured at update time.</summary>
+    public string? UpdatedByName { get; set; }
 
     /// <summary>Gets or sets the collection of runs executed against this model.</summary>
     public ICollection<ModelRun> Runs { get; set; } = new List<ModelRun>();

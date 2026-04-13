@@ -145,6 +145,36 @@ resource "azurerm_container_app" "api" {
         value = "/app/seed"
       }
 
+      #---------------------------------------------------------------
+      # Entra External ID (AzureAd:* config section consumed by
+      # Microsoft.Identity.Web). Plain envvars — these are public
+      # identifiers, not secrets.
+      #---------------------------------------------------------------
+      env {
+        name  = "AzureAd__Enabled"
+        value = "true"
+      }
+      env {
+        name  = "AzureAd__AllowGuest"
+        value = tostring(var.allow_guest_auth)
+      }
+      env {
+        name  = "AzureAd__Authority"
+        value = var.aad_authority
+      }
+      env {
+        name  = "AzureAd__Audience"
+        value = var.aad_audience
+      }
+      env {
+        name  = "AzureAd__ClientId"
+        value = var.aad_client_id
+      }
+      env {
+        name  = "AzureAd__TenantId"
+        value = var.aad_tenant_id
+      }
+
       dynamic "env" {
         for_each = { for i, v in var.api_allowed_origins : tostring(i) => v }
         content {

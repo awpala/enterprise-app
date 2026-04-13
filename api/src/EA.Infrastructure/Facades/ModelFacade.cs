@@ -49,12 +49,16 @@ public class ModelFacade(
         string name,
         string? description,
         JsonDocument? parameters,
-        string createdBy,
+        Guid createdBy,
+        string? createdByName,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(createdBy);
 
+        // createdBy may be Guid.Empty from HTTP call sites — the audit-stamping
+        // interceptor will fill it from ICurrentUser. Seeder paths pass explicit
+        // fake Guids so the interceptor's "only overwrite defaults" rule leaves
+        // them alone.
         var model = new Model
         {
             Id = Guid.NewGuid(),
@@ -65,7 +69,8 @@ public class ModelFacade(
             Parameters = parameters,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
-            CreatedBy = createdBy
+            CreatedBy = createdBy,
+            CreatedByName = createdByName
         };
 
         await repository.AddModelAsync(model, cancellationToken);
@@ -107,6 +112,9 @@ public class ModelFacade(
         model.Parameters = parameters;
         model.Version++;
         model.UpdatedAtUtc = DateTime.UtcNow;
+
+        // UpdatedBy / UpdatedByName are stamped by AuditStampingInterceptor
+        // based on ICurrentUser; no explicit assignment needed here.
 
         await repository.UpdateModelAsync(model, cancellationToken);
         await repository.SaveChangesAsync(cancellationToken);
@@ -169,6 +177,9 @@ public class ModelFacade(
             ModelId = modelId,
             Status = ModelRunStatus.Pending,
             RequestedAtUtc = DateTime.UtcNow
+            // RequestedBy / RequestedByName are filled by AuditStampingInterceptor
+            // from ICurrentUser. Data-engine-originated runs (future) will set
+            // these explicitly and the interceptor leaves them alone.
         };
 
         await repository.AddModelRunAsync(run, cancellationToken);

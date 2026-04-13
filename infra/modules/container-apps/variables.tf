@@ -84,6 +84,43 @@ variable "api_allowed_origins" {
   default     = []
 }
 
+#-------------------------------------------------------------------------
+# Entra External ID wiring — plain envvars on the API container,
+# consumed by Microsoft.Identity.Web's AzureAd:* configuration section.
+# None of these are secrets (tenant/client IDs are public identifiers);
+# the API validates bearer tokens against JWKS it fetches from authority.
+#-------------------------------------------------------------------------
+variable "aad_authority" {
+  description = "OIDC authority URL surfaced to the API as AzureAd__Authority. Format: https://<subdomain>.ciamlogin.com/<tenant-id>. Microsoft.Identity.Web appends /v2.0/.well-known/openid-configuration internally — do NOT pre-append /v2.0 here (causes .../v2.0/v2.0/.well-known/... 404 and silent metadata failure)."
+  type        = string
+}
+
+variable "aad_audience" {
+  description = "JwtBearer audience surfaced to the API as AzureAd__Audience. For v2 tokens this equals the API app's client ID."
+  type        = string
+}
+
+variable "aad_client_id" {
+  description = "Client ID of the API app registration, surfaced to the API as AzureAd__ClientId."
+  type        = string
+}
+
+variable "aad_tenant_id" {
+  description = "External ID tenant ID, surfaced to the API as AzureAd__TenantId."
+  type        = string
+}
+
+#-------------------------------------------------------------------------
+# Guest-mode failsafe — surfaced to the API as AzureAd__AllowGuest. When
+# true, the API honours a synthetic sentinel guest principal (full r/w,
+# no CIAM, no scope-down). Prod-only demo/prospecting affordance.
+#-------------------------------------------------------------------------
+variable "allow_guest_auth" {
+  description = "Prod-only demo/prospecting failsafe. When true, surfaces AzureAd__AllowGuest=true on the API container so it accepts a synthetic sentinel guest principal. Leave false for dev and local."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags to apply."
   type        = map(string)
