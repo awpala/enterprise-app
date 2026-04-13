@@ -10,8 +10,8 @@ import { AuthService } from '../../auth/auth.service';
  * layout shell (no toolbar, no sidenav) and surfaces the sign-in affordances.
  *
  * When a signed-in session is detected (either from MSAL cache on load, after
- * the redirect return hop, or from a persisted dev session), the component
- * auto-navigates to `/dashboard`.
+ * the redirect return hop, or from a persisted dev/guest session), the
+ * component auto-navigates to `/dashboard`.
  */
 @Component({
   selector: 'app-landing',
@@ -38,5 +38,9 @@ export class LandingComponent {
 
   signInAsDev(): void {
     this.authService.loginAsDev();
+  }
+
+  signInAsGuest(): void {
+    this.authService.loginAsGuest();
   }
 }

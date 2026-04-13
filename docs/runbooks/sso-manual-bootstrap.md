@@ -408,6 +408,55 @@ Repeat G.1 through G.4 for the `production` tenant after its first `terraform ap
 
 ---
 
+## Guest Mode (prod demo failsafe)
+
+A prod-only **Log in as Guest** button exists as a failsafe for sales and prospecting demos. It mirrors the **Log in as Dev** affordance used locally and in the deployed dev environment. It is **not** intended for commercial use. Guests get full read/write access equivalent to a real signed-in user so prospects can navigate every feature end-to-end.
+
+Dev and Guest are independent flags by construction: dev/local get Dev only, prod gets Guest only. Neither environment gets both.
+
+### How it's wired
+
+- **API.** A policy-scheme `JwtOrGuest` is registered as the default authentication scheme when `AzureAd:Enabled=true` AND `AzureAd:AllowGuest=true`. Its `ForwardDefaultSelector` routes requests with an `Authorization: Bearer ...` header into the real `JwtBearer` scheme (unchanged `AddMicrosoftIdentityWebApi` path) and everything else into `GuestAuthHandler`, which mints a synthetic sentinel principal. When `AllowGuest=false` (the default), behavior is unchanged — only `JwtBearer` is registered and unauthenticated calls get a 401.
+- **UI.** An independent `enableGuestAuth` environment flag exposes a **Log in as Guest** button on the landing page alongside the existing Log in / Log in as Dev buttons. Guest sessions intentionally send **no** `Authorization` header — the API's policy-scheme selector recognizes a missing header as guest intent.
+- **Infra.** A Terraform bool `allow_guest_auth` (default `false`) flows through as the `AzureAd__AllowGuest` env var on the API container. `production.tfvars` sets it to `true`; `dev.tfvars` explicitly keeps it at `false`. CI sets `ENABLE_GUEST_AUTH=true` only when building from the prod branch.
+
+### Sentinel identity
+
+| Claim | Value |
+|---|---|
+| `oid` | `00000000-0000-0000-0000-000000000003` |
+| `tid` | `00000000-0000-0000-0000-000000000004` |
+| `idp` | `guest` |
+| `name` | `Guest User` |
+| `preferred_username` | `guest@demo` |
+
+The dev sentinel remains `...-0001` / `...-0002` / `idp=dev` and is distinct — do not conflate the two.
+
+### Auditing implication
+
+Every guest action stamps the same sentinel `oid` into audit columns and RabbitMQ `x-user-oid` headers. You cannot distinguish between two prospects demoing simultaneously — that is by design for demo mode. **Do not enable guest mode once the app carries real customer data.**
+
+### How to enable in prod
+
+1. Confirm `allow_guest_auth = true` in `infra/envs/production.tfvars` (committed default for prod).
+2. Merge to `main`. CI redeploys Container Apps with `AzureAd__AllowGuest=true` and rebuilds the SPA with `ENABLE_GUEST_AUTH=true`.
+3. Verify:
+   - Prod SWA landing page renders the **Log in as Guest** button.
+   - Clicking it navigates to `/dashboard` without an External ID redirect.
+   - A subsequent API call succeeds with no `Authorization` header, and the resulting audit row carries `actor_oid = 00000000-0000-0000-0000-000000000003` and `actor_idp = "guest"`.
+
+### How to disable
+
+Flip `allow_guest_auth` back to `false` in `infra/envs/production.tfvars`, merge, redeploy. No data cleanup is required — guest-authored rows remain but are clearly tagged by the sentinel oid/idp and can be filtered or purged later.
+
+### Scope boundary
+
+- Local and dev environments continue to use **Dev** mode; they do **not** get Guest mode.
+- Prod uses **Guest** mode; it does **not** get Dev mode.
+- The two flags (`ENABLE_DEV_AUTH` / `enableDevAuth` / `AzureAd:Enabled=false` dev branch vs. `ENABLE_GUEST_AUTH` / `enableGuestAuth` / `allow_guest_auth` / `AzureAd:AllowGuest`) are wired independently end-to-end.
+
+---
+
 ## 10. Troubleshooting
 
 | Symptom | Likely cause | Fix |

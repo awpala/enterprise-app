@@ -98,3 +98,18 @@ variable "external_tenant_client_secret" {
   type        = string
   sensitive   = true
 }
+
+#-------------------------------------------------------------------------
+# Guest-mode failsafe (prod-only demo/prospecting affordance).
+#
+# When true, the API accepts a synthetic sentinel guest principal with full
+# read/write access. This is a CIAM-free, scope-down-free escape hatch
+# intended solely for sales demos / prospecting and MUST NOT be enabled
+# outside prod. The UI side is wired separately via ENABLE_GUEST_AUTH at
+# build time. Independent of the dev-auth flag.
+#-------------------------------------------------------------------------
+variable "allow_guest_auth" {
+  description = "Prod-only demo/prospecting failsafe. When true, surfaces a 'Log in as Guest' affordance that mints a synthetic sentinel principal in the API (no CIAM, no scope-down, full read/write). Leave false for dev and local; only set true in prod."
+  type        = bool
+  default     = false
+}

@@ -21,4 +21,11 @@ export const environment = {
    * leaves it false (see .github/workflows/deploy.yml).
    */
   enableDevAuth: true,
+  /**
+   * Enables the "Log in as Guest" button on the landing page — a synthetic
+   * demo session matching the backend's guest sentinel principal. Prod-only
+   * affordance for sales/demo prospects; local dev and deployed `dev` leave
+   * this false (Dev and Guest are independent, not derived from each other).
+   */
+  enableGuestAuth: false,
 };

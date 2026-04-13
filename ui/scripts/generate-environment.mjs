@@ -7,14 +7,18 @@
  *   2. the repo-root .env file (via the inlined dotenv loader), if present.
  *
  * Variables consumed:
- *   - API_URL         (required with --require-api-url)
- *   - AAD_AUTHORITY   — Entra External ID OIDC authority URL
- *   - AAD_CLIENT_ID   — SPA app registration client id
- *   - AAD_TENANT_ID   — External ID tenant id (GUID)
- *   - AAD_API_SCOPE   — fully-qualified API scope URI passed to MSAL
- *   - ENABLE_DEV_AUTH — "true" to expose the "Log in as Dev" affordance on
+ *   - API_URL          (required with --require-api-url)
+ *   - AAD_AUTHORITY    — Entra External ID OIDC authority URL
+ *   - AAD_CLIENT_ID    — SPA app registration client id
+ *   - AAD_TENANT_ID    — External ID tenant id (GUID)
+ *   - AAD_API_SCOPE    — fully-qualified API scope URI passed to MSAL
+ *   - ENABLE_DEV_AUTH  — "true" to expose the "Log in as Dev" affordance on
  *     the landing page. Enables a synthetic session that matches the backend
  *     DevAuthHandler's sentinel principal. Must be "false"/unset for prod.
+ *   - ENABLE_GUEST_AUTH — "true" to expose the "Log in as Guest" affordance
+ *     on the landing page. Enables a synthetic demo session that matches the
+ *     backend's guest sentinel principal. Independent of ENABLE_DEV_AUTH —
+ *     prod sets this true; local dev + deployed dev leave it false.
  *
  * Modes:
  *   - default (no flag): writes a safe default (empty strings) for any
@@ -66,6 +70,7 @@ const aadClientId = (process.env.AAD_CLIENT_ID ?? '').trim();
 const aadTenantId = (process.env.AAD_TENANT_ID ?? '').trim();
 const aadApiScope = (process.env.AAD_API_SCOPE ?? '').trim();
 const enableDevAuth = (process.env.ENABLE_DEV_AUTH ?? '').trim().toLowerCase() === 'true';
+const enableGuestAuth = (process.env.ENABLE_GUEST_AUTH ?? '').trim().toLowerCase() === 'true';
 
 if (requireApiUrl && !apiUrl) {
   console.error(
@@ -91,6 +96,7 @@ export const environment = {
   aadTenantId: ${JSON.stringify(aadTenantId)},
   aadApiScope: ${JSON.stringify(aadApiScope)},
   enableDevAuth: ${JSON.stringify(enableDevAuth)},
+  enableGuestAuth: ${JSON.stringify(enableGuestAuth)},
 };
 `;
 
@@ -102,5 +108,6 @@ console.log(
     `  aadClientId=${aadClientId ? aadClientId : '<empty>'}\n` +
     `  aadTenantId=${aadTenantId ? aadTenantId : '<empty>'}\n` +
     `  aadApiScope=${aadApiScope ? aadApiScope : '<empty>'}\n` +
-    `  enableDevAuth=${enableDevAuth}`
+    `  enableDevAuth=${enableDevAuth}\n` +
+    `  enableGuestAuth=${enableGuestAuth}`
 );

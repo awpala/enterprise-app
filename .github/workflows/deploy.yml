@@ -59,6 +59,15 @@ jobs:
       # provisioning a real External ID session; disabled in prod.
       ENABLE_DEV_AUTH: ${{ github.ref == 'refs/heads/main' && 'false' || 'true' }}
 
+      # Exposes the "Log in as Guest" prod-only demo/prospecting failsafe
+      # on the SPA landing page. Inverse of ENABLE_DEV_AUTH: ON for prod,
+      # OFF everywhere else. The UI build script (build-ui.sh) forwards
+      # this into ng build; generate-environment.mjs reads it alongside
+      # ENABLE_DEV_AUTH. Authoritative Terraform tfvar for the API side
+      # lives in infra/envs/*.tfvars (allow_guest_auth), so no matching
+      # TF_VAR_* is needed here.
+      ENABLE_GUEST_AUTH: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4

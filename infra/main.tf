@@ -194,5 +194,9 @@ module "container_apps" {
   aad_client_id = module.entra_external_id.api_client_id
   aad_tenant_id = module.entra_external_id.tenant_id
 
+  # Prod-only guest-mode failsafe (synthetic sentinel principal in the API).
+  # False everywhere except prod; see variables.tf for rationale.
+  allow_guest_auth = var.allow_guest_auth
+
   tags = local.common_tags
 }

@@ -32,9 +32,24 @@
       </p>
     }
 
-    @if (!authService.isMsalConfigured && !authService.isDevModeEnabled) {
+    @if (authService.isGuestModeEnabled) {
+      <button
+        mat-stroked-button
+        color="accent"
+        class="sign-in-button"
+        (click)="signInAsGuest()">
+        <mat-icon class="mr-8">person_outline</mat-icon>
+        <span>Log in as Guest</span>
+      </button>
       <p class="config-hint">
-        No sign-in is available: MSAL is unconfigured and dev auth is disabled.
+        Demo access: the guest session is a synthetic principal with full
+        read/write access, intended for sales and evaluation walkthroughs.
+      </p>
+    }
+
+    @if (!authService.isMsalConfigured && !authService.isDevModeEnabled && !authService.isGuestModeEnabled) {
+      <p class="config-hint">
+        No sign-in is available: MSAL is unconfigured and dev/guest auth are disabled.
       </p>
     }
   </section>

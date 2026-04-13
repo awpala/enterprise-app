@@ -9,6 +9,7 @@ using EA.Infrastructure.Messaging;
 using EA.Infrastructure.Repositories;
 using EA.Infrastructure.Seeding;
 using MassTransit;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -119,31 +120,72 @@ builder.Services.AddOpenApi();
 // The AzureAd:Enabled flag toggles between real JWT validation against
 // Entra External ID (prod + dev containers with envvars) and a fixed
 // dev principal (local docker compose + curl workflows + unit tests).
+//
+// When AzureAd:Enabled=true AND AzureAd:AllowGuest=true (prod-only sales
+// demo failsafe), a policy scheme "JwtOrGuest" is registered as the default
+// and forwards per-request: requests with an Authorization: Bearer ... header
+// go to JwtBearer for real token validation; everything else is handled by
+// GuestAuthHandler, which synthesizes a fixed guest principal. Guests get
+// the same read/write access as real users — no role scope-down.
 // ---------------------------------------------------------------------------
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 
 var azureAdEnabled = builder.Configuration.GetValue("AzureAd:Enabled", defaultValue: false);
+var allowGuest = builder.Configuration.GetValue("AzureAd:AllowGuest", defaultValue: false);
 
 if (azureAdEnabled)
 {
-    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddMicrosoftIdentityWebApi(
-            jwtBearerOptions =>
+    const string jwtOrGuestScheme = "JwtOrGuest";
+
+    var authBuilder = builder.Services.AddAuthentication(options =>
+    {
+        if (allowGuest)
+        {
+            options.DefaultScheme = jwtOrGuestScheme;
+            options.DefaultChallengeScheme = jwtOrGuestScheme;
+        }
+        else
+        {
+            options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        }
+    });
+
+    authBuilder.AddMicrosoftIdentityWebApi(
+        jwtBearerOptions =>
+        {
+            builder.Configuration.Bind("AzureAd", jwtBearerOptions);
+            jwtBearerOptions.TokenValidationParameters.ValidateIssuer = true;
+            jwtBearerOptions.TokenValidationParameters.NameClaimType = "name";
+        },
+        identityOptions =>
+        {
+            builder.Configuration.Bind("AzureAd", identityOptions);
+        });
+
+    if (allowGuest)
+    {
+        authBuilder.AddScheme<AuthenticationSchemeOptions, GuestAuthHandler>(
+            GuestAuthHandler.SchemeName,
+            _ => { });
+
+        authBuilder.AddPolicyScheme(jwtOrGuestScheme, jwtOrGuestScheme, options =>
+        {
+            options.ForwardDefaultSelector = ctx =>
             {
-                builder.Configuration.Bind("AzureAd", jwtBearerOptions);
-                jwtBearerOptions.TokenValidationParameters.ValidateIssuer = true;
-                jwtBearerOptions.TokenValidationParameters.NameClaimType = "name";
-            },
-            identityOptions =>
-            {
-                builder.Configuration.Bind("AzureAd", identityOptions);
-            });
+                var authHeader = ctx.Request.Headers.Authorization.ToString();
+                return authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                    ? JwtBearerDefaults.AuthenticationScheme
+                    : GuestAuthHandler.SchemeName;
+            };
+        });
+    }
 }
 else
 {
     builder.Services.AddAuthentication(DevAuthHandler.SchemeName)
-        .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, DevAuthHandler>(
+        .AddScheme<AuthenticationSchemeOptions, DevAuthHandler>(
             DevAuthHandler.SchemeName,
             _ => { });
 }

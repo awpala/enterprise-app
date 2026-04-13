@@ -29,3 +29,10 @@ image_tag   = "latest"
 # and locally via `eval "$(bash docs/runbooks/source-sso-env.sh production)"`.
 external_tenant_id = "8ce01097-ed0b-4425-a49a-2f42c41a1119"
 tenant_subdomain   = "eacustomerprod"
+
+# --- Guest-mode failsafe -------------------------------------------------
+# Prod-only demo/prospecting affordance. Surfaces AzureAd__AllowGuest=true
+# on the API container so a synthetic sentinel guest principal (full r/w,
+# no CIAM, no scope-down) is honoured. Paired with ENABLE_GUEST_AUTH=true
+# on the UI build (set in .github/workflows/deploy.yml on main).
+allow_guest_auth = true

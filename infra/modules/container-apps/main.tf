@@ -155,6 +155,10 @@ resource "azurerm_container_app" "api" {
         value = "true"
       }
       env {
+        name  = "AzureAd__AllowGuest"
+        value = tostring(var.allow_guest_auth)
+      }
+      env {
         name  = "AzureAd__Authority"
         value = var.aad_authority
       }

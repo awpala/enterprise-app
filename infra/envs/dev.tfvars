@@ -25,3 +25,9 @@ image_tag   = "latest"
 # and locally via `eval "$(bash docs/runbooks/source-sso-env.sh dev)"`.
 external_tenant_id = "a400a39c-97cf-4459-932e-6dfccf2adf1c"
 tenant_subdomain   = "eacustomerdev"
+
+# --- Guest-mode failsafe -------------------------------------------------
+# Prod-only. Explicit false here so dev deploys never surface the synthetic
+# sentinel principal. The paired UI flag ENABLE_GUEST_AUTH is likewise
+# forced false for dev in .github/workflows/deploy.yml.
+allow_guest_auth = false

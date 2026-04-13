@@ -3,12 +3,18 @@
  * observable state into Angular signals so components can read auth state
  * reactively without manual subscription plumbing.
  *
- * Two independent affordances:
+ * Three independent affordances:
  *  - `loginRedirect()` — real MSAL / Entra External ID sign-in. Available
  *    when `isMsalConfigured` is true (AAD_* values populated).
  *  - `loginAsDev()` — synthetic session matching the backend's DevAuthHandler
  *    sentinel principal. Available when `isDevModeEnabled` is true (local
  *    dev + deployed dev, OFF in prod — driven by ENABLE_DEV_AUTH).
+ *  - `loginAsGuest()` — synthetic demo session matching the backend's guest
+ *    sentinel principal. Available when `isGuestModeEnabled` is true (prod
+ *    only — driven by ENABLE_GUEST_AUTH). Guest and Dev are INDEPENDENT
+ *    flags; do not derive one from the other. Guest and Dev code paths are
+ *    deliberately kept parallel rather than collapsed into a single
+ *    "synthetic session" abstraction.
  *
  * Claims contract (Entra External ID):
  *  - `name`        — display name (may be absent for email OTP accounts)
@@ -36,6 +42,7 @@ import { filter } from 'rxjs/operators';
 import { environment } from '../environments/environment';
 
 const DEV_SESSION_STORAGE_KEY = 'ea:dev-session';
+const GUEST_SESSION_STORAGE_KEY = 'ea:guest-session';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -53,6 +60,14 @@ export class AuthService {
    * `enableDevAuth` flag — true locally and in deployed dev, false in prod.
    */
   readonly isDevModeEnabled: boolean = environment.enableDevAuth === true;
+
+  /**
+   * True when the synthetic guest session is available. Driven by the
+   * build-time `enableGuestAuth` flag — true in prod (sales/demo affordance),
+   * false in local dev and deployed dev. Fully independent of
+   * `isDevModeEnabled`.
+   */
+  readonly isGuestModeEnabled: boolean = environment.enableGuestAuth === true;
 
   /**
    * Synthetic dev account. Oid / tid / idp / name match DevAuthHandler's
@@ -75,14 +90,39 @@ export class AuthService {
     },
   };
 
+  /**
+   * Synthetic guest account. Oid / tid / idp / name match the backend's guest
+   * sentinel values so the frontend's view of "who am I" lines up with what
+   * the backend stamps into audit columns when `AzureAd:AllowGuest=true` and
+   * a request arrives without an Authorization header.
+   */
+  private readonly guestAccount: AccountInfo = {
+    homeAccountId: 'guest.demo',
+    environment: 'guest',
+    tenantId: '00000000-0000-0000-0000-000000000004',
+    username: 'guest@demo',
+    localAccountId: '00000000-0000-0000-0000-000000000003',
+    name: 'Guest User',
+    idTokenClaims: {
+      oid: '00000000-0000-0000-0000-000000000003',
+      tid: '00000000-0000-0000-0000-000000000004',
+      idp: 'guest',
+      name: 'Guest User',
+      preferred_username: 'guest@demo',
+    },
+  };
+
   /** True when a real or synthetic session is active. */
   readonly isAuthenticated = signal<boolean>(false);
 
-  /** Currently active account (MSAL or synthetic dev), or null. */
+  /** Currently active account (MSAL or synthetic dev/guest), or null. */
   readonly activeAccount = signal<AccountInfo | null>(null);
 
   /** True when the current session is the synthetic dev session. */
   readonly isDevSession = signal<boolean>(false);
+
+  /** True when the current session is the synthetic guest session. */
+  readonly isGuestSession = signal<boolean>(false);
 
   /** Human-readable display name, prefers `name`, falls back to `username`. */
   readonly displayName = computed<string>(() => {
@@ -113,6 +153,15 @@ export class AuthService {
       this.activeAccount.set(this.devAccount);
       this.isAuthenticated.set(true);
       this.isDevSession.set(true);
+    }
+
+    // Restore a previously-established guest session across reloads. Only
+    // honored when the build still advertises guest auth — stale flags can't
+    // grant access in non-guest builds.
+    if (this.isGuestModeEnabled && this.readPersistedGuestSession()) {
+      this.activeAccount.set(this.guestAccount);
+      this.isAuthenticated.set(true);
+      this.isGuestSession.set(true);
     }
 
     if (!this.isMsalConfigured) {
@@ -169,6 +218,23 @@ export class AuthService {
   }
 
   /**
+   * Establishes the synthetic guest session. No-op when guest mode is
+   * disabled. Mirrors `loginAsDev()` but is tied to the independent
+   * `isGuestModeEnabled` flag and persists under a distinct storage key.
+   */
+  loginAsGuest(): void {
+    if (!this.isGuestModeEnabled) {
+      console.warn('[AuthService] loginAsGuest suppressed — guest auth is disabled in this build.');
+      return;
+    }
+    this.persistGuestSession(true);
+    this.activeAccount.set(this.guestAccount);
+    this.isAuthenticated.set(true);
+    this.isGuestSession.set(true);
+    void this.router.navigate(['/dashboard']);
+  }
+
+  /**
    * Signs out of whichever session is active.
    *
    * MSAL branch: we eagerly clear `activeAccount` + `isAuthenticated` BEFORE
@@ -183,9 +249,17 @@ export class AuthService {
    * `loginFailedRoute`. Clearing here prevents that stale-signal render and
    * avoids the sign-out-becomes-sign-in-failure loop.
    *
-   * Dev branch already clears signals synchronously before navigating.
+   * Dev/Guest branches already clear signals synchronously before navigating.
    */
   logoutRedirect(): void {
+    if (this.isGuestSession()) {
+      this.persistGuestSession(false);
+      this.isGuestSession.set(false);
+      this.activeAccount.set(null);
+      this.isAuthenticated.set(false);
+      void this.router.navigate(['/']);
+      return;
+    }
     if (this.isDevSession()) {
       this.persistDevSession(false);
       this.isDevSession.set(false);
@@ -205,8 +279,9 @@ export class AuthService {
   }
 
   private refreshMsalState(): void {
-    // Don't clobber an active dev session if MSAL events fire with no account.
-    if (this.isDevSession()) {
+    // Don't clobber an active synthetic (dev or guest) session if MSAL events
+    // fire with no account.
+    if (this.isDevSession() || this.isGuestSession()) {
       return;
     }
 
@@ -247,6 +322,27 @@ export class AuthService {
       }
     } catch {
       // localStorage unavailable (SSR / private mode) — dev session becomes
+      // per-tab, which is acceptable.
+    }
+  }
+
+  private readPersistedGuestSession(): boolean {
+    try {
+      return window.localStorage.getItem(GUEST_SESSION_STORAGE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  private persistGuestSession(active: boolean): void {
+    try {
+      if (active) {
+        window.localStorage.setItem(GUEST_SESSION_STORAGE_KEY, '1');
+      } else {
+        window.localStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+      }
+    } catch {
+      // localStorage unavailable (SSR / private mode) — guest session becomes
       // per-tab, which is acceptable.
     }
   }

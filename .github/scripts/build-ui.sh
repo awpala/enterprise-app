@@ -9,10 +9,14 @@
 #   - aad_tenant_id   → AAD_TENANT_ID
 #   - aad_api_scope   → AAD_API_SCOPE
 #
-# Plus one caller-provided env var:
-#   - ENABLE_DEV_AUTH  — exposes the "Log in as Dev" button on the landing
-#                        page. deploy.yml sets this to "true" for the dev
-#                        environment and leaves it empty (-> false) for prod.
+# Plus two caller-provided env vars:
+#   - ENABLE_DEV_AUTH    — exposes the "Log in as Dev" button on the landing
+#                          page. deploy.yml sets this to "true" for dev and
+#                          "false" for prod.
+#   - ENABLE_GUEST_AUTH  — exposes the "Log in as Guest" prod-only failsafe
+#                          on the landing page. deploy.yml sets this to
+#                          "true" for prod and "false" everywhere else.
+#                          Independent of ENABLE_DEV_AUTH.
 #
 # Requires terraform state available under infra/ and Node/npm installed.
 set -euo pipefail
@@ -39,4 +43,5 @@ API_URL="$API_URL" \
   AAD_TENANT_ID="$AAD_TENANT_ID" \
   AAD_API_SCOPE="$AAD_API_SCOPE" \
   ENABLE_DEV_AUTH="${ENABLE_DEV_AUTH:-false}" \
+  ENABLE_GUEST_AUTH="${ENABLE_GUEST_AUTH:-false}" \
   npm run build:prod

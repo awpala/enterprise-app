@@ -110,6 +110,17 @@ variable "aad_tenant_id" {
   type        = string
 }
 
+#-------------------------------------------------------------------------
+# Guest-mode failsafe — surfaced to the API as AzureAd__AllowGuest. When
+# true, the API honours a synthetic sentinel guest principal (full r/w,
+# no CIAM, no scope-down). Prod-only demo/prospecting affordance.
+#-------------------------------------------------------------------------
+variable "allow_guest_auth" {
+  description = "Prod-only demo/prospecting failsafe. When true, surfaces AzureAd__AllowGuest=true on the API container so it accepts a synthetic sentinel guest principal. Leave false for dev and local."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags to apply."
   type        = map(string)

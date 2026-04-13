@@ -12,7 +12,6 @@ import {
   MSAL_INTERCEPTOR_CONFIG,
   MsalBroadcastService,
   MsalGuard,
-  MsalInterceptor,
   MsalService,
 } from '@azure/msal-angular';
 import { IPublicClientApplication } from '@azure/msal-browser';
@@ -24,12 +23,15 @@ import {
   msalInstanceFactory,
   msalInterceptorConfigFactory,
 } from './auth/msal.config';
+import { BearerAuthInterceptor } from './auth/bearer-auth.interceptor';
 
 /**
  * When AAD_* values are empty (no real External ID tenant), MSAL cannot
- * acquire tokens and the MsalInterceptor must be skipped — otherwise every
+ * acquire tokens and the Bearer interceptor must be skipped — otherwise every
  * HTTP call throws. In the dev-session code path the backend's DevAuthHandler
- * accepts unauthenticated requests, so omitting the Bearer header is fine.
+ * accepts unauthenticated requests, and in the guest-session path the API's
+ * policy-scheme selector routes header-less requests to the guest principal,
+ * so omitting the Bearer header is fine.
  */
 const isMsalConfigured = Boolean(
   environment.aadAuthority && environment.aadClientId,
@@ -64,8 +66,8 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    // `withInterceptorsFromDi` lets us register MsalInterceptor (a class-based
-    // HttpInterceptor) through the classic HTTP_INTERCEPTORS multi-provider.
+    // `withInterceptorsFromDi` lets us register class-based HttpInterceptors
+    // through the classic HTTP_INTERCEPTORS multi-provider.
     provideHttpClient(withInterceptorsFromDi()),
     provideAnimationsAsync(),
 
@@ -86,9 +88,13 @@ export const appConfig: ApplicationConfig = {
     MsalGuard,
     ...(isMsalConfigured
       ? [
+          // Custom session-aware Bearer interceptor replaces MsalInterceptor.
+          // It forwards dev/guest sessions unchanged (no Authorization header)
+          // and attaches a Bearer via acquireTokenSilent for real MSAL sessions.
+          // See auth/bearer-auth.interceptor.ts.
           {
             provide: HTTP_INTERCEPTORS,
-            useClass: MsalInterceptor,
+            useClass: BearerAuthInterceptor,
             multi: true,
           },
           {

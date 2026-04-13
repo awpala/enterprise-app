@@ -125,7 +125,11 @@
       "Bash(grep -oE '\\(AADSTS[0-9]+|unauthorized_client|application with identifier.{0,120}\\)' /tmp/probe.html)",
       "Bash(grep -oE 'AADSTS[0-9]+[^\"<]{0,300}' /tmp/probe.html)",
       "Bash(git -C /workspace log --oneline -5 -- docs/runbooks/sso-manual-bootstrap.md)",
-      "Bash(git -C /workspace show HEAD:docs/runbooks/sso-manual-bootstrap.md)"
+      "Bash(git -C /workspace show HEAD:docs/runbooks/sso-manual-bootstrap.md)",
+      "Bash(grep -n \"allow_guest_auth\\\\|AllowGuest\" variables.tf main.tf modules/container-apps/variables.tf modules/container-apps/main.tf envs/*.tfvars)",
+      "Bash(tflint --version)",
+      "Bash(tflint --recursive)",
+      "Bash(tflint)"
     ]
   }
 }
