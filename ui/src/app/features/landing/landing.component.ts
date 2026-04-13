@@ -33,7 +33,7 @@ export class LandingComponent {
   }
 
   signIn(): void {
-    this.authService.loginRedirect();
+    void this.router.navigate(['/dashboard']);
   }
 
   signInAsDev(): void {
