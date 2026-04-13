@@ -154,8 +154,14 @@ cd "$INFRA_DIR"
 
 BACKEND_KEY="${ENV}.tfstate"
 
-echo "Running 'terraform init -upgrade' against backend key=$BACKEND_KEY..." >&2
-if ! terraform init -upgrade \
+echo "Running 'terraform init -upgrade -reconfigure' against backend key=$BACKEND_KEY..." >&2
+# -reconfigure: discard the cached backend config from the previous init rather
+# than prompting for state migration. Safe here because each env has its own
+# state file (dev.tfstate / production.tfstate) under the same storage account
+# and container — only the key differs, and the keys are intentionally distinct.
+# Without this flag, flipping this script between envs fails with
+# "Backend configuration changed" on every env switch.
+if ! terraform init -upgrade -reconfigure \
   -backend-config=resource_group_name=ea-tfstate-rg \
   -backend-config=storage_account_name=eatfstateeaboot \
   -backend-config=container_name=tfstate \
