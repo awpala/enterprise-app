@@ -66,11 +66,13 @@ fi
   # shellcheck disable=SC1090
   source "$SECRETS" "$ENV" >&2
 
+  # Google OAuth client credentials are NOT emitted here — the Google IDP
+  # moved from Terraform-managed to portal-managed (see Part G of
+  # docs/runbooks/sso-manual-bootstrap.md). The root module no longer reads
+  # google_oidc_* vars, so emitting them would be dead noise.
   cat <<EXPORTS
 export TF_VAR_external_tenant_client_id="$EXTERNAL_TENANT_CLIENT_ID"
 export TF_VAR_external_tenant_client_secret="$EXTERNAL_TENANT_CLIENT_SECRET"
-export TF_VAR_google_oidc_client_id="$GOOGLE_OIDC_CLIENT_ID"
-export TF_VAR_google_oidc_client_secret="$GOOGLE_OIDC_CLIENT_SECRET"
 EXPORTS
 )
 

@@ -119,6 +119,15 @@ Run this twice - once in each External ID tenant.
 
 > **Don't repeat in prod**: `ea-terraform-deployer` in the dev External ID tenant was registered with *Supported account types = "Any Entra ID Tenant + Personal Microsoft accounts"*. That value is **unnecessarily broad** for a CI service principal that only uses the client-credentials flow - it exposes no user auth paths either way, but minimum scope is **option 1: "Single tenant only"** (`AzureADMyOrg`). For the production pass, register `ea-terraform-deployer` (prod) with option 1, as Step 3 above already prescribes. Dev's existing breadth is left as-is to avoid a rebuild.
 
+> **Verify Part B** - after creating the deployer SP in each tenant (and after any secret rotation, per [Section 11](#11-secret-rotation)), run the companion health check:
+>
+> ```bash
+> az login --tenant <external-tenant-id> --allow-no-subscriptions
+> bash docs/runbooks/verify-deployer-sp.sh <dev|production>
+> ```
+>
+> The script asserts the SP is single-tenant (`AzureADMyOrg`), has at least one unexpired client secret, and holds admin-consent on all three required Graph application roles (`Application.ReadWrite.All`, `IdentityProvider.ReadWrite.All`, `Policy.ReadWrite.AuthenticationFlows`). Non-zero exit on any failure - safe to chain into CI or pre-apply gating.
+
 ---
 
 ## 5. Part C - Register the Google OAuth 2.0 client (one per env)
@@ -326,6 +335,25 @@ Note: the user flow, Google IDP, and Email one-time passcode method are **not** 
    - Regression check: a real Google / Email-OTP sign-in from Step 3 still works - the `JwtOrGuest` policy scheme routes any `Authorization: Bearer ...` request through the unchanged `JwtBearer` path; guest intent is signalled by the header's absence.
 
    The dev sentinel (`oid = ...-0001`, `tid = ...-0002`, `idp = "dev"`) is distinct from the guest sentinel - do not conflate them when auditing.
+
+### Step 5. Full snapshot validation (closed-loop)
+
+5. Run the tracked validator [`docs/runbooks/validate-sso-snapshot.sh`](./validate-sso-snapshot.sh) as the closing loop on Parts B, F, and G. It consolidates ~20 minutes of ad-hoc CLI (switching between the workforce subscription and the two External ID tenants, spot-checking Container App env vars, app registrations, and Graph-managed IDPs) into one invocation with uniform `PASS:` / `FAIL:` lines, genericized `expected:` / `actual:` echo pairs for side-by-side visual comparison, and a single non-zero process exit on any failure.
+
+   **Prerequisites**: `az login` completed against the workforce tenant (subscription `5eeebca2-f232-415b-a8cf-6b6688ca5e8f`), and `docs/runbooks/push-sso-secrets.sh` populated (from [Part D](#6-part-d---push-secrets-and-variables-to-github)) — the deployer-SP credentials used to read `/beta/identity/identityProviders` come from there via [`source-sso-env.sh`](./source-sso-env.sh).
+
+   ```bash
+   bash docs/runbooks/validate-sso-snapshot.sh
+   ```
+
+   **What it checks**:
+   - Section 1 (workforce subscription): both dev + prod API Container Apps expose the expected `AzureAd__Enabled`, `AzureAd__AllowGuest` (`false` for dev, `true` for prod), `AzureAd__Authority`, `AzureAd__Audience`, `AzureAd__ClientId`, `AzureAd__TenantId` env vars — confirms the latest `terraform apply` wired everything.
+   - Section 2 (dev External ID tenant): runs [`verify-deployer-sp.sh dev`](./verify-deployer-sp.sh) (Part B rollup), asserts `ea-api-dev` + `ea-spa-dev` app registrations exist (Part F), and authenticates as the deployer SP to read Microsoft Graph `/beta/identity/identityProviders` — expects `EmailOtpSignup-OAUTH`, `EmailPassword-OAUTH`, `Google-OAUTH` (Part G).
+   - Section 3 (production External ID tenant): same shape against the prod tenant.
+
+   The script will `az login --tenant <external-tenant-id> --allow-no-subscriptions` interactively for Sections 2 and 3 if the current session is not already on that tenant. It does **not** short-circuit on the first failure — every section runs to completion so the operator sees the full snapshot in one pass.
+
+   Exit 0 = all checks pass (safe to gate CI / merges on). Exit 1 = one or more checks failed; the `FAIL:` lines point at the specific assertion, and the `expected:` / `actual:` pair immediately above it shows the drift.
 
 ---
 

@@ -132,7 +132,10 @@
       "Bash(tflint)",
       "Bash(git log:*)",
       "Bash(chmod +x /workspace/docs/runbooks/verify-deployer-sp.sh)",
-      "Bash(bash -n /workspace/docs/runbooks/verify-deployer-sp.sh)"
+      "Bash(bash -n /workspace/docs/runbooks/verify-deployer-sp.sh)",
+      "Bash(git -C /workspace checkout HEAD -- docs/runbooks/verify-deployer-sp.sh)",
+      "Bash(git -C /workspace diff docs/runbooks/verify-deployer-sp.sh)",
+      "Bash(bash -n /workspace/docs/runbooks/validate-sso-snapshot.sh)"
     ]
   }
 }
