@@ -36,15 +36,26 @@ const isMsalConfigured = Boolean(
 );
 
 /**
- * Ensures MSAL has completed its async initialization (and processed any
- * pending redirect response) before Angular's router starts evaluating
- * route guards. Without this, MsalGuard can race initialization on first
- * load and throw `BrowserAuthError: uninitialized_public_client_application`.
+ * Pre-initializes MSAL before Angular's router starts evaluating route guards.
+ *
+ * Single responsibility: await `msalInstance.initialize()` so that MsalGuard
+ * does not throw `BrowserAuthError: uninitialized_public_client_application`
+ * on first load (the v3 PublicClientApplication requires explicit async init
+ * before any other API call).
+ *
+ * IMPORTANT: this factory intentionally does NOT call `handleRedirectPromise()`.
+ * Redirect-response processing is owned by `MsalRedirectComponent`, which is
+ * mounted at the `/auth/redirect` route (see app.routes.ts) and is also
+ * bootstrapped into `<app-redirect>` via main.ts. Calling
+ * `handleRedirectPromise()` here would race that component and silently
+ * consume the URL fragment first, leaving MsalRedirectComponent with `null`
+ * and breaking the post-redirect navigation back to the originally-requested
+ * URL — manifesting as a stuck `/auth/redirect` page or a perpetual sign-in
+ * loop on the return hop from External ID.
  */
 function msalInitializerFactory(msalInstance: IPublicClientApplication): () => Promise<void> {
   return async () => {
     await msalInstance.initialize();
-    await msalInstance.handleRedirectPromise();
   };
 }
 
