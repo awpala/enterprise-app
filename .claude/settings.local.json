@@ -130,7 +130,9 @@
       "Bash(tflint --version)",
       "Bash(tflint --recursive)",
       "Bash(tflint)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(chmod +x /workspace/docs/runbooks/verify-deployer-sp.sh)",
+      "Bash(bash -n /workspace/docs/runbooks/verify-deployer-sp.sh)"
     ]
   }
 }
