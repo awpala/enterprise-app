@@ -109,7 +109,23 @@
       "Bash(curl -sS https://proud-ground-0d14aa60f.7.azurestaticapps.net/ -o /tmp/idx.html)",
       "Bash(grep -l \"TENANT_ID\\\\|CLIENT_ID\\\\|CLIENT_SECRET\" /workspace/docs/runbooks/*.sh)",
       "Bash(npm test:*)",
-      "Bash(echo \"fmt_exit=$?\")"
+      "Bash(echo \"fmt_exit=$?\")",
+      "Bash(curl -sS -H 'Authorization: Bearer __TRACKED_VAR__' 'https://graph.microsoft.com/v1.0/me?$select=id,userPrincipalName,mail,userType,displayName,identities,onPremisesSyncEnabled,creationType,externalUserState')",
+      "Bash(curl -sS \"https://login.microsoftonline.com/common/userrealm/adamwpala%40outlook.com?api-version=2.1\")",
+      "Bash(curl -sS -X POST \"https://login.microsoftonline.com/common/GetCredentialType?mkt=en-US\" -H \"Content-Type: application/json; charset=UTF-8\" -H \"Accept: application/json\" -d '{\"username\":\"adamwpala@outlook.com\",\"isOtherIdpSupported\":true,\"checkPhones\":false,\"isRemoteNGCSupported\":true,\"isCookieBannerShown\":false,\"isFidoSupported\":true,\"flowToken\":\"\"}')",
+      "Bash(curl -sS -o /tmp/authz.html -w 'status=%{http_code} content-type=%{content_type} size=%{size_download}\\\\n' -D /tmp/authz.headers 'https://login.microsoftonline.com/common/v2.0/authorize?client_id=2858b78e-5259-460a-aa92-78e21b96448e&response_type=code&redirect_uri=https%3A%2F%2Feacustomerdev.ciamlogin.com%2Fa400a39c-97cf-4459-932e-6dfccf2adf1c%2Ffederation%2Foauth2&scope=openid+profile+email&response_mode=form_post&state=test&nonce=test&login_hint=adamwpala%40outlook.com')",
+      "Bash(grep -oE '\\(AADSTS[0-9]+|couldn.t find|We couldn|sErrorCode|error_description\\)[^<\"]{0,150}' /tmp/authz.html)",
+      "Bash(curl -sS -L -o /tmp/authz2.html -w 'final_status=%{http_code} final_url=%{url_effective}\\\\n' \"https://login.microsoftonline.com/common/v2.0/authorize?client_id=2858b78e-5259-460a-aa92-78e21b96448e&response_type=code&redirect_uri=https%3A%2F%2Feacustomerdev.ciamlogin.com%2Fa400a39c-97cf-4459-932e-6dfccf2adf1c%2Ffederation%2Foauth2&scope=openid&state=test&nonce=test\")",
+      "Bash(grep -oE '\\(AADSTS[0-9]+[^<\"]{0,250}|sErrorCode[^<]{0,200}|iErrorCode[^<]{0,200}|\"error_description\"[^}]{0,300}\\)' /tmp/authz2.html)",
+      "Bash(wc -l /workspace/__logs/auth-*.log)",
+      "Bash(python3)",
+      "Bash(python3 -c ':*)",
+      "Bash(curl -sL -A 'Mozilla/5.0 \\(Windows NT 10.0; rv:149.0\\) Gecko/20100101 Firefox/149.0' 'https://eacustomerdev.ciamlogin.com/a400a39c-97cf-4459-932e-6dfccf2adf1c/oauth2/v2.0/authorize?client_id=83cce8eb-896d-4f36-87f0-7704d1b6b00e&scope=openid+profile&redirect_uri=http%3A%2F%2Flocalhost%3A4200%2Fauth%2Fredirect&response_type=code&response_mode=query&nonce=nonce123&state=s1&code_challenge=Td7vDrckp5JLpAMAfZY-lYQKoB_nh4EyTv8Dgk4504Y&code_challenge_method=S256' -o /tmp/signin.html -D /tmp/signin_headers.txt)",
+      "Bash(curl -s -o /tmp/probe.html -w 'HTTP=%{http_code}\\\\n' 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=d603e268-e302-4066-8914-0b5e0b8d3d83&response_type=code&redirect_uri=https%3A%2F%2Fexample.com%2F&scope=openid&nonce=x')",
+      "Bash(grep -oE '\\(AADSTS[0-9]+|unauthorized_client|application with identifier.{0,120}\\)' /tmp/probe.html)",
+      "Bash(grep -oE 'AADSTS[0-9]+[^\"<]{0,300}' /tmp/probe.html)",
+      "Bash(git -C /workspace log --oneline -5 -- docs/runbooks/sso-manual-bootstrap.md)",
+      "Bash(git -C /workspace show HEAD:docs/runbooks/sso-manual-bootstrap.md)"
     ]
   }
 }
