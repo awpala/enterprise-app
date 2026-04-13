@@ -125,6 +125,8 @@ Run this twice - once in each External ID tenant.
 
 Repeat twice (dev project + prod project). Keeping dev and prod in **separate Google Cloud projects** is required for independent consent screens and secret rotation.
 
+> **Start Part C for prod before you need it.** If you publish the prod Google consent screen as **External**, Google verification can take **several weeks** (Google's SLA, not ours). For a sales-demo posture - matching the scope boundary declared in the [Guest Mode section](#guest-mode-prod-demo-failsafe) (not for commercial use) - an acceptable alternative is to leave the prod consent screen in **Testing** mode and add the demo Gmail accounts as explicit test users (Step 7 below). Testing-mode apps still work end-to-end for any email on the test list. Decide this posture **before** starting Step 8 so the merge-to-`main` timeline does not block on Google review.
+
 1. Go to [https://console.cloud.google.com](https://console.cloud.google.com).
 2. In the top project selector, click **New Project**:
    - **Project name**: `ea-customer-dev` or `ea-customer-prd`
@@ -309,10 +311,21 @@ Note: the user flow, Google IDP, and Email one-time passcode method are **not** 
 ### Step 3. Smoke test end-to-end sign-in
 
 3. Smoke test the end-to-end sign-in flow. **Prerequisite**: on the first apply, [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) must be complete - without the user flow and IDPs configured in the portal, the SPA sign-in will surface a tenant-level error (no user flow attached) rather than the IDP picker.
-   - Browse to the dev SWA URL (e.g. `https://<swa-dev>.azurestaticapps.net`).
+   - Browse to the SWA URL for the env under test (e.g. `https://<swa-dev>.azurestaticapps.net` or the prod FQDN).
    - Click **Sign in**.
    - Confirm the Microsoft-hosted sign-in page renders two IDP options: **Google** and **Email one-time passcode**.
    - Sign in with each option in turn and confirm a round-trip to the SPA with a valid session.
+
+### Step 4. Prod-only - guest-mode smoke test
+
+4. On **prod only** (guest mode is disabled in dev by `allow_guest_auth = false` in [`infra/envs/dev.tfvars`](../../infra/envs/dev.tfvars)), verify the guest failsafe on top of the real SSO:
+   - Confirm the prod SWA landing page renders the **Log in as Guest** button alongside **Log in**. If it is missing, CI did not build the SPA with `ENABLE_GUEST_AUTH=true` - check the `refs/heads/main` branch conditional in [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) and the generated environment bundle (search `enableGuestAuth` in the shipped JS).
+   - Click **Log in as Guest**. Expect immediate navigation to `/dashboard` with **no** External ID redirect.
+   - Open browser devtools Network tab, trigger any API action (e.g. open the Models list), and confirm the outbound request to `/api/...` carries **no** `Authorization` header and returns `200`.
+   - In Postgres, the resulting audit row must carry `actor_oid = 00000000-0000-0000-0000-000000000003`, `actor_tid = 00000000-0000-0000-0000-000000000004`, and `actor_idp = "guest"`. The corresponding RabbitMQ message must carry `x-user-oid` + `x-user-idp` headers with the same sentinel values.
+   - Regression check: a real Google / Email-OTP sign-in from Step 3 still works - the `JwtOrGuest` policy scheme routes any `Authorization: Bearer ...` request through the unchanged `JwtBearer` path; guest intent is signalled by the header's absence.
+
+   The dev sentinel (`oid = ...-0001`, `tid = ...-0002`, `idp = "dev"`) is distinct from the guest sentinel - do not conflate them when auditing.
 
 ---
 
@@ -438,9 +451,11 @@ Every guest action stamps the same sentinel `oid` into audit columns and RabbitM
 
 ### How to enable in prod
 
+> **Prerequisite for the first-ever merge to `main`**: the merge that activates guest mode is *also* the first prod apply of the entire SSO slice. [Parts A-E](#3-part-a---create-the-entra-external-id-tenant-one-per-env) must be complete for the **prod** tenant before the merge (otherwise CI's `terraform apply -auto-approve` fails on the prod `module.entra_external_id` apply), and [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) must be completed immediately after the merge (before sign-in smoke tests can pass). Guest mode itself is a flag-flip, but the flag rides on infrastructure that must exist first. On subsequent merges (prod already bootstrapped) only Steps 1-3 below apply.
+
 1. Confirm `allow_guest_auth = true` in `infra/envs/production.tfvars` (committed default for prod).
 2. Merge to `main`. CI redeploys Container Apps with `AzureAd__AllowGuest=true` and rebuilds the SPA with `ENABLE_GUEST_AUTH=true`.
-3. Verify:
+3. Verify (same checklist as [Part F Step 4](#step-4-prod-only---guest-mode-smoke-test)):
    - Prod SWA landing page renders the **Log in as Guest** button.
    - Clicking it navigates to `/dashboard` without an External ID redirect.
    - A subsequent API call succeeds with no `Authorization` header, and the resulting audit row carries `actor_oid = 00000000-0000-0000-0000-000000000003` and `actor_idp = "guest"`.

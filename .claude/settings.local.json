@@ -129,7 +129,8 @@
       "Bash(grep -n \"allow_guest_auth\\\\|AllowGuest\" variables.tf main.tf modules/container-apps/variables.tf modules/container-apps/main.tf envs/*.tfvars)",
       "Bash(tflint --version)",
       "Bash(tflint --recursive)",
-      "Bash(tflint)"
+      "Bash(tflint)",
+      "Bash(git log:*)"
     ]
   }
 }
