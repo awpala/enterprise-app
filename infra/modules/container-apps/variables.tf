@@ -91,7 +91,7 @@ variable "api_allowed_origins" {
 # the API validates bearer tokens against JWKS it fetches from authority.
 #-------------------------------------------------------------------------
 variable "aad_authority" {
-  description = "OIDC authority URL surfaced to the API as AzureAd__Authority (e.g. https://<subdomain>.ciamlogin.com/<tenant-id>/v2.0)."
+  description = "OIDC authority URL surfaced to the API as AzureAd__Authority. Format: https://<subdomain>.ciamlogin.com/<tenant-id>. Microsoft.Identity.Web appends /v2.0/.well-known/openid-configuration internally — do NOT pre-append /v2.0 here (causes .../v2.0/v2.0/.well-known/... 404 and silent metadata failure)."
   type        = string
 }
 

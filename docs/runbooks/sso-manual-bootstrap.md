@@ -9,7 +9,7 @@ These steps are manual because:
 - **External ID tenants** are provisioned through a dedicated Azure Portal experience, not the AzureRM provider. The tenant must exist before any `azuread`/`azapi` provider can authenticate against it.
 - **Google Cloud OAuth 2.0 clients** live in Google Cloud Console and cannot be managed by Terraform.
 - **Admin consent** for Microsoft Graph permissions is a portal-only action (Terraform can assign the permission; it cannot click "Grant admin consent").
-- **The External ID user flow and its attached identity providers** (Microsoft Entra ID multi-tenant, Microsoft Account, Google, Email one-time passcode) are configured through the External ID portal as a one-time bootstrap per tenant - see [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers). Terraform no longer manages these objects.
+- **The External ID user flow and its attached identity providers** (Google, a custom Microsoft OIDC provider covering both work and personal accounts, and Email one-time passcode) are configured through the External ID portal as a one-time bootstrap per tenant - see [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers). Terraform no longer manages these objects. Microsoft work + personal accounts are federated via a single custom OIDC provider backed by a multi-tenant workforce app reg; they are **not** built-in External ID identity providers. See G.0 for the backing app reg and G.2 for the OIDC configuration.
 
 **Who runs this**: a single operator who holds both
 
@@ -74,6 +74,8 @@ Repeat this section twice: once for `dev`, once for `production`.
 
    Why committed tfvars and not a GitHub Environment secret: Terraform's `-var-file=envs/<env>.tfvars` has **higher precedence than `TF_VAR_*` environment variables**. If the tfvars file still holds a `<PLACEHOLDER: ...>` string, `terraform plan` silently uses the placeholder even when the operator populated `push-sso-secrets.sh` correctly, and the `azuread.external` provider fails with an opaque unmarshal error.
 
+10. **Capture the Microsoft OIDC federation app reg credentials for password-manager storage.** In addition to the tenant GUID + subdomain above, Part G.0 produces a multi-tenant app registration (`ea-ms-oidc-federation-<env>`) in the **workforce** tenant whose **Application (client) ID** and **client secret** must be captured into the operator's password manager. These credentials are pasted into the External ID tenant's custom OIDC provider config in [Part G.2](#g2---configure-the-three-tenant-level-identity-providers). They are **not** pushed to GitHub Environments - no `gh secret set` needed. Same trust model as Google's OAuth credentials (Part C). The actual registration happens in G.0; this bullet exists only so Part A's capture checklist is complete.
+
 Reference: [What is Microsoft Entra External ID?](https://learn.microsoft.com/en-us/entra/external-id/customers/overview-customers-ciam)
 
 ---
@@ -116,6 +118,8 @@ Run this twice - once in each External ID tenant.
 > 4. Click **Grant admin consent for \<tenant\>** and confirm all three rows (`Application.ReadWrite.All`, `IdentityProvider.ReadWrite.All`, `Policy.ReadWrite.AuthenticationFlows`) show green checkmarks under **Status**.
 >
 > No other Part B artifacts need to change - the client secret, any federated credential, and the captured tenant ID / client ID stay as-is. Run this true-up once per External ID tenant (dev and production).
+
+> **Don't repeat in prod**: `ea-terraform-deployer` in the dev External ID tenant was registered with *Supported account types = "Any Entra ID Tenant + Personal Microsoft accounts"* (`signInAudience = AzureADandPersonalMicrosoftAccount`). That value is **unnecessarily broad** for a CI service principal that only uses the client-credentials flow - it exposes no user auth paths either way, but minimum scope is **option 1: "Single tenant only"** (`AzureADMyOrg`). For the production pass, register `ea-terraform-deployer` (prod) with option 1, as Step 3 above already prescribes. Dev's existing breadth is left as-is to avoid a rebuild.
 
 ---
 
@@ -281,7 +285,7 @@ bash docs/runbooks/plan-infra.sh dev --out /tmp/dev.tfplan
 - `module.container_apps.*` updates where the API container app gets new `AzureAd__*` environment variables populated from `module.entra_external_id` outputs.
 - **Zero destroys of unrelated resources.** If the plan shows destroys outside `module.entra_external_id`, **stop** and investigate - that indicates state drift, not expected change.
 
-Note: the user flow, Google IDP, Email one-time passcode method, Microsoft Account, and Microsoft Entra ID (multi-tenant) providers are **not** in the plan - those are portal-managed via [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers).
+Note: the user flow, Google IDP, Email one-time passcode method, and the custom Microsoft OIDC provider are **not** in the plan - those are portal-managed via [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers).
 
 **If the plan is clean**: commit and push the branch. CI picks up the GitHub Environment secrets (wired through `deploy.yml` into the same `TF_VAR_*` names) and runs the identical apply.
 
@@ -309,7 +313,7 @@ Note: the user flow, Google IDP, Email one-time passcode method, Microsoft Accou
 3. Smoke test the end-to-end sign-in flow. **Prerequisite**: on the first apply, [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) must be complete - without the user flow and IDPs configured in the portal, the SPA sign-in will surface a tenant-level error (no user flow attached) rather than the IDP picker.
    - Browse to the dev SWA URL (e.g. `https://<swa-dev>.azurestaticapps.net`).
    - Click **Sign in**.
-   - Confirm the Microsoft-hosted sign-in page renders all four IDP options.
+   - Confirm the Microsoft-hosted sign-in page renders three IDP options: **Microsoft** (covers work + personal), **Google**, and **Email one-time passcode**.
    - Sign in with each option in turn and confirm a round-trip to the SPA with a valid session.
 
 ---
@@ -318,6 +322,8 @@ Note: the user flow, Google IDP, Email one-time passcode method, Microsoft Accou
 
 Run this **once per tenant**, immediately after the first successful `terraform apply` in [Part F](#8-part-f---verification) - that apply is what creates the `ea-spa-<env>` app registration and its redirect URIs, which the user flow needs to exist before it can be attached. Repeat once for `dev`, once for `production`.
 
+> **Architectural correction (read first)**: Microsoft work accounts (Entra ID) and Microsoft personal accounts (MSA: Outlook/Hotmail/Live) are **not** built-in identity providers on Entra External ID self-service sign-up flows (`externalUsersSelfServiceSignUpEventsFlow`). The flow's **Identity providers** blade exposes only one Email radio (`Email with password` | `Email one-time passcode`) plus checkboxes for configured social IDPs (Google) and any custom OIDC IDPs. There are **no Microsoft checkboxes**. The correct pattern to cover both Microsoft work and personal in a single IDP is a **custom OpenID Connect provider** in the External ID tenant, backed by a multi-tenant app registration in the **workforce** Entra tenant, pointing at `https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration`. One OIDC entry covers both account classes because `/common/v2.0` accepts work (multi-tenant) and personal (MSA) logins - **but only if the backing app reg's `signInAudience` is set correctly** (see G.0 below).
+
 > **True-up for operators who already ran Parts A-E**
 >
 > The move from Terraform-managed user flow / IDPs to portal-managed user flow / IDPs does **not** invalidate prior bootstrap work. Specifically:
@@ -325,7 +331,7 @@ Run this **once per tenant**, immediately after the first successful `terraform 
 > - **Still valid, no action**:
 >   - **Part A** - the External ID tenant itself. Keep.
 >   - **Part B** - the `ea-terraform-deployer` SP and its client secret. Terraform still uses these to manage the `ea-api-<env>` / `ea-spa-<env>` app registrations, SPs, identifier URI, and SPA pre-authorization.
->   - **Part C** - the Google Cloud OAuth client and its client ID / client secret. These are now consumed by the portal paste in [Step 2](#step-2) below rather than by Terraform. Keep them in your password manager; all future rotations go portal-side (see [Section 10](#10-secret-rotation)).
+>   - **Part C** - the Google Cloud OAuth client and its client ID / client secret. These are now consumed by the portal paste in [G.2](#g2---configure-the-three-tenant-level-identity-providers) below rather than by Terraform. Keep them in your password manager; all future rotations go portal-side (see [Section 10](#10-secret-rotation)).
 >   - **Part E** - workforce-tenant Graph consent (`Application.ReadWrite.OwnedBy`, `IdentityProvider.ReadWrite.All`). Still required for `azuread` app-registration management in CI.
 > - **You likely have NOT yet populated `infra/envs/dev.tfvars` (and/or `production.tfvars`) with real `external_tenant_id` + `tenant_subdomain`.** The runbook previously did not instruct this. Do it now - see the extended final step of [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env) - before re-running `bash docs/runbooks/plan-infra.sh <env>`. Without this, `-var-file` wins over `TF_VAR_*` and the plan blows up inside the `azuread.external` provider with an opaque unmarshal error.
 > - **`source-sso-env.sh` no longer exports `TF_VAR_external_tenant_id` or `TF_VAR_tenant_subdomain`.** Those two values now live in the committed tfvars (see above). `push-sso-secrets.sh` still contains them for reference and for the (now-inert) GitHub secret / variable push; those GitHub objects are harmless and may be left in place.
@@ -343,48 +349,109 @@ Run this **once per tenant**, immediately after the first successful `terraform 
 >   Either way, the Google client ID / secret must still live in your **password manager** for future portal rotation.
 > - **`push-sso-secrets.sh`** - if you still have a populated local copy (not the tracked `sample.*` template), the two `GOOGLE_OIDC_CLIENT_ID` and `GOOGLE_OIDC_CLIENT_SECRET` assignments and the trailing `gh secret set GOOGLE_OIDC_*` invocations are now no-ops against Terraform. You may delete those lines from your local copy, or ignore them - they do not break anything. The tracked `sample.push-sso-secrets.sh` has already been updated to the four-value shape.
 
-### Step 1. Create the user flow
+**Claim note**: Tokens issued via the `/common/v2.0` federation include an upstream `idp` claim distinguishing work (`https://sts.windows.net/<tid>/`) from personal (`https://login.live.com`). During the [G.4 smoke test](#g4---picker-smoke-test), log the raw `idp` claim the SPA receives to confirm whether External ID passes it through - if product needs to differentiate work vs personal at the app layer, a follow-up can split into two OIDC providers (one at `/organizations/v2.0`, one at `/consumers/v2.0`).
 
-1. Switch into the External ID tenant (top-right tenant switcher).
+### G.0 - Register the Microsoft OIDC federation app in the workforce tenant (prerequisite)
+
+This is the critical step that must run **before** G.2's custom OIDC configuration. The app registration lives in the **workforce** Entra tenant (not the External ID tenant) and provides the client credentials the External ID tenant uses to federate out to Microsoft's shared `/common/v2.0` authority. Getting the `signInAudience` wrong silently breaks one of the two Microsoft account classes (work or personal), so pay close attention to the radio selection.
+
+1. In the Azure Portal, use the top-right tenant switcher to switch into the **workforce tenant** (not the External ID tenant).
+2. Open **Entra ID -> App registrations -> + New registration**.
+3. Fill in:
+   - **Name**: `ea-ms-oidc-federation-<env>` (e.g. `ea-ms-oidc-federation-dev`, `ea-ms-oidc-federation-prod`). Register a **separate** app reg per environment when replaying this runbook for production.
+   - **Supported account types** - the portal presents four radio options. Pick **option 3**:
+     1. *Single tenant only - <workforce-tenant-display-name>* -> `signInAudience = AzureADMyOrg` - **WRONG** (excludes every user outside the workforce tenant; we want customers federating in).
+     2. *Multiple Entra ID tenants* -> `signInAudience = AzureADMultipleOrgs` - **WRONG** (kills personal MSA accounts).
+     3. ✅ *Any Entra ID Tenant + Personal Microsoft accounts* -> `signInAudience = AzureADandPersonalMicrosoftAccount` - **CORRECT - pick this one**. It is the only value compatible with the `/common/v2.0` metadata URL we point External ID at in G.2. Any other choice silently breaks one of the two account classes.
+     4. *Personal accounts only* -> `signInAudience = PersonalMicrosoftAccount` - **WRONG** (kills work/Entra accounts).
+   - **Redirect URI**: leave blank. External ID supplies the exact redirect URI during [G.2](#g2---configure-the-three-tenant-level-identity-providers); the final step of G.2 rounds it back into this app reg.
+4. Click **Register**.
+5. Capture the **Application (client) ID** from the app's Overview blade.
+6. Open **Certificates & secrets -> Client secrets -> + New client secret**:
+   - **Description**: `external-id-oidc-<env>`
+   - **Expires**: 24 months (track expiry; see [Section 11](#11-secret-rotation)).
+   - Click **Add**, then immediately copy the secret **Value** (not the Secret ID). It is only shown once.
+7. **Capture destination**: the operator's password manager. Record both the **Application (client) ID** and the **client secret value**. Do **not** run `gh secret set` - these credentials are portal-only config at the External ID end, same trust model as Google's clientId/secret (Part C). They are pasted into the External ID tenant's custom OIDC provider in G.2 and never flow through Terraform or GitHub Environments.
+
+### G.1 - Create the user flow
+
+1. Switch into the **External ID tenant** (top-right tenant switcher).
 2. Open **External Identities -> User flows -> + New user flow**.
 3. Configure:
    - **Name**: `ea-<env>-signup-signin` (e.g. `ea-dev-signup-signin`). The `B2C_1_` prefix is prepended automatically by the portal in some UIs - match whichever label the current portal version shows; the resulting flow name is the same.
    - **Type**: *Sign up and sign in*.
    - Attributes collected at sign-up: pick the minimum set that the SPA consumes (typically email + display name).
 4. Click **Create**.
-5. On the new flow's **Applications** blade, click **+ Add application** and attach `ea-spa-<env>`. This is the binding that tells the Microsoft-hosted sign-in page to render this flow when the SPA initiates auth.
+5. On the new flow's **Applications** blade, click **+ Add application** and attach `ea-spa-<env>` as the sole application. This is the binding that tells the Microsoft-hosted sign-in page to render this flow when the SPA initiates auth.
 
-### Step 2. Configure the four tenant-level identity providers
+### G.2 - Configure the three tenant-level identity providers
 
-Under **External Identities -> All identity providers**, configure each of the following. These are **tenant-level** providers; enabling them here makes them *available* to user flows, but each flow still has to opt in (Step 3).
+Under **External Identities -> All identity providers**, configure each of the following **three** entries. These are **tenant-level** providers; enabling them here makes them *available* to user flows, but each flow still has to opt in ([G.3](#g3---attach-identity-providers-to-the-user-flow)).
 
-- **Microsoft Entra ID (multi-tenant)** - social/work provider. Enable. **No credentials required** - the External ID tenant federates with Microsoft's shared authority directly.
-- **Microsoft Account** - social provider for personal MSA accounts. Enable. **No credentials required**.
-- **Google**:
-  1. Click **+ Google**.
-  2. **Name**: `Google`.
-  3. **Client ID**: paste the Google OAuth client ID captured in [Part C](#5-part-c---register-the-google-oauth-20-client-one-per-env) (from your password manager).
-  4. **Client secret**: paste the Google OAuth client secret from the same password-manager entry.
-  5. Save.
-- **Email one-time passcode**: the exact portal location has shifted between External ID portal versions - check both **External Identities -> Email and phone signup** and **External Identities -> Authentication methods** and use whichever blade the current portal version exposes. Enable the setting named something like "Email with one-time passcode" or "Email OTP for guests" (the label differs slightly between portal versions; match whatever is currently rendered).
+As a sanity check: running `GET /beta/identity/identityProviders` against this tenant should return `EmailOtpSignup-OAUTH`, `EmailPassword-OAUTH`, `Google`, and - once this step is complete - a custom OIDC provider named `Microsoft`. There are no Microsoft built-ins.
 
-### Step 3. Enable all four providers on the user flow
+#### Google
+
+1. Click **+ Google**.
+2. **Name**: `Google`.
+3. **Client ID**: paste the Google OAuth client ID captured in [Part C](#5-part-c---register-the-google-oauth-20-client-one-per-env) (from your password manager).
+4. **Client secret**: paste the Google OAuth client secret from the same password-manager entry.
+5. Save.
+
+#### Custom OpenID Connect provider named `Microsoft` (covers work + personal)
+
+1. Click **+ Custom OpenID Connect** (or the equivalent "Add custom OIDC" entry point; label differs slightly between portal versions).
+2. **Name**: `Microsoft`. This is the label that will render on the picker and is what the operator and end-user see.
+3. **Metadata URL**: `https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration`. The `/common/v2.0` authority accepts both multi-tenant work accounts and personal MSA accounts, which is exactly why G.0 required `signInAudience = AzureADandPersonalMicrosoftAccount`.
+4. **Client ID**: paste the `ea-ms-oidc-federation-<env>` **Application (client) ID** captured in [G.0](#g0---register-the-microsoft-oidc-federation-app-in-the-workforce-tenant-prerequisite).
+5. **Client secret**: paste the client secret value captured in G.0.
+6. **Scope**: `openid profile email`.
+7. **Response type**: `code`.
+8. **Response mode**: `form_post`.
+9. **Claim mapping**:
+   - **User ID** -> `oid` (fallback `sub`)
+   - **Display name** -> `name`
+   - **Given name** -> `given_name`
+   - **Surname** -> `family_name`
+   - **Email** -> `email`
+10. Click **Save**. The portal responds by displaying a **redirect URI** of the form:
+
+    ```
+    https://<subdomain>.ciamlogin.com/<tenant-id>/federation/oauth2
+    ```
+
+    For example: `https://eacustomerdev.ciamlogin.com/11111111-2222-3333-4444-555555555555/federation/oauth2`. **Copy this URI exactly** - it must be round-tripped into the workforce app reg (next step).
+11. **Round-trip the redirect URI into the workforce app reg (critical)**. Switch the tenant switcher back to the **workforce tenant**, open **Entra ID -> App registrations -> `ea-ms-oidc-federation-<env>` -> Authentication -> + Add a platform -> Web**, paste the copied redirect URI into the **Redirect URIs** field, and click **Configure / Save**. Skipping this step causes `AADSTS50011: invalid redirect URI` at first sign-in (see [Section 10](#10-troubleshooting)).
+
+#### Email one-time passcode
+
+Ensure the Email one-time passcode method is **explicitly enabled** at the tenant level. The exact portal location has shifted between External ID portal versions - check both **External Identities -> Email and phone signup** and **External Identities -> Authentication methods** and use whichever blade the current portal version exposes. Enable the setting named something like "Email with one-time passcode" or "Email OTP for guests" (the label differs slightly between portal versions; match whatever is currently rendered). Do not assume OTP is on by default - it must be toggled on by the operator.
+
+### G.3 - Attach identity providers to the user flow
 
 1. Return to **External Identities -> User flows -> `ea-<env>-signup-signin`**.
-2. Open the **Identity providers** blade.
-3. Enable all four: **Microsoft Entra ID**, **Microsoft Account**, **Google**, **Email one-time passcode**.
-4. Save.
+2. Open the **Identity providers** blade. You will see:
+   - An **Email** radio with two options: **Email with password** and **Email one-time passcode**. On flow creation the radio defaults to **Email with password**; **flip it to Email one-time passcode**.
+   - A **Google** checkbox (because [G.2](#g2---configure-the-three-tenant-level-identity-providers) enabled it at the tenant level).
+   - A **Microsoft** checkbox (the custom OIDC provider configured in G.2; it only appears as a checkbox *after* G.2 completes).
+3. Check the **Google** checkbox.
+4. Check the custom **Microsoft** checkbox.
+5. Click **Save**.
 
-This is the step that makes the Microsoft-hosted sign-in page actually render the full four-tile picker. Without it, the tenant-level providers from Step 2 exist but will not appear in the flow.
+This is the step that makes the Microsoft-hosted sign-in page actually render the three-option picker (Microsoft, Google, Email one-time passcode). Without it, the tenant-level providers from G.2 exist but will not appear on the flow.
 
-### Step 4. Validate the picker renders
+### G.4 - Picker smoke test
 
 1. Still on the user flow blade, click **Run user flow**. In the preview pane, select the `ea-spa-<env>` application and the SPA's reply URL, then click **Run user flow**.
 2. Alternatively, hit the real SPA sign-in (the same URL used in [Part F Step 3](#step-3-smoke-test-end-to-end-sign-in)).
-3. Confirm that all four IDP tiles render on the Microsoft-hosted sign-in page.
-4. Optionally, complete a sign-in through each IDP to confirm the round-trip.
+3. Confirm that the Microsoft-hosted sign-in page renders **three** picker options - **Microsoft** (covers work + personal), **Google**, and **Email one-time passcode** - not four.
+4. Complete a sign-in through each option to confirm the round-trip:
+   - **Microsoft** - test **both** a work account (any Entra tenant) and a personal MSA account (Outlook/Hotmail/Live). Both must succeed on the single `Microsoft` tile; if one class fails, the `signInAudience` on `ea-ms-oidc-federation-<env>` is likely wrong - return to [G.0](#g0---register-the-microsoft-oidc-federation-app-in-the-workforce-tenant-prerequisite) and confirm option 3 was selected.
+   - **Google** - any Gmail account on the test-users list (see [Part C](#5-part-c---register-the-google-oauth-20-client-one-per-env)).
+   - **Email one-time passcode** - any email; expect the OTP challenge.
+5. During the first Microsoft sign-in, log the raw `idp` claim the SPA receives and confirm it reads `https://sts.windows.net/<tid>/` for work accounts and `https://login.live.com` for personal accounts. This is the hook the app layer would use if product later needs to differentiate the two at runtime.
 
-Repeat Steps 1-4 for the `production` tenant after its first `terraform apply`.
+Repeat G.0 through G.4 for the `production` tenant after its first `terraform apply`, producing a separate `ea-ms-oidc-federation-prod` app reg and a separate `ea-prod-signup-signin` user flow.
 
 ---
 
@@ -393,10 +460,13 @@ Repeat Steps 1-4 for the `production` tenant after its first `terraform apply`.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `AADSTS50011: Reply URL mismatch` | SPA redirect URI not registered on the SPA app reg | Confirm the SWA FQDN (including trailing slash behavior) and `http://localhost:4200/auth/redirect` are in the SPA app reg's redirect URIs. Terraform owns this; update the module input and re-apply. |
-| Microsoft-hosted sign-in page errors out with "no user flow" or "application is not configured" | Part G has not been run on this tenant, or the user flow is not attached to `ea-spa-<env>` | Complete [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) Step 1.5 (attach the SPA app to the user flow). |
-| Sign-in page renders fewer than four IDP tiles | The tenant-level provider is enabled but the user flow is not opted in, or vice versa | Check both [Part G Step 2](#step-2-configure-the-four-tenant-level-identity-providers) (tenant-level) and [Step 3](#step-3-enable-all-four-providers-on-the-user-flow) (flow-level). Both are required. |
+| Microsoft-hosted sign-in page errors out with "no user flow" or "application is not configured" | Part G has not been run on this tenant, or the user flow is not attached to `ea-spa-<env>` | Complete [Part G.1](#g1---create-the-user-flow) (create flow + attach the SPA app). |
+| Sign-in page renders fewer than three IDP options | The tenant-level provider is enabled but the user flow is not opted in, or vice versa | Check both [G.2](#g2---configure-the-three-tenant-level-identity-providers) (tenant-level) and [G.3](#g3---attach-identity-providers-to-the-user-flow) (flow-level). Both are required. |
+| User flow's Identity providers blade does not offer Microsoft Entra ID or Microsoft Account checkboxes | Those are **not** built-in identity providers on `externalUsersSelfServiceSignUpEventsFlow`; Microsoft work + personal accounts must be federated via a custom OIDC provider | Complete [G.0](#g0---register-the-microsoft-oidc-federation-app-in-the-workforce-tenant-prerequisite) -> [G.2](#g2---configure-the-three-tenant-level-identity-providers) -> [G.3](#g3---attach-identity-providers-to-the-user-flow) as specified. The `Microsoft` checkbox only appears on the flow's Identity providers blade after the custom OIDC provider is saved in G.2. |
+| Selecting **Microsoft** at the picker -> `AADSTS50011: invalid redirect URI` | The round-trip paste in [G.2](#g2---configure-the-three-tenant-level-identity-providers) was missed - the redirect URI that External ID surfaced after saving the custom OIDC provider was never applied to the workforce app reg `ea-ms-oidc-federation-<env>` | Return to the final step of G.2 and paste the External-ID-supplied redirect URI into `ea-ms-oidc-federation-<env>` -> **Authentication -> + Add a platform -> Web**. Save. Retry sign-in. |
+| **Microsoft** picker succeeds for work accounts but fails for personal MSA (or vice versa) | `ea-ms-oidc-federation-<env>` was registered with the wrong `signInAudience` (options 1, 2, or 4 instead of option 3) | Delete (or re-register) the app reg with **option 3: "Any Entra ID Tenant + Personal Microsoft accounts"** (`AzureADandPersonalMicrosoftAccount`). See [G.0](#g0---register-the-microsoft-oidc-federation-app-in-the-workforce-tenant-prerequisite). Only option 3 is compatible with `/common/v2.0`. |
 | Google sign-in returns `Error 403: access_denied` for non-test users | Google consent screen still in **Testing** mode | Add the account to the test user list, or submit the app for verification (see [Part C](#5-part-c---register-the-google-oauth-20-client-one-per-env)). |
-| Google sign-in returns `invalid_client` or `unauthorized_client` | Google OAuth client ID/secret in the External ID Google IDP config is wrong or rotated out-of-band | Re-paste the current client ID and secret into **External Identities -> All identity providers -> Google** (Part G Step 2). |
+| Google sign-in returns `invalid_client` or `unauthorized_client` | Google OAuth client ID/secret in the External ID Google IDP config is wrong or rotated out-of-band | Re-paste the current client ID and secret into **External Identities -> All identity providers -> Google** ([G.2](#g2---configure-the-three-tenant-level-identity-providers)). |
 | API returns `401 invalid_token` with `aud` claim mismatch | `accessTokenAcceptedVersion` on the API app reg is not `2` | Confirm `accessTokenAcceptedVersion = 2` in the API app reg manifest. Terraform's `api` block should set this; if set to `null` or `1`, tokens are v1 and will not match the v2 authority. |
 | `Insufficient privileges to complete the operation` during `terraform apply` | Terraform deployer SP (Part B) missing admin consent | Return to [Part B](#4-part-b---create-the-terraform-service-principal-inside-the-external-id-tenant) step 6 and click **Grant admin consent**. |
 | CI pipeline fails with `AADSTS700016` when touching External ID | CI SP missing Graph permissions or admin consent in workforce tenant | Rerun [Part E](#7-part-e---grant-workforce-tenant-graph-permissions-one-time). |
@@ -427,6 +497,17 @@ Secrets to rotate, and how:
 4. Re-run the deploy workflow to confirm Terraform still authenticates.
 5. Delete the old secret from the app reg **Certificates & secrets** blade.
 
+### Microsoft OIDC federation client secret (from Part G.0)
+
+Rotation is **portal-only** - the secret never flows through GitHub or Terraform.
+
+1. In the **workforce** tenant portal: **Entra ID -> App registrations -> `ea-ms-oidc-federation-<env>` -> Certificates & secrets -> + New client secret**. Copy the new value immediately.
+2. Switch the tenant switcher to the **External ID tenant** and open **External Identities -> All identity providers -> Microsoft** (the custom OIDC entry).
+3. Paste the new client secret into the **Client secret** field (the client ID stays the same unless you also rotated the app reg). Save.
+4. Update the entry in your password manager.
+5. Smoke-test sign-in via the Microsoft picker (both a work account and a personal MSA) per [G.4](#g4---picker-smoke-test).
+6. Delete the old secret from the workforce app reg's **Certificates & secrets** blade.
+
 ### Google OAuth client secret (from Part C)
 
 Rotation is now **portal-only** - Terraform does not consume the Google secret, so there is no GitHub secret push and no re-apply.
@@ -441,5 +522,5 @@ Rotation is now **portal-only** - Terraform does not consume the Google secret, 
 
 ### Cadence
 
-- Rotate both secrets **annually** at minimum, or immediately on suspected compromise or operator departure.
-- Track expiry of the External ID SP secret (24 months from creation) - set a calendar reminder.
+- Rotate all three secrets (Part B deployer, Part G.0 Microsoft OIDC federation, Part C Google) **annually** at minimum, or immediately on suspected compromise or operator departure.
+- Track expiry of the External ID SP secret (24 months from creation) and the `ea-ms-oidc-federation-<env>` client secret (24 months from creation) - set calendar reminders for both.

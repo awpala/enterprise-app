@@ -85,7 +85,27 @@
       "Bash(npm run:*)",
       "Bash(chmod +x /workspace/docs/runbooks/sample.push-sso-secrets.sh)",
       "Bash(bash -n /workspace/docs/runbooks/sample.push-sso-secrets.sh)",
-      "Bash(chmod +x /workspace/docs/runbooks/plan-infra.sh)"
+      "Bash(chmod +x /workspace/docs/runbooks/plan-infra.sh)",
+      "Bash(curl -sS \"https://eacustomerdev.ciamlogin.com/a400a39c-97cf-4459-932e-6dfccf2adf1c/v2.0/.well-known/openid-configuration\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -sS -o /dev/null -w \"HEAD federation/oauth2: %{http_code}\\\\n\" \"https://eacustomerdev.ciamlogin.com/a400a39c-97cf-4459-932e-6dfccf2adf1c/federation/oauth2\")",
+      "Bash(curl -sS -o /dev/null -w \"HEAD federation/oidc: %{http_code}\\\\n\" \"https://eacustomerdev.ciamlogin.com/a400a39c-97cf-4459-932e-6dfccf2adf1c/federation/oidc\")",
+      "Bash(curl -sS -o /dev/null -w \"HEAD oauth2/authresp: %{http_code}\\\\n\" \"https://eacustomerdev.ciamlogin.com/a400a39c-97cf-4459-932e-6dfccf2adf1c/oauth2/authresp\")",
+      "Bash(curl -sS https://proud-ground-0d14aa60f.7.azurestaticapps.net/)",
+      "Bash(curl -sS https://proud-ground-0d14aa60f.7.azurestaticapps.net/main-JZ5FLPP2.js)",
+      "Bash(grep -oE 'ciamlogin\\\\.com[^\",\\)]{0,200}|aadApiScope[^\",\\)]{0,200}|aadClientId[^\",\\)]{0,200}|aadAuthority[^\",\\)]{0,200}|api:\\\\\\\\/\\\\\\\\/[a-zA-Z0-9-]{10,}[^\",\\)]{0,200}|azurecontainerapps\\\\.io[^\",\\)]{0,200}')",
+      "Bash(curl -sS https://proud-ground-0d14aa60f.7.azurestaticapps.net/ -o /tmp/index.html)",
+      "Bash(curl -sS -o /dev/null -w \"env.js: %{http_code}\\\\n\" https://proud-ground-0d14aa60f.7.azurestaticapps.net/env.js)",
+      "Bash(curl -sS -o /dev/null -w \"assets/env.js: %{http_code}\\\\n\" https://proud-ground-0d14aa60f.7.azurestaticapps.net/assets/env.js)",
+      "Bash(curl -sS -o /dev/null -w \"assets/config.json: %{http_code}\\\\n\" https://proud-ground-0d14aa60f.7.azurestaticapps.net/assets/config.json)",
+      "Bash(curl -sS https://proud-ground-0d14aa60f.7.azurestaticapps.net/__TRACKED_VAR__.js)",
+      "Bash(grep -oE 'ciamlogin[^\"]{0,120}|api://[a-z0-9-]{30,}[^\"]{0,80}|aadAuthority[^,}]{0,200}|83cce8eb[^\"]{0,120}')",
+      "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" \"https://eacustomerdev.ciamlogin.com/a400a39c-97cf-4459-932e-6dfccf2adf1c/v2.0/.well-known/openid-configuration\")",
+      "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" \"https://eacustomerdev.ciamlogin.com/a400a39c-97cf-4459-932e-6dfccf2adf1c/.well-known/openid-configuration\")",
+      "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" \"https://eacustomerdev.ciamlogin.com/a400a39c-97cf-4459-932e-6dfccf2adf1c/v2.0/v2.0/.well-known/openid-configuration\")",
+      "Bash(python3 -c 'import sys,json; print\\(json.load\\(sys.stdin\\).get\\(\"issuer\"\\)\\)')",
+      "Bash(curl -sS \"https://eacustomerdev.ciamlogin.com/a400a39c-97cf-4459-932e-6dfccf2adf1c/.well-known/openid-configuration\")",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(\"issuer:\", d.get\\(\"issuer\"\\)\\); print\\(\"authorization_endpoint:\", d.get\\(\"authorization_endpoint\"\\)\\)')"
     ]
   }
 }

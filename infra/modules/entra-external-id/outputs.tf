@@ -1,6 +1,6 @@
 output "authority" {
-  description = "OIDC authority URL for MSAL (SPA) and Microsoft.Identity.Web (API). Format: https://<subdomain>.ciamlogin.com/<tenant-id>/v2.0."
-  value       = "https://${lower(var.tenant_subdomain)}.ciamlogin.com/${var.external_tenant_id}/v2.0"
+  description = "OIDC authority URL for MSAL (SPA) and Microsoft.Identity.Web (API). Format: https://<subdomain>.ciamlogin.com/<tenant-id>. MSAL / Microsoft.Identity.Web both append /v2.0/.well-known/openid-configuration internally — do NOT pre-append /v2.0 here (causes .../v2.0/v2.0/.well-known/... 404 and silent metadata failure)."
+  value       = "https://${lower(var.tenant_subdomain)}.ciamlogin.com/${var.external_tenant_id}"
 }
 
 output "tenant_id" {
