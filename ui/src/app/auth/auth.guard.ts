@@ -6,15 +6,19 @@ import { AuthService } from './auth.service';
 
 /**
  * Route guard for the authenticated area. Resolution order:
- *   1. Active synthetic dev session → allow.
- *   2. MSAL is configured           → delegate to MsalGuard.
- *   3. Otherwise                    → redirect to the public landing.
+ *   1. Active synthetic dev session   → allow.
+ *   2. Active synthetic guest session → allow.
+ *   3. MSAL is configured             → delegate to MsalGuard.
+ *   4. Otherwise                      → redirect to the public landing.
  */
 export const authGuard: CanActivateFn = (route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
   if (auth.isDevSession()) {
+    return true;
+  }
+  if (auth.isGuestSession()) {
     return true;
   }
   if (auth.isMsalConfigured) {
@@ -28,6 +32,9 @@ export const authGuardChild: CanActivateChildFn = (route, state) => {
   const router = inject(Router);
 
   if (auth.isDevSession()) {
+    return true;
+  }
+  if (auth.isGuestSession()) {
     return true;
   }
   if (auth.isMsalConfigured) {
