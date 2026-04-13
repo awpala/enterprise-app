@@ -46,8 +46,16 @@ function redirectUri(): string {
     : '/auth/redirect';
 }
 
+/**
+ * Runtime-derived post-logout redirect URI. Must match a registered redirect
+ * URI on the SPA app registration. The azuread provider requires any
+ * registered URI without a path segment to end with a trailing slash, so the
+ * Terraform-managed value is `<origin>/` — this factory appends the slash to
+ * keep MSAL's `post_logout_redirect_uri` query param exactly aligned with
+ * what External ID validates against.
+ */
 function postLogoutRedirectUri(): string {
-  return typeof window !== 'undefined' ? window.location.origin : '/';
+  return typeof window !== 'undefined' ? window.location.origin + '/' : '/';
 }
 
 /**

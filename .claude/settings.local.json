@@ -107,7 +107,9 @@
       "Bash(curl -sS \"https://eacustomerdev.ciamlogin.com/a400a39c-97cf-4459-932e-6dfccf2adf1c/.well-known/openid-configuration\")",
       "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(\"issuer:\", d.get\\(\"issuer\"\\)\\); print\\(\"authorization_endpoint:\", d.get\\(\"authorization_endpoint\"\\)\\)')",
       "Bash(curl -sS https://proud-ground-0d14aa60f.7.azurestaticapps.net/ -o /tmp/idx.html)",
-      "Bash(grep -l \"TENANT_ID\\\\|CLIENT_ID\\\\|CLIENT_SECRET\" /workspace/docs/runbooks/*.sh)"
+      "Bash(grep -l \"TENANT_ID\\\\|CLIENT_ID\\\\|CLIENT_SECRET\" /workspace/docs/runbooks/*.sh)",
+      "Bash(npm test:*)",
+      "Bash(echo \"fmt_exit=$?\")"
     ]
   }
 }

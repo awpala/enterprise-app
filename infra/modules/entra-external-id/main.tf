@@ -88,11 +88,16 @@ resource "azuread_application" "spa" {
     requested_access_token_version = 2
   }
 
+  # NOTE: the azuread provider requires a trailing slash on any redirect URI
+  # that has no path segment. The origin-root entries below are written as
+  # `<origin>/` for that reason. MSAL's `postLogoutRedirectUri` must match
+  # exactly, so the SPA auth config uses `window.location.origin + '/'` to
+  # align with the registered value.
   single_page_application {
     redirect_uris = [
-      var.swa_url,
+      "${var.swa_url}/",
       "${var.swa_url}/auth/redirect",
-      "http://localhost:4200",
+      "http://localhost:4200/",
       "http://localhost:4200/auth/redirect",
     ]
   }
