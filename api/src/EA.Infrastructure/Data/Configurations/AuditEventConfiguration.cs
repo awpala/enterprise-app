@@ -65,7 +65,6 @@ public class AuditEventConfiguration : IEntityTypeConfiguration<AuditEvent>
 
         builder.Property(e => e.Details)
             .HasColumnName("details")
-            .HasColumnType("jsonb")
             .IsRequired();
 
         builder.Property(e => e.CorrelationId)
