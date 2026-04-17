@@ -6,8 +6,8 @@ namespace EA.Infrastructure.Data.Configurations;
 
 /// <summary>
 /// EF Core entity configuration for the append-only <see cref="AuditEvent"/>
-/// table. No rows are written in Phase 2B; the table exists so Phase 3 can
-/// start emitting audit records without another schema migration.
+/// table. Rows are emitted by <c>AuditStampingInterceptor</c> during
+/// <c>SaveChanges</c> for auditable domain entities.
 /// </summary>
 public class AuditEventConfiguration : IEntityTypeConfiguration<AuditEvent>
 {

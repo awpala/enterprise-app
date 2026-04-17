@@ -250,14 +250,73 @@ from models
 order by created_at_utc desc
 limit 20;
 
--- Recent audit rows (handy for cross-checking guest vs. real-user flows)
-select id, actor_oid, actor_idp, action, occurred_at_utc
+-- Recent audit rows (cross-check guest vs. real-user flows, verify actor identity)
+select action, entity_type, entity_id, actor_name, actor_oid, actor_idp, occurred_at_utc
 from audit_events
 order by occurred_at_utc desc
 limit 20;
+
+-- Audit trail for a specific entity
+select action, actor_name, actor_email, occurred_at_utc
+from audit_events
+where entity_type = 'Model' and entity_id = '<guid>'
+order by occurred_at_utc desc;
 ```
 
 The Query Editor enforces a per-statement timeout (~5 minutes) and is read-or-write capable - **be careful** running anything beyond `select` from this surface in production.
+
+---
+
+## 5a. Audit events
+
+The `audit_events` table records every domain mutation made through the API. Rows are emitted automatically by the `AuditStampingInterceptor`, which hooks into EF Core's `SaveChanges` pipeline. No application code needs to call audit explicitly - the interceptor detects added or modified domain entities and writes an `AuditEvent` row in the same transaction.
+
+### Audited actions
+
+| Action | Trigger |
+|---|---|
+| `model.created` | A new `Model` entity is inserted |
+| `model.updated` | An existing `Model` entity is modified |
+| `model.archived` | A `Model` is soft-deleted (archived) |
+| `modelrun.requested` | A new `ModelRun` entity is inserted (run request) |
+
+### Actor identity
+
+Each audit row captures the authenticated user's identity from the Entra ID JWT claims:
+
+- `actor_oid` - Entra object ID (`oid` claim)
+- `actor_tid` - Entra tenant ID (`tid` claim)
+- `actor_idp` - identity provider (`idp` claim; values include `"google.com"`, `"EmailOTP"`, `"guest"`, `"dev"`)
+- `actor_name` - display name (`name` claim)
+- `actor_email` - email address (`emails` claim)
+
+Seed operations and background consumers (data-engine messages processed by MassTransit) do **not** generate audit rows. This is correct by design - `HttpContext.User.Identity.IsAuthenticated` is `false` in those contexts, so the interceptor skips audit emission.
+
+### API endpoint
+
+Audit events are queryable through the API:
+
+```
+GET /api/v1/audit-events?page=1&pageSize=20&entityType=Model&entityId={guid}&actorOid={guid}
+```
+
+All query parameters are optional. The response is a paginated list of audit event records.
+
+### psql quick-check
+
+```sql
+-- Twenty most recent audit events
+SELECT action, entity_type, entity_id, actor_name, occurred_at_utc
+FROM audit_events
+ORDER BY occurred_at_utc DESC
+LIMIT 20;
+
+-- All mutations by a specific user
+SELECT action, entity_type, entity_id, occurred_at_utc
+FROM audit_events
+WHERE actor_oid = '<entra-oid>'
+ORDER BY occurred_at_utc DESC;
+```
 
 ---
 
