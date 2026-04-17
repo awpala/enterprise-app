@@ -1,0 +1,68 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0"
+
+      - name: Restore .NET packages
+        run: dotnet restore api/EA.sln
+
+      - name: Run API unit tests
+        run: dotnet test api/tests/EA.Api.Tests/ --configuration Release --no-restore
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm ci
+
+      - name: Run UI tests
+        working-directory: ui
+        run: npm test -- --watch=false --passWithNoTests
+
+  integration-tests:
+    name: Integration tests
+    if: github.ref == 'refs/heads/main'
+    needs: unit-tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0"
+
+      - name: Restore .NET packages
+        run: dotnet restore api/EA.sln
+
+      - name: Run API integration tests
+        run: dotnet test api/tests/EA.Api.IntegrationTests/ --configuration Release --no-restore
