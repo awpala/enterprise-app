@@ -155,7 +155,10 @@
       "Bash(find /workspace/api/tests -name \"*.cs\" -type f -exec grep -l \"AuditEvent\\\\|audit\" {} \\\\;)",
       "Bash(ls /workspace/api/Dockerfile* /workspace/data-engine/Dockerfile*)",
       "Bash(chmod +x /workspace/.github/scripts/clean-acr-images.sh)",
-      "Bash(dotnet ef:*)"
+      "Bash(dotnet ef:*)",
+      "Bash(docker info:*)",
+      "Read(//var/run/**)",
+      "Read(//usr/local/bin/**)"
     ]
   }
 }
