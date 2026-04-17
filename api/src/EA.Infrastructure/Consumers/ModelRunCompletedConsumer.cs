@@ -33,6 +33,7 @@ public class ModelRunCompletedConsumer(
         run.Status = ModelRunStatus.Completed;
         run.CompletedAtUtc = message.OccurredAtUtc;
         run.ResultSummary = message.ResultSummary;
+        run.SampleData = message.HistogramData;
 
         await repository.UpdateModelRunAsync(run, context.CancellationToken);
 

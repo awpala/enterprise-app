@@ -9,6 +9,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { DatePipe, DecimalPipe, JsonPipe } from '@angular/common';
 import { ModelRunService } from '../../../../core/services/model-run.service';
 import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
+import { HistogramComponent } from '../../../../shared/components/histogram/histogram.component';
 import { ModelRunDetail } from '../../../../shared/models/model-run.interface';
 
 @Component({
@@ -25,6 +26,7 @@ import { ModelRunDetail } from '../../../../shared/models/model-run.interface';
     DecimalPipe,
     JsonPipe,
     StatusBadgeComponent,
+    HistogramComponent,
   ],
   templateUrl: './run-detail.component.html',
   styleUrl: './run-detail.component.scss',

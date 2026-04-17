@@ -7,8 +7,8 @@
   "parameters": {
     "distribution": "normal",
     "mean": 52.276,
-    "stddev": 1.784,
-    "iterations": 26996
+    "stdDev": 1.784,
+    "sampleSize": 26996
   },
   "createdAtUtc": "2025-01-01T00:00:00Z",
   "updatedAtUtc": "2025-01-22T17:00:00Z",

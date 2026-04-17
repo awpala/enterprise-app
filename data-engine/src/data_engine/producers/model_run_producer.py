@@ -14,6 +14,7 @@ from pika.adapters.blocking_connection import BlockingChannel
 
 from data_engine.config import Settings
 from data_engine.models.messages import (
+    HistogramData,
     MassTransitEnvelope,
     MetricResult,
     ModelRunCompleted,
@@ -75,6 +76,7 @@ class ModelRunProducer:
         correlation_id: UUID,
         metrics: list[MetricResult],
         result_summary: ResultSummary,
+        histogram_data: HistogramData | None = None,
     ) -> None:
         """Publish a ModelRunCompleted event."""
         payload = ModelRunCompleted(
@@ -83,6 +85,7 @@ class ModelRunProducer:
             modelId=model_id,
             metrics=metrics,
             resultSummary=result_summary,
+            histogramData=histogram_data,
         )
         self._publish(
             exchange=EXCHANGE_MODEL_RUN_COMPLETED,

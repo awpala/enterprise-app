@@ -45,6 +45,10 @@ public class ModelRunConfiguration : IEntityTypeConfiguration<ModelRun>
             .HasColumnName("result_summary")
             .HasColumnType("jsonb");
 
+        builder.Property(r => r.SampleData)
+            .HasColumnName("sample_data")
+            .HasColumnType("jsonb");
+
         builder.Property(r => r.ErrorMessage)
             .HasColumnName("error_message")
             .HasMaxLength(4000);

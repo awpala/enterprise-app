@@ -12,7 +12,8 @@ public record ModelRunCompleted(
     Guid ModelRunId,
     Guid ModelId,
     IReadOnlyList<MetricResult> Metrics,
-    JsonDocument? ResultSummary);
+    JsonDocument? ResultSummary,
+    JsonDocument? HistogramData);
 
 /// <summary>
 /// Represents a single computed metric result within a completed run message.

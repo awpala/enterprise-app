@@ -57,6 +57,28 @@
       "type": "object",
       "description": "Aggregated computation results",
       "additionalProperties": true
+    },
+    "histogramData": {
+      "type": "object",
+      "description": "Pre-computed histogram bins for sample distribution visualization",
+      "properties": {
+        "binEdges": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "n+1 bin edges for n histogram bins"
+        },
+        "counts": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "description": "Count of samples in each bin"
+        },
+        "sampleSize": {
+          "type": "integer",
+          "description": "Total number of samples used"
+        }
+      },
+      "required": ["binEdges", "counts", "sampleSize"],
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

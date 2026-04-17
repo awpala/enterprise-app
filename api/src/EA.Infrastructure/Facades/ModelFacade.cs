@@ -20,6 +20,19 @@ public class ModelFacade(
 {
     private static readonly ActivitySource ActivitySource = new("EA.Api.Facade");
 
+    /// <summary>
+    /// The set of distribution types supported by the data engine.
+    /// </summary>
+    private static readonly HashSet<string> SupportedDistributions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "normal", "uniform", "exponential", "lognormal"
+    };
+
+    /// <summary>
+    /// Maximum degree of parallelism for batch run requests.
+    /// </summary>
+    private const int BatchMaxConcurrency = 5;
+
     /// <inheritdoc />
     public async Task<(IReadOnlyList<Model> Items, int TotalCount)> GetModelsAsync(
         int page,
@@ -180,43 +193,7 @@ public class ModelFacade(
             return null;
         }
 
-        if (model.Status == ModelStatus.Archived)
-        {
-            logger.LogWarning("Cannot request run for archived model {ModelId}", modelId);
-            return null;
-        }
-
-        var run = new ModelRun
-        {
-            Id = Guid.NewGuid(),
-            ModelId = modelId,
-            Status = ModelRunStatus.Pending,
-            RequestedAtUtc = DateTime.UtcNow
-            // RequestedBy / RequestedByName are filled by AuditStampingInterceptor
-            // from ICurrentUser. Data-engine-originated runs (future) will set
-            // these explicitly and the interceptor leaves them alone.
-        };
-
-        await repository.AddModelRunAsync(run, cancellationToken);
-        await repository.SaveChangesAsync(cancellationToken);
-
-        var correlationId = Guid.NewGuid();
-        var message = new ModelRunRequested(
-            MessageId: Guid.NewGuid(),
-            CorrelationId: correlationId,
-            OccurredAtUtc: DateTime.UtcNow,
-            ModelId: modelId,
-            ModelRunId: run.Id,
-            ModelName: model.Name,
-            Parameters: model.Parameters);
-
-        await publishEndpoint.Publish(message, cancellationToken);
-
-        logger.LogInformation(
-            "Requested model run {ModelRunId} for model {ModelId}, published message with correlation {CorrelationId}",
-            run.Id, modelId, correlationId);
-
-        return run;
+        return await CreateAndPublishRunAsync(model, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -250,5 +227,136 @@ public class ModelFacade(
         }
 
         return run;
+    }
+
+    /// <inheritdoc />
+    public async Task<(IReadOnlyList<ModelRun> Items, int TotalCount)> GetAllRunsAsync(
+        int page, int pageSize, ModelRunStatus? status, CancellationToken cancellationToken = default)
+    {
+        using var activity = ActivitySource.StartActivity(nameof(GetAllRunsAsync));
+
+        ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(pageSize, 100);
+
+        logger.LogInformation("Retrieving all runs page {Page} with page size {PageSize}, status filter: {Status}",
+            page, pageSize, status);
+
+        return await repository.GetAllRunsAsync(page, pageSize, status, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ModelRun>> RequestBatchRunAsync(
+        IReadOnlyList<Guid> modelIds, CancellationToken cancellationToken = default)
+    {
+        using var activity = ActivitySource.StartActivity(nameof(RequestBatchRunAsync));
+
+        ArgumentNullException.ThrowIfNull(modelIds);
+
+        logger.LogInformation("Requesting batch run for {Count} models", modelIds.Count);
+
+        using var semaphore = new SemaphoreSlim(BatchMaxConcurrency);
+        var tasks = modelIds.Select(async modelId =>
+        {
+            await semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                return await RequestModelRunAsync(modelId, cancellationToken);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        var results = await Task.WhenAll(tasks);
+        var runs = results.Where(r => r is not null).Cast<ModelRun>().ToList();
+
+        logger.LogInformation("Batch run completed: {SuccessCount}/{TotalCount} runs created",
+            runs.Count, modelIds.Count);
+
+        return runs;
+    }
+
+    /// <summary>
+    /// Creates a model run, validates the distribution parameter, publishes the message,
+    /// and returns the created run. Shared by single and batch run paths.
+    /// </summary>
+    private async Task<ModelRun?> CreateAndPublishRunAsync(Model model, CancellationToken cancellationToken)
+    {
+        if (model.Status == ModelStatus.Archived)
+        {
+            logger.LogWarning("Cannot request run for archived model {ModelId}", model.Id);
+            return null;
+        }
+
+        // Validate distribution parameter before creating the run
+        var distribution = ExtractDistribution(model.Parameters);
+        var isUnsupportedDistribution = distribution is null || !SupportedDistributions.Contains(distribution);
+
+        var run = new ModelRun
+        {
+            Id = Guid.NewGuid(),
+            ModelId = model.Id,
+            Status = isUnsupportedDistribution ? ModelRunStatus.Failed : ModelRunStatus.Pending,
+            RequestedAtUtc = DateTime.UtcNow,
+            ErrorMessage = isUnsupportedDistribution
+                ? $"Unsupported or missing distribution '{distribution ?? "(none)"}'. Supported distributions: {string.Join(", ", SupportedDistributions.Order())}."
+                : null
+            // RequestedBy / RequestedByName are filled by AuditStampingInterceptor
+            // from ICurrentUser. Data-engine-originated runs (future) will set
+            // these explicitly and the interceptor leaves them alone.
+        };
+
+        if (isUnsupportedDistribution)
+        {
+            logger.LogWarning(
+                "Model {ModelId} has unsupported distribution '{Distribution}'; run {ModelRunId} marked as Failed immediately",
+                model.Id, distribution ?? "(none)", run.Id);
+
+            run.CompletedAtUtc = DateTime.UtcNow;
+            await repository.AddModelRunAsync(run, cancellationToken);
+            await repository.SaveChangesAsync(cancellationToken);
+            return run;
+        }
+
+        await repository.AddModelRunAsync(run, cancellationToken);
+        await repository.SaveChangesAsync(cancellationToken);
+
+        var correlationId = Guid.NewGuid();
+        var message = new ModelRunRequested(
+            MessageId: Guid.NewGuid(),
+            CorrelationId: correlationId,
+            OccurredAtUtc: DateTime.UtcNow,
+            ModelId: model.Id,
+            ModelRunId: run.Id,
+            ModelName: model.Name,
+            Parameters: model.Parameters);
+
+        await publishEndpoint.Publish(message, cancellationToken);
+
+        logger.LogInformation(
+            "Requested model run {ModelRunId} for model {ModelId}, published message with correlation {CorrelationId}",
+            run.Id, model.Id, correlationId);
+
+        return run;
+    }
+
+    /// <summary>
+    /// Extracts the distribution field from a model's JSON parameters document.
+    /// Returns null if parameters are missing or the distribution property is absent.
+    /// </summary>
+    private static string? ExtractDistribution(JsonDocument? parameters)
+    {
+        if (parameters is null)
+            return null;
+
+        if (parameters.RootElement.TryGetProperty("distribution", out var distributionElement) &&
+            distributionElement.ValueKind == JsonValueKind.String)
+        {
+            return distributionElement.GetString();
+        }
+
+        return null;
     }
 }

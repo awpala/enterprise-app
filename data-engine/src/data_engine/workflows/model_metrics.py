@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 from scipy import stats as sp_stats
 
-from data_engine.models.messages import MetricResult, ResultSummary
+from data_engine.models.messages import HistogramData, MetricResult, ResultSummary
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class UnsupportedDistributionError(Exception):
     """Raised when the requested distribution is not recognised."""
 
 
-def compute_metrics(parameters: dict[str, Any]) -> tuple[list[MetricResult], ResultSummary]:
+def compute_metrics(parameters: dict[str, Any]) -> tuple[list[MetricResult], ResultSummary, HistogramData]:
     """Generate sample data and compute summary statistics.
 
     Args:
@@ -39,8 +39,8 @@ def compute_metrics(parameters: dict[str, Any]) -> tuple[list[MetricResult], Res
             Expected keys: ``sampleSize``, ``distribution``, ``mean``, ``stdDev``.
 
     Returns:
-        A tuple of (metrics list, result summary) ready for inclusion in a
-        ``ModelRunCompleted`` message.
+        A tuple of (metrics list, result summary, histogram data) ready for
+        inclusion in a ``ModelRunCompleted`` message.
 
     Raises:
         UnsupportedDistributionError: If the distribution name is not supported.
@@ -100,6 +100,14 @@ def compute_metrics(parameters: dict[str, Any]) -> tuple[list[MetricResult], Res
 
     result_summary = ResultSummary(distribution=distribution, percentiles=percentiles)
 
+    # Compute histogram bins for visualization (50 bins).
+    hist_counts, hist_edges = np.histogram(samples, bins=50)
+    histogram_data = HistogramData(
+        binEdges=[round(float(e), 6) for e in hist_edges],
+        counts=[int(c) for c in hist_counts],
+        sampleSize=sample_size,
+    )
+
     logger.info(
         "Metrics computation complete for '%s' distribution: sample_size=%d, computed_mean=%.6f",
         distribution,
@@ -107,4 +115,4 @@ def compute_metrics(parameters: dict[str, Any]) -> tuple[list[MetricResult], Res
         computed_mean,
     )
 
-    return metrics, result_summary
+    return metrics, result_summary, histogram_data

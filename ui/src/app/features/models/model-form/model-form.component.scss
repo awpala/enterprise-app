@@ -6,9 +6,21 @@
   padding-top: 16px;
 }
 
-.json-input {
-  font-family: monospace;
-  font-size: 13px;
+.parameters-section {
+  margin-top: 8px;
+}
+
+.section-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.parameters-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
 }
 
 .form-actions {

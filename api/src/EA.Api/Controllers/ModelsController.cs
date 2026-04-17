@@ -230,7 +230,7 @@ public class ModelsController(
         var dto = new ModelRunDetailDto(
             run.Id, run.ModelId, run.Status.ToString(),
             run.RequestedAtUtc, run.StartedAtUtc, run.CompletedAtUtc,
-            run.ResultSummary, run.ErrorMessage, metricDtos);
+            run.ResultSummary, run.ErrorMessage, metricDtos, run.SampleData);
 
         return Ok(dto);
     }
