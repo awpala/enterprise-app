@@ -143,7 +143,11 @@
       "Bash(terraform get:*)",
       "Bash(terraform providers:*)",
       "Bash(npm view:*)",
-      "Bash(API_URL=https://example.test npm run build:prod)"
+      "Bash(API_URL=https://example.test npm run build:prod)",
+      "Bash(.venv/bin/python -m py_compile src/data_engine/main.py)",
+      "Bash(.venv/bin/python -m py_compile src/data_engine/config.py)",
+      "Bash(.venv/bin/python -m py_compile src/data_engine/consumers/model_run_consumer.py)",
+      "Bash(.venv/bin/python -m py_compile src/data_engine/workflows/model_metrics.py)"
     ]
   }
 }

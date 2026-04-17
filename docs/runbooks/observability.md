@@ -117,10 +117,10 @@ requests
 Two custom workbooks ship as Terraform-managed `azurerm_application_insights_workbook` resources.
 
 1. From the App Insights blade, left nav -> **Monitoring** group -> **Workbooks**.
-2. At the top of the workbooks gallery, click the **Shared reports** tab (the default tab is **Quick start**, which only shows Microsoft templates - your two workbooks are not there).
-3. The two custom workbooks are listed by name:
-   - **overview** - golden-signals view across all three services. Tiles for request rate, P50 / P95 / P99 latency, success rate, and a request-count breakdown by `cloud_RoleName`. Use this for "is the system healthy?" at a glance.
-   - **errors** - failure-focused view. Top exceptions grouped by `cloud_RoleName` and `type`, failed-request waterfall, and a recent failures table with `traceId` for click-through into end-to-end transaction view. Use this when investigating an alert.
+2. Click the **Workbooks** tab (portal versions may label this **Shared reports** instead — either way, it is the tab that lists custom workbooks, not the **Quick start** / Microsoft templates tab).
+3. The two custom workbooks are listed as `ea-{env} — Overview` and `ea-{env} — Errors`:
+   - **Overview** - golden-signals view across all three services. Tiles for request rate, P50 / P95 / P99 latency, success rate, and a request-count breakdown by `cloud_RoleName`. Use this for "is the system healthy?" at a glance.
+   - **Errors** - failure-focused view. Top exceptions grouped by `cloud_RoleName` and `type`, failed-request waterfall, and a recent failures table with `traceId` for click-through into end-to-end transaction view. Use this when investigating an alert.
 4. Click into either to open it. Time range defaults to the last 24 hours - change via the **Time Range** pill at the top of the workbook.
 
 ---
@@ -194,9 +194,13 @@ Type `exit` to leave the container.
 
 ## 5. Postgres Query Editor (zero-deploy Postgres UI)
 
-For ad-hoc reads against the live database without standing up a `psql` jump box. This is the default Azure path for Flexible Server.
+For ad-hoc reads against the live database. Two paths depending on your Flexible Server SKU.
 
-### Click-by-click
+### Path A — Portal Query Editor (General Purpose / Memory Optimized SKUs only)
+
+The **Query editor (preview)** blade is only available on General Purpose and Memory Optimized tier Flexible Servers. It does **not** appear on Burstable-tier SKUs (e.g. `B_Standard_B1ms`, the current dev default).
+
+If your server is on an eligible SKU:
 
 1. In the portal top search bar, type **PostgreSQL flexible server** and select the matching service.
 2. From the result list, click the server `ea-{env}-pgsql-{suffix}`.
@@ -216,22 +220,40 @@ For ad-hoc reads against the live database without standing up a `psql` jump box
    - **Database**: `ea` (value of the `postgres_database_name` tfvar).
 5. Click **OK**.
 
+### Path B — psql from Cloud Shell or devcontainer (all SKUs)
+
+Use this path when the server is on the Burstable tier, or when you prefer a CLI workflow. Azure Cloud Shell has network access via the "Allow Azure services" firewall rule; connecting from a local machine requires adding your IP to the server's firewall first.
+
+```bash
+# Retrieve the admin password from Key Vault
+PG_PASS=$(az keyvault secret show \
+  --vault-name ea-{env}-kv-{suffix} \
+  --name postgres-admin-password \
+  --query value -o tsv)
+
+# Connect and run a query
+psql "host=ea-{env}-pgsql-{suffix}.postgres.database.azure.com \
+      port=5432 dbname=ea sslmode=require \
+      user=eaadmin password=${PG_PASS}" \
+  -c 'select count(*) from models;'
+```
+
 ### Useful read-only queries
 
 ```sql
 -- How many models are in the system?
-select count(*) from "Models";
+select count(*) from models;
 
 -- Twenty most recent models
-select "Id", "Name", "CreatedAtUtc"
-from "Models"
-order by "CreatedAtUtc" desc
+select id, name, created_at_utc
+from models
+order by created_at_utc desc
 limit 20;
 
 -- Recent audit rows (handy for cross-checking guest vs. real-user flows)
-select "Id", "ActorOid", "ActorIdp", "Action", "OccurredAtUtc"
-from "AuditEvents"
-order by "OccurredAtUtc" desc
+select id, actor_oid, actor_idp, action, occurred_at_utc
+from audit_events
+order by occurred_at_utc desc
 limit 20;
 ```
 

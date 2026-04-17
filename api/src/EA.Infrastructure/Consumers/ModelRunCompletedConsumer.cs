@@ -19,8 +19,9 @@ public class ModelRunCompletedConsumer(
     public async Task Consume(ConsumeContext<ModelRunCompleted> context)
     {
         var message = context.Message;
-        logger.LogInformation("Received ModelRunCompleted for run {ModelRunId}, model {ModelId}",
-            message.ModelRunId, message.ModelId);
+        logger.LogInformation(
+            "Received ModelRunCompleted for run {ModelRunId}, model {ModelId} (MessageId: {MessageId}, CorrelationId: {CorrelationId})",
+            message.ModelRunId, message.ModelId, message.MessageId, message.CorrelationId);
 
         var run = await repository.GetModelRunByIdAsync(message.ModelRunId, context.CancellationToken);
         if (run is null)

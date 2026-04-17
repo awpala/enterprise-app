@@ -71,6 +71,7 @@ export class BearerAuthInterceptor implements HttpInterceptor {
     if (!account) {
       // No cached account — nothing to acquire silently against. Pass through
       // and let MsalGuard handle the redirect on the next navigation.
+      console.warn('[BearerAuthInterceptor] No cached MSAL account — API request to', req.url, 'will proceed without a Bearer token.');
       return next.handle(req);
     }
 
@@ -90,6 +91,7 @@ export class BearerAuthInterceptor implements HttpInterceptor {
       }),
       catchError((err: unknown) => {
         if (err instanceof InteractionRequiredAuthError) {
+          console.warn('[BearerAuthInterceptor] Silent token acquisition requires interaction — redirecting to login for', req.url);
           this.msalService.instance.acquireTokenRedirect({
             scopes: this.apiScopes,
             account,
@@ -97,6 +99,7 @@ export class BearerAuthInterceptor implements HttpInterceptor {
           // The redirect is about to unload the page; emit no events.
           return of();
         }
+        console.error('[BearerAuthInterceptor] Token acquisition failed for', req.url, err);
         return throwError(() => err);
       }),
     );

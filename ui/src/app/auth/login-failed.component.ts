@@ -42,6 +42,8 @@ export class LoginFailedComponent {
   private readonly router = inject(Router);
 
   constructor() {
+    console.warn('[LoginFailedComponent] User landed on sign-in failure page — MsalGuard rejected the authentication attempt.');
+
     effect(() => {
       if (this.authService.isAuthenticated()) {
         void this.router.navigate(['/dashboard']);

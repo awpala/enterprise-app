@@ -88,7 +88,10 @@ export class ModelListComponent implements OnInit {
             this.snackBar.open('Model archived', 'OK', { duration: 3000 });
             this.loadModels();
           },
-          error: () => this.snackBar.open('Failed to archive model', 'OK', { duration: 3000 }),
+          error: (err: unknown) => {
+            console.error('[ModelListComponent] Failed to archive model', model.id, err);
+            this.snackBar.open('Failed to archive model', 'OK', { duration: 3000 });
+          },
         });
       }
     });
@@ -102,7 +105,8 @@ export class ModelListComponent implements OnInit {
         this.totalCount.set(result.totalCount);
         this.loading.set(false);
       },
-      error: () => {
+      error: (err: unknown) => {
+        console.error('[ModelListComponent] Failed to load models', err);
         this.snackBar.open('Failed to load models', 'OK', { duration: 3000 });
         this.loading.set(false);
       },

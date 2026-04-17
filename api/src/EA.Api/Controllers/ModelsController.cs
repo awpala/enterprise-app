@@ -85,6 +85,8 @@ public class ModelsController(
         if (!ModelState.IsValid)
             return ValidationProblem();
 
+        logger.LogInformation("Creating model with name {ModelName}", request.Name);
+
         // Pass Guid.Empty / null; the AuditStampingInterceptor fills the audit
         // columns from ICurrentUser before SaveChanges. Seeder call sites pass
         // explicit non-default values so the interceptor leaves them alone.
@@ -120,11 +122,16 @@ public class ModelsController(
         if (!Enum.TryParse<ModelStatus>(request.Status, true, out var parsedStatus))
             return BadRequest(new ProblemDetails { Title = "Invalid status", Detail = $"'{request.Status}' is not a valid status." });
 
+        logger.LogInformation("Updating model {ModelId} with status {Status}", id, request.Status);
+
         var model = await facade.UpdateModelAsync(
             id, request.Name, request.Description, parsedStatus, request.Parameters, cancellationToken);
 
         if (model is null)
+        {
+            logger.LogWarning("Update failed: model {ModelId} not found or archived", id);
             return NotFound();
+        }
 
         var dto = new ModelDto(
             model.Id, model.Name, model.Description, model.Status.ToString(),
@@ -143,8 +150,16 @@ public class ModelsController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteModel(Guid id, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Archiving model {ModelId}", id);
+
         var archived = await facade.ArchiveModelAsync(id, cancellationToken);
-        return archived ? NoContent() : NotFound();
+        if (!archived)
+        {
+            logger.LogWarning("Archive failed: model {ModelId} not found", id);
+            return NotFound();
+        }
+
+        return NoContent();
     }
 
     /// <summary>
@@ -158,9 +173,14 @@ public class ModelsController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RequestRun(Guid id, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Requesting run for model {ModelId}", id);
+
         var run = await facade.RequestModelRunAsync(id, cancellationToken);
         if (run is null)
+        {
+            logger.LogWarning("Run request failed: model {ModelId} not found or archived", id);
             return NotFound();
+        }
 
         var dto = new ModelRunDto(
             run.Id, run.ModelId, run.Status.ToString(),

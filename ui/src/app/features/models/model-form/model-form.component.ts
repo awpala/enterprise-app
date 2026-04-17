@@ -68,7 +68,8 @@ export class ModelFormComponent implements OnInit {
     if (parameters?.trim()) {
       try {
         parsedParams = JSON.parse(parameters);
-      } catch {
+      } catch (e) {
+        console.warn('[ModelFormComponent] Invalid JSON in Parameters field', e);
         this.snackBar.open('Invalid JSON in Parameters field', 'OK', { duration: 3000 });
         this.saving.set(false);
         return;
@@ -86,7 +87,8 @@ export class ModelFormComponent implements OnInit {
           this.snackBar.open('Model updated', 'OK', { duration: 3000 });
           this.router.navigate(['/models', model.id]);
         },
-        error: () => {
+        error: (err: unknown) => {
+          console.error('[ModelFormComponent] Failed to update model', this.modelId(), err);
           this.snackBar.open('Failed to update model', 'OK', { duration: 3000 });
           this.saving.set(false);
         },
@@ -101,7 +103,8 @@ export class ModelFormComponent implements OnInit {
           this.snackBar.open('Model created', 'OK', { duration: 3000 });
           this.router.navigate(['/models', model.id]);
         },
-        error: () => {
+        error: (err: unknown) => {
+          console.error('[ModelFormComponent] Failed to create model', err);
           this.snackBar.open('Failed to create model', 'OK', { duration: 3000 });
           this.saving.set(false);
         },
@@ -129,7 +132,8 @@ export class ModelFormComponent implements OnInit {
         });
         this.loading.set(false);
       },
-      error: () => {
+      error: (err: unknown) => {
+        console.error('[ModelFormComponent] Failed to load model for editing', id, err);
         this.snackBar.open('Model not found', 'OK', { duration: 3000 });
         this.router.navigate(['/models']);
       },
