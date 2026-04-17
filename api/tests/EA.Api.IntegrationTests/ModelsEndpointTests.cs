@@ -38,7 +38,7 @@ public class ModelsEndpointTests
         await _factory.DisposeAsync();
     }
 
-    [Test]
+    [Test, Order(0)]
     public async Task GetModels_EmptyDatabase_ReturnsEmptyPage()
     {
         var response = await _client.GetAsync("/api/v1/models");
@@ -104,7 +104,7 @@ public class ModelsEndpointTests
     [Test]
     public async Task RequestRun_ExistingModel_ReturnsCreated()
     {
-        var createRequest = new { name = "Run Test Model" };
+        var createRequest = new { name = "Run Test Model", parameters = new { distribution = "normal", mean = 0, stdDev = 1, sampleSize = 100 } };
         var createResponse = await _client.PostAsJsonAsync("/api/v1/models", createRequest);
         var created = await createResponse.Content.ReadFromJsonAsync<ModelDto>();
 

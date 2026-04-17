@@ -158,7 +158,29 @@
       "Bash(dotnet ef:*)",
       "Bash(docker info:*)",
       "Read(//var/run/**)",
-      "Read(//usr/local/bin/**)"
+      "Read(//usr/local/bin/**)",
+      "Bash(pkill -f \"dotnet.*EA.Api\")",
+      "Bash(nohup dotnet:*)",
+      "Bash(curl -sf http://localhost:9995/health/live)",
+      "Bash(curl -s -X POST http://localhost:9995/api/v1/models -H 'Content-Type: application/json' -H 'x-user-oid: 11111111-1111-1111-1111-111111111111' -H 'x-user-tid: 22222222-2222-2222-2222-222222222222' -H 'x-user-idp: test' -H 'x-user-name: Tester' -H 'x-user-email: t@t.com' -d '{\"name\":\"RunModel\",\"parameters\":{\"distribution\":\"normal\",\"mean\":0,\"stdDev\":1,\"sampleSize\":100}}')",
+      "Bash(python3 -c \"import json;print\\(json.load\\(open\\('/tmp/create_resp.json'\\)\\)['id']\\)\")",
+      "Bash(pkill -f \"dotnet.*EA.Api\" sleep 2)",
+      "Bash(ls -la /tmp/api-test*.log)",
+      "Bash(echo \"API starting in background, PID=$!\")",
+      "Bash(break)",
+      "Bash(PGPASSWORD=password psql -h ea-db -U postgres -d ea-db -c \"DELETE FROM model_metrics; DELETE FROM model_runs; DELETE FROM models; DELETE FROM audit_events;\")",
+      "Bash(curl -s http://localhost:9995/api/v1/models -H 'x-user-oid: 11111111-1111-1111-1111-111111111111' -H 'x-user-tid: 22222222-2222-2222-2222-222222222222' -H 'x-user-idp: test')",
+      "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\(f'Total: {d[\\\\\"totalCount\\\\\"]} items'\\)\")",
+      "Bash(tee /tmp/create.json)",
+      "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\(f'Status: {d[\\\\\"status\\\\\"]} | ID: {d[\\\\\"id\\\\\"]}'\\)\")",
+      "Bash(python3 -c \"import json;print\\(json.load\\(open\\('/tmp/create.json'\\)\\)['id']\\)\")",
+      "Bash(curl -s -X POST http://localhost:9995/api/v1/models/__TRACKED_VAR__/runs -H 'x-user-oid: 11111111-1111-1111-1111-111111111111' -H 'x-user-tid: 22222222-2222-2222-2222-222222222222' -H 'x-user-idp: test' -H 'x-user-name: Tester' -H 'x-user-email: t@t.com')",
+      "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\(f'Run status: {d[\\\\\"status\\\\\"]}'\\)\")",
+      "Bash(curl -s -X POST http://localhost:9995/api/v1/models -H 'Content-Type: application/json' -H 'x-user-oid: 11111111-1111-1111-1111-111111111111' -H 'x-user-tid: 22222222-2222-2222-2222-222222222222' -H 'x-user-idp: test' -H 'x-user-name: Tester' -H 'x-user-email: t@t.com' -d '{\"name\":\"NoParamsModel\"}')",
+      "Bash(tee /tmp/create2.json)",
+      "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\(f'Created: {d[\\\\\"id\\\\\"]}'\\)\")",
+      "Bash(python3 -c \"import json;print\\(json.load\\(open\\('/tmp/create2.json'\\)\\)['id']\\)\")",
+      "Bash(curl -s 'http://localhost:9995/api/v1/audit-events?pageSize=5' -H 'x-user-oid: 11111111-1111-1111-1111-111111111111' -H 'x-user-tid: 22222222-2222-2222-2222-222222222222' -H 'x-user-idp: test')"
     ]
   }
 }
