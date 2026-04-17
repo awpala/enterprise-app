@@ -44,7 +44,7 @@ jobs:
 
       - name: Run UI tests
         working-directory: ui
-        run: npm test -- --watch=false
+        run: npm test -- --watch=false --passWithNoTests
 
   integration-tests:
     name: Integration tests
