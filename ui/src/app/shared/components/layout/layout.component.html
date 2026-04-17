@@ -26,7 +26,8 @@
   <mat-sidenav
     #sidenav
     [mode]="isMobile() ? 'over' : 'side'"
-    [opened]="!isMobile()"
+    [opened]="isMobile() ? false : sidenavOpen()"
+    (openedChange)="onSidenavOpenedChange($event)"
     class="sidenav">
     <mat-nav-list>
       <a mat-list-item routerLink="/dashboard" routerLinkActive="active-link" (click)="closeSidenavIfMobile()">

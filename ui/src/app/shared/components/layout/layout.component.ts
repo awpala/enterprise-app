@@ -9,6 +9,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 
 import { AuthService } from '../../../auth/auth.service';
+import { UiStateService, UI_STATE_KEYS } from '../../../core/services/ui-state.service';
 
 /**
  * Authenticated application shell (toolbar + sidenav + content outlet).
@@ -36,9 +37,13 @@ import { AuthService } from '../../../auth/auth.service';
 })
 export class LayoutComponent {
   private readonly breakpointObserver = inject(BreakpointObserver);
+  private readonly uiState = inject(UiStateService);
   readonly authService = inject(AuthService);
 
   readonly isMobile = signal(false);
+
+  /** Persisted sidenav open/closed state for desktop. Mobile always starts closed. */
+  readonly sidenavOpen = this.uiState.signalFor<boolean>(UI_STATE_KEYS.sidenavOpen, true);
 
   @ViewChild('sidenav') sidenav!: MatSidenav;
 
@@ -46,6 +51,13 @@ export class LayoutComponent {
     this.breakpointObserver.observe([Breakpoints.Handset]).subscribe(result => {
       this.isMobile.set(result.matches);
     });
+  }
+
+  onSidenavOpenedChange(opened: boolean): void {
+    // Only persist desktop state; mobile overlays shouldn't affect the desktop default.
+    if (!this.isMobile()) {
+      this.sidenavOpen.set(opened);
+    }
   }
 
   closeSidenavIfMobile(): void {
