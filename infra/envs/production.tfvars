@@ -30,6 +30,11 @@ image_tag   = "latest"
 external_tenant_id = "8ce01097-ed0b-4425-a49a-2f42c41a1119"
 tenant_subdomain   = "eacustomerprod"
 
+# --- Dev synthetic session -----------------------------------------------
+# Deployed-dev only. Explicit false in prod so the dev sentinel principal
+# is never reachable in production.
+allow_dev_auth = false
+
 # --- Guest-mode failsafe -------------------------------------------------
 # Prod-only demo/prospecting affordance. Surfaces AzureAd__AllowGuest=true
 # on the API container so a synthetic sentinel guest principal (full r/w,

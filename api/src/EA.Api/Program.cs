@@ -174,23 +174,26 @@ builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 
 var azureAdEnabled = builder.Configuration.GetValue("AzureAd:Enabled", defaultValue: false);
 var allowGuest = builder.Configuration.GetValue("AzureAd:AllowGuest", defaultValue: false);
+// allowDev enables the same JwtOrDev policy-scheme trick as allowGuest but
+// routes to DevAuthHandler instead. Set AzureAd:AllowDev=true in deployed
+// dev so engineers can use the "Log in as Dev" button without a real Entra
+// External ID account. Must be false in prod.
+var allowDev = builder.Configuration.GetValue("AzureAd:AllowDev", defaultValue: false);
 
 if (azureAdEnabled)
 {
     const string jwtOrGuestScheme = "JwtOrGuest";
+    const string jwtOrDevScheme = "JwtOrDev";
+
+    // allowDev and allowGuest are mutually exclusive by environment (dev vs prod).
+    var defaultScheme = allowDev ? jwtOrDevScheme
+        : allowGuest ? jwtOrGuestScheme
+        : JwtBearerDefaults.AuthenticationScheme;
 
     var authBuilder = builder.Services.AddAuthentication(options =>
     {
-        if (allowGuest)
-        {
-            options.DefaultScheme = jwtOrGuestScheme;
-            options.DefaultChallengeScheme = jwtOrGuestScheme;
-        }
-        else
-        {
-            options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-        }
+        options.DefaultScheme = defaultScheme;
+        options.DefaultChallengeScheme = defaultScheme;
     });
 
     authBuilder.AddMicrosoftIdentityWebApi(
@@ -204,6 +207,24 @@ if (azureAdEnabled)
         {
             builder.Configuration.Bind("AzureAd", identityOptions);
         });
+
+    if (allowDev)
+    {
+        authBuilder.AddScheme<AuthenticationSchemeOptions, DevAuthHandler>(
+            DevAuthHandler.SchemeName,
+            _ => { });
+
+        authBuilder.AddPolicyScheme(jwtOrDevScheme, jwtOrDevScheme, options =>
+        {
+            options.ForwardDefaultSelector = ctx =>
+            {
+                var authHeader = ctx.Request.Headers.Authorization.ToString();
+                return authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                    ? JwtBearerDefaults.AuthenticationScheme
+                    : DevAuthHandler.SchemeName;
+            };
+        });
+    }
 
     if (allowGuest)
     {
