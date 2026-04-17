@@ -1,6 +1,10 @@
 """Configuration loaded from environment variables via pydantic-settings."""
 
+import logging
+
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -16,8 +20,6 @@ class Settings(BaseSettings):
     rabbitmq_vhost: str = "/"
 
     log_level: str = "INFO"
-
-    otel_exporter_otlp_endpoint: str = ""
 
     # Reconnect behaviour.
     reconnect_delay_initial: float = 1.0
@@ -37,4 +39,17 @@ class Settings(BaseSettings):
 
 def load_settings() -> Settings:
     """Create and return a validated ``Settings`` instance."""
-    return Settings()
+    settings = Settings()
+    logger.info(
+        "Configuration loaded: rabbitmq_host=%s, rabbitmq_port=%d, rabbitmq_vhost=%s, "
+        "log_level=%s, reconnect_delay_initial=%.1f, reconnect_delay_max=%.1f, "
+        "reconnect_delay_multiplier=%.1f",
+        settings.rabbitmq_host,
+        settings.rabbitmq_port,
+        settings.rabbitmq_vhost,
+        settings.log_level,
+        settings.reconnect_delay_initial,
+        settings.reconnect_delay_max,
+        settings.reconnect_delay_multiplier,
+    )
+    return settings

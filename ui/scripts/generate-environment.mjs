@@ -19,6 +19,10 @@
  *     on the landing page. Enables a synthetic demo session that matches the
  *     backend's guest sentinel principal. Independent of ENABLE_DEV_AUTH —
  *     prod sets this true; local dev + deployed dev leave it false.
+ *   - APPLICATIONINSIGHTS_CONNECTION_STRING — App Insights connection string
+ *     baked into the SPA bundle so browser telemetry (pageviews, exceptions,
+ *     fetch dependencies) lands in the same App Insights resource as the API.
+ *     Optional — empty string disables the SDK at runtime (local dev no-op).
  *
  * Modes:
  *   - default (no flag): writes a safe default (empty strings) for any
@@ -71,6 +75,9 @@ const aadTenantId = (process.env.AAD_TENANT_ID ?? '').trim();
 const aadApiScope = (process.env.AAD_API_SCOPE ?? '').trim();
 const enableDevAuth = (process.env.ENABLE_DEV_AUTH ?? '').trim().toLowerCase() === 'true';
 const enableGuestAuth = (process.env.ENABLE_GUEST_AUTH ?? '').trim().toLowerCase() === 'true';
+const applicationInsightsConnectionString = (
+  process.env.APPLICATIONINSIGHTS_CONNECTION_STRING ?? ''
+).trim();
 
 if (requireApiUrl && !apiUrl) {
   console.error(
@@ -97,6 +104,7 @@ export const environment = {
   aadApiScope: ${JSON.stringify(aadApiScope)},
   enableDevAuth: ${JSON.stringify(enableDevAuth)},
   enableGuestAuth: ${JSON.stringify(enableGuestAuth)},
+  applicationInsightsConnectionString: ${JSON.stringify(applicationInsightsConnectionString)},
 };
 `;
 
@@ -109,5 +117,6 @@ console.log(
     `  aadTenantId=${aadTenantId ? aadTenantId : '<empty>'}\n` +
     `  aadApiScope=${aadApiScope ? aadApiScope : '<empty>'}\n` +
     `  enableDevAuth=${enableDevAuth}\n` +
-    `  enableGuestAuth=${enableGuestAuth}`
+    `  enableGuestAuth=${enableGuestAuth}\n` +
+    `  applicationInsightsConnectionString=${applicationInsightsConnectionString ? '<set>' : '<empty>'}`
 );

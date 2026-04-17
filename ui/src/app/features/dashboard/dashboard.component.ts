@@ -48,7 +48,10 @@ export class DashboardComponent implements OnInit {
         this.recentModels.set(result.items);
         this.totalModels.set(result.totalCount);
       },
-      error: () => this.loading.set(false),
+      error: (err: unknown) => {
+        console.error('[DashboardComponent] Failed to load recent models', err);
+        this.loading.set(false);
+      },
     });
 
     this.modelService.getModels(1, 1, 'Active').subscribe({
@@ -56,7 +59,10 @@ export class DashboardComponent implements OnInit {
         this.activeModels.set(result.totalCount);
         this.loading.set(false);
       },
-      error: () => this.loading.set(false),
+      error: (err: unknown) => {
+        console.error('[DashboardComponent] Failed to load active model count', err);
+        this.loading.set(false);
+      },
     });
   }
 

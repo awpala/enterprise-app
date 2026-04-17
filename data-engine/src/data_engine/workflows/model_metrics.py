@@ -58,13 +58,11 @@ def compute_metrics(parameters: dict[str, Any]) -> tuple[list[MetricResult], Res
         )
 
     logger.info(
-        "Generating samples",
-        extra={
-            "distribution": distribution,
-            "sample_size": sample_size,
-            "mean": mean_param,
-            "std_dev": std_dev_param,
-        },
+        "Generating %d samples from '%s' distribution (mean=%.4f, stdDev=%.4f)",
+        sample_size,
+        distribution,
+        mean_param,
+        std_dev_param,
     )
 
     rng = np.random.default_rng()
@@ -103,12 +101,10 @@ def compute_metrics(parameters: dict[str, Any]) -> tuple[list[MetricResult], Res
     result_summary = ResultSummary(distribution=distribution, percentiles=percentiles)
 
     logger.info(
-        "Metrics computation complete",
-        extra={
-            "distribution": distribution,
-            "sample_size": sample_size,
-            "computed_mean": computed_mean,
-        },
+        "Metrics computation complete for '%s' distribution: sample_size=%d, computed_mean=%.6f",
+        distribution,
+        sample_size,
+        computed_mean,
     )
 
     return metrics, result_summary

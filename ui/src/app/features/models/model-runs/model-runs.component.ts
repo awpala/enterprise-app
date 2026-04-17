@@ -55,7 +55,10 @@ export class ModelRunsComponent implements OnInit {
         this.snackBar.open('Run requested', 'OK', { duration: 3000 });
         this.loadRuns();
       },
-      error: () => this.snackBar.open('Failed to request run', 'OK', { duration: 3000 }),
+      error: (err: unknown) => {
+        console.error('[ModelRunsComponent] Failed to request run for model', this.modelId(), err);
+        this.snackBar.open('Failed to request run', 'OK', { duration: 3000 });
+      },
     });
   }
 
@@ -66,7 +69,8 @@ export class ModelRunsComponent implements OnInit {
         this.runs.set(runs);
         this.loading.set(false);
       },
-      error: () => {
+      error: (err: unknown) => {
+        console.error('[ModelRunsComponent] Failed to load runs for model', this.modelId(), err);
         this.snackBar.open('Failed to load runs', 'OK', { duration: 3000 });
         this.loading.set(false);
       },

@@ -58,7 +58,10 @@ export class ModelDetailComponent implements OnInit {
         this.snackBar.open('Run requested', 'OK', { duration: 3000 });
         this.loadRuns(m.id);
       },
-      error: () => this.snackBar.open('Failed to request run', 'OK', { duration: 3000 }),
+      error: (err: unknown) => {
+        console.error('[ModelDetailComponent] Failed to request run for model', m.id, err);
+        this.snackBar.open('Failed to request run', 'OK', { duration: 3000 });
+      },
     });
   }
 
@@ -72,7 +75,8 @@ export class ModelDetailComponent implements OnInit {
         this.model.set(model);
         this.loading.set(false);
       },
-      error: () => {
+      error: (err: unknown) => {
+        console.error('[ModelDetailComponent] Failed to load model', id, err);
         this.snackBar.open('Model not found', 'OK', { duration: 3000 });
         this.router.navigate(['/models']);
       },
@@ -82,6 +86,9 @@ export class ModelDetailComponent implements OnInit {
   private loadRuns(modelId: string): void {
     this.modelRunService.getRuns(modelId).subscribe({
       next: runs => this.recentRuns.set(runs.slice(0, 5)),
+      error: (err: unknown) => {
+        console.error('[ModelDetailComponent] Failed to load runs for model', modelId, err);
+      },
     });
   }
 }

@@ -32,6 +32,7 @@ function authorityHost(authority: string): string {
   try {
     return new URL(authority).host;
   } catch {
+    console.warn('[msal.config] Failed to parse authority URL — MSAL known-authorities will be empty. Authority value:', authority);
     return '';
   }
 }

@@ -30,7 +30,12 @@ resource "azurerm_role_assignment" "acr_pull" {
 }
 
 #-------------------------------------------------------------------------
-# RabbitMQ — public image, internal-only ingress, single replica.
+# RabbitMQ — public image, internal-only ingress, single replica. Exposing
+# the management UI (15672) would require a second external HTTP ingress,
+# which AzureRM 4.68 does not surface (`additional_port_mappings` is not
+# in the provider schema at this version). Operators reach the management
+# UI via `az containerapp exec` + local port-forward — see
+# docs/runbooks/observability.md.
 #-------------------------------------------------------------------------
 resource "azurerm_container_app" "rabbitmq" {
   name                         = "${var.name_prefix}-rabbitmq"
@@ -135,6 +140,10 @@ resource "azurerm_container_app" "api" {
       env {
         name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         secret_name = "appinsights-connection-string"
+      }
+      env {
+        name  = "OTEL_SERVICE_NAME"
+        value = "ea-api"
       }
       env {
         name  = "Seeding__Enabled"
@@ -300,6 +309,18 @@ resource "azurerm_container_app" "data_engine" {
       env {
         name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         secret_name = "appinsights-connection-string"
+      }
+      env {
+        name  = "OTEL_SERVICE_NAME"
+        value = "ea-data-engine"
+      }
+      env {
+        name  = "OTEL_TRACES_SAMPLER"
+        value = "parentbased_traceidratio"
+      }
+      env {
+        name  = "OTEL_TRACES_SAMPLER_ARG"
+        value = "0.2"
       }
     }
   }

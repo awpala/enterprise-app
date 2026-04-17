@@ -101,3 +101,15 @@ output "aad_api_scope" {
   description = "Fully-qualified API scope URI (AAD_API_SCOPE in the SPA build, passed to msal.loginRedirect)."
   value       = module.entra_external_id.api_scope_uri
 }
+
+#-------------------------------------------------------------------------
+# Application Insights — consumed by .github/scripts/build-ui.sh to bake
+# the connection string into the SPA bundle so browser telemetry lands in
+# the same App Insights resource as the API (enables end-to-end correlation
+# in Application Map: ea-ui → ea-api → Postgres/RabbitMQ → ea-data-engine).
+#-------------------------------------------------------------------------
+output "application_insights_connection_string" {
+  description = "Application Insights connection string (APPLICATIONINSIGHTS_CONNECTION_STRING in the SPA build)."
+  value       = module.observability.application_insights_connection_string
+  sensitive   = true
+}

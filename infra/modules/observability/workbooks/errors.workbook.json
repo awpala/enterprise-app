@@ -1,0 +1,58 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "## Enterprise App — Errors\n\nDrill-down into exceptions, failed dependencies, and error-level traces across all roles."
+      },
+      "name": "header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "exceptions\n| summarize count() by outerMessage, cloud_RoleName\n| top 20 by count_",
+        "size": 0,
+        "title": "Top exceptions",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{ApplicationInsights}"
+        ]
+      },
+      "name": "exceptions"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "dependencies\n| where success == false\n| summarize count() by target, resultCode\n| top 20 by count_",
+        "size": 0,
+        "title": "Failed dependencies",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{ApplicationInsights}"
+        ]
+      },
+      "name": "failed_deps"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where severityLevel == 3\n| summarize count() by cloud_RoleName, message\n| top 20 by count_",
+        "size": 0,
+        "title": "Top error traces",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{ApplicationInsights}"
+        ]
+      },
+      "name": "error_traces"
+    }
+  ],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}

@@ -308,7 +308,8 @@ export class AuthService {
   private readPersistedDevSession(): boolean {
     try {
       return window.localStorage.getItem(DEV_SESSION_STORAGE_KEY) === '1';
-    } catch {
+    } catch (e) {
+      console.warn('[AuthService] Failed to read dev session from localStorage', e);
       return false;
     }
   }
@@ -320,16 +321,18 @@ export class AuthService {
       } else {
         window.localStorage.removeItem(DEV_SESSION_STORAGE_KEY);
       }
-    } catch {
+    } catch (e) {
       // localStorage unavailable (SSR / private mode) — dev session becomes
       // per-tab, which is acceptable.
+      console.warn('[AuthService] Failed to persist dev session to localStorage', e);
     }
   }
 
   private readPersistedGuestSession(): boolean {
     try {
       return window.localStorage.getItem(GUEST_SESSION_STORAGE_KEY) === '1';
-    } catch {
+    } catch (e) {
+      console.warn('[AuthService] Failed to read guest session from localStorage', e);
       return false;
     }
   }
@@ -341,9 +344,10 @@ export class AuthService {
       } else {
         window.localStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
       }
-    } catch {
+    } catch (e) {
       // localStorage unavailable (SSR / private mode) — guest session becomes
       // per-tab, which is acceptable.
+      console.warn('[AuthService] Failed to persist guest session to localStorage', e);
     }
   }
 }

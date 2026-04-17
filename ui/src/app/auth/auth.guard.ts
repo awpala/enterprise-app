@@ -24,6 +24,7 @@ export const authGuard: CanActivateFn = (route, state) => {
   if (auth.isMsalConfigured) {
     return inject(MsalGuard).canActivate(route, state);
   }
+  console.warn('[authGuard] No active session and MSAL is not configured — redirecting to landing page. Requested URL:', state.url);
   return router.parseUrl('/');
 };
 
@@ -40,5 +41,6 @@ export const authGuardChild: CanActivateChildFn = (route, state) => {
   if (auth.isMsalConfigured) {
     return inject(MsalGuard).canActivate(route, state);
   }
+  console.warn('[authGuardChild] No active session and MSAL is not configured — redirecting to landing page. Requested URL:', state.url);
   return router.parseUrl('/');
 };

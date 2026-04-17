@@ -35,6 +35,13 @@ class ModelRunConsumer:
 
     def start(self) -> None:
         """Connect to RabbitMQ and start consuming. Blocks until stopped."""
+        logger.info(
+            "Connecting to RabbitMQ at %s:%d (vhost=%s)",
+            self._settings.rabbitmq_host,
+            self._settings.rabbitmq_port,
+            self._settings.rabbitmq_vhost,
+        )
+
         params = pika.ConnectionParameters(
             host=self._settings.rabbitmq_host,
             port=self._settings.rabbitmq_port,
@@ -56,6 +63,8 @@ class ModelRunConsumer:
             raise RuntimeError("Failed to open RabbitMQ channel")
         self._channel = channel
         self._producer = ModelRunProducer(channel, self._settings)
+
+        logger.info("RabbitMQ connection established, channel opened")
 
         # Declare the MassTransit message-type exchange (fanout).
         channel.exchange_declare(
@@ -87,6 +96,7 @@ class ModelRunConsumer:
 
     def stop(self) -> None:
         """Signal the consumer to shut down gracefully."""
+        logger.info("Consumer stop requested")
         self._should_stop = True
         channel = self._channel
         if channel is not None and channel.is_open:
@@ -109,7 +119,9 @@ class ModelRunConsumer:
             payload = ModelRunRequested.model_validate(envelope.message)
 
             logger.info(
-                "Processing run %s for model %s (%s)",
+                "Received message_id=%s correlation_id=%s: processing run %s for model %s (%s)",
+                payload.messageId,
+                payload.correlationId,
                 payload.modelRunId,
                 payload.modelId,
                 payload.modelName,
@@ -140,10 +152,20 @@ class ModelRunConsumer:
                 result_summary=result_summary,
             )
 
-            logger.info("Run %s completed with %d metrics", payload.modelRunId, len(metrics))
+            logger.info(
+                "Run %s completed with %d metrics (correlation_id=%s)",
+                payload.modelRunId,
+                len(metrics),
+                payload.correlationId,
+            )
 
         except UnsupportedDistributionError as exc:
-            logger.warning("Unsupported distribution: %s", exc)
+            logger.warning(
+                "Unsupported distribution for run %s (correlation_id=%s): %s",
+                payload.modelRunId if payload is not None else "unknown",
+                payload.correlationId if payload is not None else "unknown",
+                exc,
+            )
             if payload is not None and self._producer is not None:
                 self._producer.publish_run_failed(
                     model_run_id=payload.modelRunId,
@@ -152,7 +174,11 @@ class ModelRunConsumer:
                     error_message=str(exc),
                 )
         except Exception:
-            logger.exception("Unexpected error processing message")
+            logger.exception(
+                "Unexpected error processing message (model_run_id=%s, correlation_id=%s)",
+                payload.modelRunId if payload is not None else "unknown",
+                payload.correlationId if payload is not None else "unknown",
+            )
             if payload is not None and self._producer is not None:
                 try:
                     self._producer.publish_run_failed(
@@ -162,6 +188,9 @@ class ModelRunConsumer:
                         error_message="Unexpected processing error",
                     )
                 except Exception:
-                    logger.exception("Failed to publish failure event")
+                    logger.exception(
+                        "Failed to publish failure event for run %s",
+                        payload.modelRunId,
+                    )
         finally:
             channel.basic_ack(delivery_tag=method.delivery_tag)

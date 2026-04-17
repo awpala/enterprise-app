@@ -50,7 +50,8 @@ export class RunDetailComponent implements OnInit {
         this.run.set(run);
         this.loading.set(false);
       },
-      error: () => {
+      error: (err: unknown) => {
+        console.error('[RunDetailComponent] Failed to load run', runId, 'for model', id, err);
         this.snackBar.open('Run not found', 'OK', { duration: 3000 });
         this.router.navigate(['/models', id, 'runs']);
       },

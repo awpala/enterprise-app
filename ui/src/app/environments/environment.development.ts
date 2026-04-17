@@ -28,4 +28,5 @@ export const environment = {
    * this false (Dev and Guest are independent, not derived from each other).
    */
   enableGuestAuth: false,
+  applicationInsightsConnectionString: '',
 };
