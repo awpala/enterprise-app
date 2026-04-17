@@ -99,6 +99,7 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
 // Repositories & Facades
 // ---------------------------------------------------------------------------
 builder.Services.AddScoped<IModelRepository, ModelRepository>();
+builder.Services.AddScoped<IAuditRepository, AuditRepository>();
 builder.Services.AddScoped<IModelFacade, ModelFacade>();
 
 // ---------------------------------------------------------------------------

@@ -141,7 +141,7 @@ class ModelRunConsumer:
             )
 
             # 2. Compute metrics.
-            metrics, result_summary = compute_metrics(payload.parameters.model_dump())
+            metrics, result_summary, histogram_data = compute_metrics(payload.parameters.model_dump())
 
             # 3. Publish completed event.
             producer.publish_run_completed(
@@ -150,6 +150,7 @@ class ModelRunConsumer:
                 correlation_id=payload.correlationId,
                 metrics=metrics,
                 result_summary=result_summary,
+                histogram_data=histogram_data,
             )
 
             logger.info(

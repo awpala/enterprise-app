@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 # ---------------------------------------------------------------------------
@@ -30,6 +30,14 @@ class ResultSummary(BaseModel):
     percentiles: dict[str, float]
 
 
+class HistogramData(BaseModel):
+    """Pre-computed histogram bins for sample distribution visualization."""
+
+    binEdges: list[float]  # noqa: N815 — n+1 edges for n bins
+    counts: list[int]  # n bin counts
+    sampleSize: int  # noqa: N815 — total samples used
+
+
 # ---------------------------------------------------------------------------
 # Inbound: model.run.requested.v1
 # ---------------------------------------------------------------------------
@@ -38,10 +46,16 @@ class ResultSummary(BaseModel):
 class ModelRunRequestedParameters(BaseModel):
     """Parameters block inside a ModelRunRequested message."""
 
-    sampleSize: int = 1000  # noqa: N815 — matches .NET PascalCase JSON
+    sampleSize: int = Field(  # noqa: N815 — matches .NET PascalCase JSON
+        default=1000,
+        validation_alias=AliasChoices("sampleSize", "iterations"),
+    )
     distribution: str = "normal"
     mean: float = 0.0
-    stdDev: float = 1.0  # noqa: N815
+    stdDev: float = Field(  # noqa: N815
+        default=1.0,
+        validation_alias=AliasChoices("stdDev", "stddev"),
+    )
 
 
 class ModelRunRequested(BaseModel):
@@ -86,6 +100,7 @@ class ModelRunCompleted(BaseModel):
     modelId: UUID  # noqa: N815
     metrics: list[MetricResult]
     resultSummary: ResultSummary  # noqa: N815
+    histogramData: HistogramData | None = None  # noqa: N815
 
 
 # ---------------------------------------------------------------------------

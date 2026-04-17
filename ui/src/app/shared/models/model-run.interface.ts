@@ -13,9 +13,29 @@ export interface ModelRun {
   readonly errorMessage: string | null;
 }
 
+/** A Model Run summary for cross-model listing, includes model name. */
+export interface RunSummary {
+  readonly id: string;
+  readonly modelId: string;
+  readonly modelName: string;
+  readonly status: ModelRunStatus;
+  readonly requestedAtUtc: string;
+  readonly startedAtUtc: string | null;
+  readonly completedAtUtc: string | null;
+  readonly errorMessage: string | null;
+}
+
+/** Pre-computed histogram bins for distribution visualization. */
+export interface HistogramData {
+  readonly binEdges: number[];
+  readonly counts: number[];
+  readonly sampleSize: number;
+}
+
 /** Extended Model Run with computed metrics. */
 export interface ModelRunDetail extends ModelRun {
   readonly metrics: ModelMetric[];
+  readonly sampleData: HistogramData | null;
 }
 
 /** A single metric produced by a Model Run. */

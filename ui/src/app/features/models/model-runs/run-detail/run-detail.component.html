@@ -70,6 +70,19 @@
       </mat-card>
     }
 
+    @if (r.sampleData) {
+      <mat-card class="mt-16">
+        <mat-card-header>
+          <mat-card-title>Distribution</mat-card-title>
+          <span class="spacer"></span>
+          <span class="sample-count">{{ r.sampleData.sampleSize | number }} samples</span>
+        </mat-card-header>
+        <mat-card-content>
+          <app-histogram [data]="r.sampleData" />
+        </mat-card-content>
+      </mat-card>
+    }
+
     @if (r.resultSummary) {
       <mat-card class="mt-16">
         <mat-card-header>

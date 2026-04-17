@@ -202,6 +202,7 @@ The generated `.sql` pairs with the C# migration of the same stem (e.g. `2026041
 - Structured logs to stdout/stderr (Container Apps routes to Log Analytics).
 - Correlation IDs propagated across HTTP and RabbitMQ boundaries.
 - Health probes wired to Container Apps liveness/readiness/startup checks.
+- Audit logging via `AuditStampingInterceptor` on every `SaveChanges` call. Emits rows to the `audit_events` table for domain mutations (`model.created`, `model.updated`, `model.archived`, `modelrun.requested`) with actor identity from the authenticated user's Entra ID claims.
 
 ## Deployment Pipeline
 

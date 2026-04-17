@@ -1,9 +1,9 @@
 namespace EA.Domain.Entities;
 
 /// <summary>
-/// Append-only audit record capturing a single domain action.
-/// No writes happen yet in Phase 2B — the table is provisioned so that Phase 3
-/// can start emitting rows without another migration.
+/// Append-only audit record capturing a single domain action. Rows are emitted
+/// by <c>AuditStampingInterceptor</c> during <c>SaveChanges</c> for auditable
+/// entities (<c>Model</c>, <c>ModelRun</c>).
 /// </summary>
 /// <remarks>
 /// Property setters are <c>private</c> so rows are only built via

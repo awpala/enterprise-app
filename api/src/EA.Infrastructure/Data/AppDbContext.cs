@@ -17,10 +17,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     /// <summary>Gets or sets the model metrics DbSet.</summary>
     public DbSet<ModelMetric> ModelMetrics => Set<ModelMetric>();
 
-    /// <summary>
-    /// Gets or sets the append-only audit events DbSet. The table is
-    /// provisioned in Phase 2B; actual writes are deferred to Phase 3.
-    /// </summary>
+    /// <summary>Gets or sets the append-only audit events DbSet.</summary>
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     /// <inheritdoc />

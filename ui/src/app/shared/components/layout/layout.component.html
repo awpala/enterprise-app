@@ -37,6 +37,10 @@
         <mat-icon matListItemIcon>science</mat-icon>
         <span matListItemTitle>Models</span>
       </a>
+      <a mat-list-item routerLink="/runs" routerLinkActive="active-link" (click)="closeSidenavIfMobile()">
+        <mat-icon matListItemIcon>play_circle</mat-icon>
+        <span matListItemTitle>Runs</span>
+      </a>
     </mat-nav-list>
   </mat-sidenav>
 

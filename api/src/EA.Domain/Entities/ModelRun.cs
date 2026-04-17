@@ -29,6 +29,9 @@ public class ModelRun
     /// <summary>Gets or sets the aggregated result summary as JSON.</summary>
     public JsonDocument? ResultSummary { get; set; }
 
+    /// <summary>Gets or sets the pre-computed histogram data (bin edges, counts) as JSON for visualization.</summary>
+    public JsonDocument? SampleData { get; set; }
+
     /// <summary>Gets or sets the error message if the run failed.</summary>
     public string? ErrorMessage { get; set; }
 

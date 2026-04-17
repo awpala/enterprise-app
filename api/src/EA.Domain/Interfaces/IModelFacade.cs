@@ -106,4 +106,24 @@ public interface IModelFacade
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The model run entity, or null if not found or mismatched.</returns>
     Task<ModelRun?> GetModelRunByIdAsync(Guid modelId, Guid runId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a paged list of all runs across all models, optionally filtered by status.
+    /// </summary>
+    /// <param name="page">The page number (1-based).</param>
+    /// <param name="pageSize">The number of items per page.</param>
+    /// <param name="status">Optional run status filter.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A tuple of items (with Model navigation loaded) and total count.</returns>
+    Task<(IReadOnlyList<ModelRun> Items, int TotalCount)> GetAllRunsAsync(
+        int page, int pageSize, ModelRunStatus? status, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Requests runs for multiple models in parallel with throttled concurrency.
+    /// </summary>
+    /// <param name="modelIds">The model identifiers to run.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of created model runs (nulls filtered out for models not found).</returns>
+    Task<IReadOnlyList<ModelRun>> RequestBatchRunAsync(
+        IReadOnlyList<Guid> modelIds, CancellationToken cancellationToken = default);
 }

@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace EA.Contracts.Models;
 
 /// <summary>
-/// Detailed DTO for a model run, including metrics and result summary.
+/// Detailed DTO for a model run, including metrics, result summary, and sample data.
 /// </summary>
 public record ModelRunDetailDto(
     Guid Id,
@@ -14,4 +14,5 @@ public record ModelRunDetailDto(
     DateTime? CompletedAtUtc,
     JsonDocument? ResultSummary,
     string? ErrorMessage,
-    IReadOnlyList<ModelMetricDto> Metrics);
+    IReadOnlyList<ModelMetricDto> Metrics,
+    JsonDocument? SampleData);

@@ -61,6 +61,18 @@ public interface IModelRepository
     Task<IReadOnlyList<ModelRun>> GetModelRunsAsync(Guid modelId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Retrieves a paged list of all model runs across all models, optionally filtered by status.
+    /// Includes the parent Model navigation property.
+    /// </summary>
+    /// <param name="page">The page number (1-based).</param>
+    /// <param name="pageSize">The number of items per page.</param>
+    /// <param name="status">Optional status filter.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A tuple of items (with Model included) and total count.</returns>
+    Task<(IReadOnlyList<ModelRun> Items, int TotalCount)> GetAllRunsAsync(
+        int page, int pageSize, ModelRunStatus? status, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Adds a new model run entity to the data store.
     /// </summary>
     /// <param name="run">The model run to add.</param>

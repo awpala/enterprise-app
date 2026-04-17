@@ -41,12 +41,18 @@ export class ModelFormComponent implements OnInit {
   readonly isEdit = signal(false);
   readonly modelId = signal<string | null>(null);
   readonly statusOptions: ModelStatus[] = ['Draft', 'Active', 'Archived'];
+  readonly distributionOptions = ['normal', 'uniform', 'exponential', 'lognormal'] as const;
 
   readonly form = this.fb.group({
     name: ['', [Validators.required, Validators.maxLength(200)]],
     description: ['', [Validators.maxLength(2000)]],
     status: ['Draft' as ModelStatus],
-    parameters: [''],
+    parameters: this.fb.group({
+      distribution: ['normal', [Validators.required]],
+      mean: [0, [Validators.required]],
+      stdDev: [1.0, [Validators.required, Validators.min(0.0001)]],
+      sampleSize: [1000, [Validators.required, Validators.min(1), Validators.max(100000)]],
+    }),
   });
 
   ngOnInit(): void {
@@ -64,17 +70,12 @@ export class ModelFormComponent implements OnInit {
     this.saving.set(true);
     const { name, description, status, parameters } = this.form.value;
 
-    let parsedParams: Record<string, unknown> | null = null;
-    if (parameters?.trim()) {
-      try {
-        parsedParams = JSON.parse(parameters);
-      } catch (e) {
-        console.warn('[ModelFormComponent] Invalid JSON in Parameters field', e);
-        this.snackBar.open('Invalid JSON in Parameters field', 'OK', { duration: 3000 });
-        this.saving.set(false);
-        return;
-      }
-    }
+    const parsedParams: Record<string, unknown> | null = parameters ? {
+      distribution: parameters.distribution,
+      mean: parameters.mean,
+      stdDev: parameters.stdDev,
+      sampleSize: parameters.sampleSize,
+    } : null;
 
     if (this.isEdit()) {
       this.modelService.updateModel(this.modelId()!, {
@@ -128,7 +129,12 @@ export class ModelFormComponent implements OnInit {
           name: model.name,
           description: model.description ?? '',
           status: model.status,
-          parameters: model.parameters ? JSON.stringify(model.parameters, null, 2) : '',
+          parameters: model.parameters ? {
+            distribution: (model.parameters['distribution'] as string) ?? 'normal',
+            mean: (model.parameters['mean'] as number) ?? 0,
+            stdDev: (model.parameters['stdDev'] as number) ?? 1.0,
+            sampleSize: (model.parameters['sampleSize'] as number) ?? 1000,
+          } : undefined,
         });
         this.loading.set(false);
       },

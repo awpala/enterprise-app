@@ -76,6 +76,31 @@ public class ModelRepository(AppDbContext dbContext) : IModelRepository
     }
 
     /// <inheritdoc />
+    public async Task<(IReadOnlyList<ModelRun> Items, int TotalCount)> GetAllRunsAsync(
+        int page, int pageSize, ModelRunStatus? status, CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.ModelRuns
+            .AsNoTracking()
+            .Include(r => r.Model)
+            .AsQueryable();
+
+        if (status.HasValue)
+        {
+            query = query.Where(r => r.Status == status.Value);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(r => r.RequestedAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
+    }
+
+    /// <inheritdoc />
     public async Task AddModelRunAsync(ModelRun run, CancellationToken cancellationToken = default)
     {
         await dbContext.ModelRuns.AddAsync(run, cancellationToken);

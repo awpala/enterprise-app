@@ -5,10 +5,10 @@
   "status": "active",
   "version": 2,
   "parameters": {
-    "distribution": "triangular",
+    "distribution": "exponential",
     "mean": 82.583,
-    "stddev": 0.19,
-    "iterations": 5166
+    "stdDev": 0.19,
+    "sampleSize": 5166
   },
   "createdAtUtc": "2025-01-20T00:00:00Z",
   "updatedAtUtc": "2025-02-14T05:00:00Z",

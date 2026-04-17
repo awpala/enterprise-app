@@ -242,6 +242,10 @@ namespace EA.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("result_summary");
 
+                    b.Property<JsonDocument>("SampleData")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("sample_data");
+
                     b.Property<DateTime?>("StartedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("started_at_utc");
