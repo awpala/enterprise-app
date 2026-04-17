@@ -111,6 +111,18 @@ variable "aad_tenant_id" {
 }
 
 #-------------------------------------------------------------------------
+# Dev-mode synthetic session — surfaced to the API as AzureAd__AllowDev.
+# When true, the API registers a JwtOrDev policy scheme that routes
+# header-free requests to DevAuthHandler. Deployed-dev only; must be
+# false in prod. Paired with ENABLE_DEV_AUTH=true on the SPA build.
+#-------------------------------------------------------------------------
+variable "allow_dev_auth" {
+  description = "Deployed-dev synthetic session. When true, surfaces AzureAd__AllowDev=true on the API container so the JwtOrDev policy scheme accepts no-Bearer requests as the dev sentinel principal. Must be false in prod."
+  type        = bool
+  default     = false
+}
+
+#-------------------------------------------------------------------------
 # Guest-mode failsafe — surfaced to the API as AzureAd__AllowGuest. When
 # true, the API honours a synthetic sentinel guest principal (full r/w,
 # no CIAM, no scope-down). Prod-only demo/prospecting affordance.

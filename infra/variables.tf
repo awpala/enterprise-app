@@ -100,6 +100,21 @@ variable "external_tenant_client_secret" {
 }
 
 #-------------------------------------------------------------------------
+# Dev-mode synthetic session (deployed-dev only).
+#
+# When true, the API registers a JwtOrDev policy scheme that routes
+# no-Bearer requests to DevAuthHandler. Enables the "Log in as Dev"
+# button in deployed dev without requiring a real Entra External ID
+# account. The UI side is wired via ENABLE_DEV_AUTH at build time.
+# MUST be false in prod.
+#-------------------------------------------------------------------------
+variable "allow_dev_auth" {
+  description = "Deployed-dev synthetic session. When true the API's JwtOrDev policy scheme accepts no-Bearer requests as the dev sentinel principal. Paired with ENABLE_DEV_AUTH=true on the SPA. Must be false in prod."
+  type        = bool
+  default     = false
+}
+
+#-------------------------------------------------------------------------
 # Guest-mode failsafe (prod-only demo/prospecting affordance).
 #
 # When true, the API accepts a synthetic sentinel guest principal with full

@@ -26,8 +26,15 @@ image_tag   = "latest"
 external_tenant_id = "a400a39c-97cf-4459-932e-6dfccf2adf1c"
 tenant_subdomain   = "eacustomerdev"
 
+# --- Dev synthetic session -----------------------------------------------
+# Enables the "Log in as Dev" affordance in deployed dev. The API registers
+# a JwtOrDev policy scheme that routes no-Bearer requests to DevAuthHandler.
+# Paired with ENABLE_DEV_AUTH=true on the SPA build (set in deploy.yml for
+# non-main branches). Must be false in prod.
+allow_dev_auth = true
+
 # --- Guest-mode failsafe -------------------------------------------------
 # Prod-only. Explicit false here so dev deploys never surface the synthetic
-# sentinel principal. The paired UI flag ENABLE_GUEST_AUTH is likewise
+# guest sentinel principal. The paired UI flag ENABLE_GUEST_AUTH is likewise
 # forced false for dev in .github/workflows/deploy.yml.
 allow_guest_auth = false
