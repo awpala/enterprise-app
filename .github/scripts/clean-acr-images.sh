@@ -81,7 +81,15 @@ for REPO in $REPOS; do
 
   echo "  Keeping tags: ${KEEP_TAGS[*]}"
 
-  # Walk all tags and delete those not in the keep set
+  # Nothing to prune if the only tags are the ones we're keeping.
+  if [ "$TAG_COUNT" -le "${#KEEP_TAGS[@]}" ]; then
+    echo "  Nothing to prune."
+    continue
+  fi
+
+  # Walk all tags and delete those not in the keep set.
+  # Tolerate "tag does not exist" errors — multiple tags can share a
+  # manifest digest, so deleting one tag may remove sibling tags too.
   ALL_TAGS=$(echo "$TAG_DATA" | jq -r '.[].name')
 
   for TAG in $ALL_TAGS; do
@@ -100,7 +108,7 @@ for REPO in $REPOS; do
       az acr repository delete \
         --name "$ACR_NAME" \
         --image "$REPO:$TAG" \
-        --yes
+        --yes 2>/dev/null || echo "  (already removed — shared manifest)"
     fi
   done
 done

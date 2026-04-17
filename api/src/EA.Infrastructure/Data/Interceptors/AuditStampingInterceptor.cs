@@ -152,12 +152,12 @@ public sealed class AuditStampingInterceptor(ICurrentUser currentUser) : SaveCha
     private AuditEvent BuildModelAuditEvent(EntityEntry entry, Model model, DateTime now, Guid? correlationId)
     {
         string action;
-        string details;
+        JsonDocument details;
 
         if (entry.State == EntityState.Added)
         {
             action = "model.created";
-            details = JsonSerializer.Serialize(new { name = model.Name, status = nameof(ModelStatus.Draft) });
+            details = JsonSerializer.SerializeToDocument(new { name = model.Name, status = nameof(ModelStatus.Draft) });
         }
         else if (entry.State == EntityState.Modified
                  && entry.Property(nameof(Model.Status)).IsModified
@@ -165,7 +165,7 @@ public sealed class AuditStampingInterceptor(ICurrentUser currentUser) : SaveCha
         {
             var previousStatus = entry.Property(nameof(Model.Status)).OriginalValue?.ToString() ?? "unknown";
             action = "model.archived";
-            details = JsonSerializer.Serialize(new { name = model.Name, previousStatus });
+            details = JsonSerializer.SerializeToDocument(new { name = model.Name, previousStatus });
         }
         else
         {
@@ -174,7 +174,7 @@ public sealed class AuditStampingInterceptor(ICurrentUser currentUser) : SaveCha
                 .Where(p => p.IsModified && !AuditStampColumns.Contains(p.Metadata.Name))
                 .Select(p => p.Metadata.Name)
                 .ToList();
-            details = JsonSerializer.Serialize(new { name = model.Name, version = model.Version, changedFields });
+            details = JsonSerializer.SerializeToDocument(new { name = model.Name, version = model.Version, changedFields });
         }
 
         return AuditEvent.Create(
@@ -201,7 +201,7 @@ public sealed class AuditStampingInterceptor(ICurrentUser currentUser) : SaveCha
         if (entry.State != EntityState.Added)
             return null;
 
-        var details = JsonSerializer.Serialize(new { modelId = run.ModelId, status = nameof(ModelRunStatus.Pending) });
+        var details = JsonSerializer.SerializeToDocument(new { modelId = run.ModelId, status = nameof(ModelRunStatus.Pending) });
 
         return AuditEvent.Create(
             occurredAtUtc: now,

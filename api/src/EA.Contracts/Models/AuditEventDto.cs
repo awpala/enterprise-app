@@ -14,5 +14,5 @@ public record AuditEventDto(
     string Action,
     string EntityType,
     Guid? EntityId,
-    string Details,
+    object? Details,
     Guid? CorrelationId);

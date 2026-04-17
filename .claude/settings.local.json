@@ -154,7 +154,8 @@
       "Bash(find /workspace -type f \\\\\\( -name \"*.ts\" -o -name \"*.py\" -o -name \"*.tf\" -o -name \"*.json\" -o -name \"*.md\" \\\\\\) -exec grep -l \"audit.event\\\\|audit_event\\\\|AuditEvent\" {} \\\\;)",
       "Bash(find /workspace/api/tests -name \"*.cs\" -type f -exec grep -l \"AuditEvent\\\\|audit\" {} \\\\;)",
       "Bash(ls /workspace/api/Dockerfile* /workspace/data-engine/Dockerfile*)",
-      "Bash(chmod +x /workspace/.github/scripts/clean-acr-images.sh)"
+      "Bash(chmod +x /workspace/.github/scripts/clean-acr-images.sh)",
+      "Bash(dotnet ef:*)"
     ]
   }
 }

@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace EA.Domain.Entities;
 
 /// <summary>
@@ -61,9 +63,9 @@ public class AuditEvent
 
     /// <summary>
     /// Gets the JSON payload capturing action-specific context. Stored as
-    /// <c>jsonb</c> in Postgres. Defaults to <c>"{}"</c> for rows with no detail.
+    /// <c>jsonb</c> in Postgres.
     /// </summary>
-    public string Details { get; private set; } = "{}";
+    public JsonDocument? Details { get; private set; }
 
     /// <summary>Gets the correlation identifier linking this event to a request or message.</summary>
     public Guid? CorrelationId { get; private set; }
@@ -95,7 +97,7 @@ public class AuditEvent
         string? actorName = null,
         string? actorEmail = null,
         Guid? entityId = null,
-        string? details = null,
+        JsonDocument? details = null,
         Guid? correlationId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(action);
@@ -116,7 +118,7 @@ public class AuditEvent
             ActorName = actorName,
             ActorEmail = actorEmail,
             EntityId = entityId,
-            Details = string.IsNullOrWhiteSpace(details) ? "{}" : details,
+            Details = details,
             CorrelationId = correlationId,
         };
     }

@@ -194,3 +194,6 @@ jobs:
 
       - name: Smoke test — /health/ready
         run: .github/scripts/smoke-test.sh
+
+      - name: Clean stale ACR images
+        run: .github/scripts/clean-acr-images.sh
