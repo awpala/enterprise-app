@@ -7,7 +7,7 @@ namespace EA.Contracts.Models;
 /// Request payload for updating an existing model.
 /// </summary>
 public record UpdateModelRequest(
-    [property: Required, MaxLength(200)] string Name,
-    [property: MaxLength(2000)] string? Description,
-    [property: Required] string Status,
+    [Required, MaxLength(200)] string Name,
+    [MaxLength(2000)] string? Description,
+    [Required] string Status,
     JsonDocument? Parameters);
