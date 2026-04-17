@@ -152,7 +152,9 @@
       "Bash(python -c \"from data_engine.workflows.model_metrics import compute_metrics; m, s, h = compute_metrics\\({'distribution': 'normal', 'mean': 10, 'stdDev': 2, 'sampleSize': 5000}\\); print\\(f'bins={len\\(h.counts\\)}, edges={len\\(h.binEdges\\)}, sampleSize={h.sampleSize}, sum_counts={sum\\(h.counts\\)}'\\)\")",
       "Bash(find /workspace/api/src -name \"*.cs\" -type f -exec grep -l \"AuditEvent\" {} \\\\;)",
       "Bash(find /workspace -type f \\\\\\( -name \"*.ts\" -o -name \"*.py\" -o -name \"*.tf\" -o -name \"*.json\" -o -name \"*.md\" \\\\\\) -exec grep -l \"audit.event\\\\|audit_event\\\\|AuditEvent\" {} \\\\;)",
-      "Bash(find /workspace/api/tests -name \"*.cs\" -type f -exec grep -l \"AuditEvent\\\\|audit\" {} \\\\;)"
+      "Bash(find /workspace/api/tests -name \"*.cs\" -type f -exec grep -l \"AuditEvent\\\\|audit\" {} \\\\;)",
+      "Bash(ls /workspace/api/Dockerfile* /workspace/data-engine/Dockerfile*)",
+      "Bash(chmod +x /workspace/.github/scripts/clean-acr-images.sh)"
     ]
   }
 }

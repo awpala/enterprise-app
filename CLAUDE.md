@@ -63,10 +63,11 @@ User → Angular SPA → (Bearer token) → ASP.NET Core API → PostgreSQL
 │   ├── compose.yaml            # Full-stack local dev (API + Postgres + RabbitMQ + UI)
 │   └── compose.override.yaml   # Dev overrides (hot reload, debug ports)
 ├── .github/
-│   └── workflows/
-│       ├── ci.yml              # Build, test, push images
-│       ├── deploy.yml          # Terraform plan/apply
-│       └── swa-deploy.yml      # Static Web Apps deploy
+│   ├── workflows/
+│   │   ├── ci.yml              # Unit tests (all branches) + integration tests (main)
+│   │   ├── deploy.yml          # Selective image builds, Terraform apply, SWA deploy
+│   │   └── cleanup-acr.yml     # Prune stale ACR images on merge to main
+│   └── scripts/                # CI/CD helper scripts
 ├── schemas/                    # JSON Schema message contracts (source of truth)
 ├── docs/                       # Architecture decisions, runbooks, API docs
 └── CLAUDE.md                   # This file
@@ -86,7 +87,7 @@ User → Angular SPA → (Bearer token) → ASP.NET Core API → PostgreSQL
 | Message broker | RabbitMQ | 4 | `rabbitmq:4-management` image |
 | IaC | Terraform | ≥1.9 | AzureRM provider, azurerm backend |
 | Containers | Docker | Compose v2 | Multi-stage builds, BuildKit |
-| CI/CD | GitHub Actions | — | OIDC to Azure, Buildx, matrix builds |
+| CI/CD | GitHub Actions | — | OIDC to Azure, selective image builds, ACR cleanup |
 | Observability | OpenTelemetry | — | Azure Monitor distro for .NET |
 
 ## Development Workflow
@@ -206,13 +207,25 @@ The generated `.sql` pairs with the C# migration of the same stem (e.g. `2026041
 
 ## Deployment Pipeline
 
-1. **PR** → CI builds, tests, lints (no push to ACR).
-2. **Merge to `main`** → build images, tag with `sha-<short>`, push to ACR.
-3. **Terraform plan** → saved as artifact, requires approval.
-4. **Terraform apply** → updates Container Apps image tags, infra changes.
+### CI (`ci.yml`)
+- **Every push** → unit tests (API + UI) run on all branches.
+- **Merge to `main`** → integration tests (Testcontainers) run after unit tests pass.
+
+### Deploy (`deploy.yml`)
+1. **Detect changes** → `git diff` identifies which sub-apps changed (`api/`, `data-engine/`).
+2. **Terraform apply — phase 1** → ensures resource group + ACR exist.
+3. **Selective image builds** → only changed images are rebuilt via `az acr build`; unchanged images are re-tagged to the new `IMAGE_TAG` via `az acr import`.
+4. **Terraform apply — phase 2** → full infrastructure apply with the new image tag.
 5. **Migration job** → Container Apps Job runs EF Core migration bundle.
 6. **SWA deploy** → Angular build deployed to Static Web Apps.
-7. **Smoke tests** → hit `/health/ready` + one end-to-end flow.
+7. **Smoke test** → `GET /health/ready` with retries.
+
+### Image tagging
+- `main` → `sha-<sha7>`
+- Non-main → `<branch-slug>-<sha7>`
+
+### ACR cleanup (`cleanup-acr.yml`)
+- **On merge to `main`** → prunes stale image tags from both dev and production ACRs, keeping only the most recent tag per repository.
 
 ## Azure Resource Mapping
 

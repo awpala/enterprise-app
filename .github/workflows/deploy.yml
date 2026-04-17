@@ -20,10 +20,53 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
+  detect-changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      api_changed: ${{ steps.changes.outputs.api_changed }}
+      data_engine_changed: ${{ steps.changes.outputs.data_engine_changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: changes
+        run: |
+          # Compare against the merge base with the default branch.
+          # For pushes to main, compare against the previous commit.
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            BASE="${GITHUB_SHA}~1"
+          else
+            BASE="origin/main"
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" HEAD -- 2>/dev/null || echo "")
+
+          api_changed=false
+          data_engine_changed=false
+
+          if echo "$CHANGED" | grep -q '^api/'; then
+            api_changed=true
+          fi
+          if echo "$CHANGED" | grep -q '^data-engine/'; then
+            data_engine_changed=true
+          fi
+
+          echo "api_changed=$api_changed" >> "$GITHUB_OUTPUT"
+          echo "data_engine_changed=$data_engine_changed" >> "$GITHUB_OUTPUT"
+          echo "Changes detected — api: $api_changed, data-engine: $data_engine_changed"
+
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
+    needs: detect-changes
     # Route to the right GitHub Environment so OIDC picks the right
     # federated credential (dev or production).
     environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'dev' }}
@@ -69,6 +112,12 @@ jobs:
       # lives in infra/envs/*.tfvars (allow_guest_auth), so no matching
       # TF_VAR_* is needed here.
       ENABLE_GUEST_AUTH: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
+
+      # Change detection outputs — consumed by build-and-push-images.sh.
+      # When unset (e.g. workflow_dispatch), the script defaults to building
+      # all images (safe fallback).
+      API_CHANGED: ${{ needs.detect-changes.outputs.api_changed }}
+      DATA_ENGINE_CHANGED: ${{ needs.detect-changes.outputs.data_engine_changed }}
 
     steps:
       - name: Checkout
@@ -130,7 +179,7 @@ jobs:
       - name: Setup Node (for UI build)
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: ui/package-lock.json
 
