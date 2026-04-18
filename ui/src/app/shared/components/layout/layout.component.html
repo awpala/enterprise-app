@@ -5,6 +5,8 @@
   <span class="toolbar-title">Enterprise App</span>
   <span class="spacer"></span>
 
+  <app-theme-toggle></app-theme-toggle>
+
   <button mat-button [matMenuTriggerFor]="accountMenu" class="account-button">
     <mat-icon class="mr-8">account_circle</mat-icon>
     <span>{{ authService.displayName() }}</span>
@@ -26,7 +28,8 @@
   <mat-sidenav
     #sidenav
     [mode]="isMobile() ? 'over' : 'side'"
-    [opened]="!isMobile()"
+    [opened]="isMobile() ? false : sidenavOpen()"
+    (openedChange)="onSidenavOpenedChange($event)"
     class="sidenav">
     <mat-nav-list>
       <a mat-list-item routerLink="/dashboard" routerLinkActive="active-link" (click)="closeSidenavIfMobile()">

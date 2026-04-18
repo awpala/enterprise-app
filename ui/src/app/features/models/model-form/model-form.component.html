@@ -85,9 +85,13 @@
           </div>
 
           <div class="form-actions">
-            <button mat-button type="button" (click)="onCancel()">Cancel</button>
+            <button mat-button type="button" (click)="onCancel()" [disabled]="saving()">Cancel</button>
+            <button mat-stroked-button type="button" (click)="onClear()" [disabled]="saving()">
+              <mat-icon>clear</mat-icon>
+              Clear
+            </button>
             <button mat-flat-button color="primary" type="submit"
-                    [disabled]="form.invalid || saving()">
+                    [disabled]="!canSubmit()">
               @if (saving()) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {

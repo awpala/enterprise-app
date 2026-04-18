@@ -12,6 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
 import { DatePipe } from '@angular/common';
 import { ModelService } from '../../../core/services/model.service';
+import { UiStateService, UI_STATE_KEYS } from '../../../core/services/ui-state.service';
 import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { Model, ModelStatus } from '../../../shared/models/model.interface';
@@ -41,13 +42,14 @@ export class ModelListComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
+  private readonly uiState = inject(UiStateService);
 
   readonly loading = signal(true);
   readonly models = signal<Model[]>([]);
   readonly totalCount = signal(0);
   readonly page = signal(1);
-  readonly pageSize = signal(20);
-  readonly statusFilter = signal<ModelStatus | undefined>(undefined);
+  readonly pageSize = this.uiState.signalFor<number>(UI_STATE_KEYS.modelsTablePageSize, 20);
+  readonly statusFilter = this.uiState.signalFor<ModelStatus | undefined>(UI_STATE_KEYS.modelsTableFilter, undefined);
   readonly displayedColumns = ['name', 'status', 'version', 'createdBy', 'updatedAtUtc', 'actions'];
   readonly statusOptions: (ModelStatus | 'All')[] = ['All', 'Draft', 'Active', 'Archived'];
 
@@ -55,8 +57,24 @@ export class ModelListComponent implements OnInit {
     this.loadModels();
   }
 
+  /**
+   * Filter-chip click handler. Always exactly one chip is "on":
+   *  - Click All when All is already selected → no-op.
+   *  - Click a non-All chip that is already selected → fall back to All.
+   *  - Click any other chip → select it.
+   */
   onStatusFilter(status: ModelStatus | 'All'): void {
-    this.statusFilter.set(status === 'All' ? undefined : status);
+    const current = this.statusFilter();
+    let nextFilter: ModelStatus | undefined;
+    if (status === 'All') {
+      if (current === undefined) return;
+      nextFilter = undefined;
+    } else if (current === status) {
+      nextFilter = undefined;
+    } else {
+      nextFilter = status;
+    }
+    this.statusFilter.set(nextFilter);
     this.page.set(1);
     this.loadModels();
   }

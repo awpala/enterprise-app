@@ -7,12 +7,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatSelectModule } from '@angular/material/select';
+import { MatChipsModule } from '@angular/material/chips';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { DatePipe } from '@angular/common';
 import { interval, filter, switchMap, tap } from 'rxjs';
 import { ModelRunService } from '../../core/services/model-run.service';
+import { UiStateService, UI_STATE_KEYS } from '../../core/services/ui-state.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { ModelRunStatus, RunSummary } from '../../shared/models/model-run.interface';
 
@@ -30,9 +30,8 @@ import { ModelRunStatus, RunSummary } from '../../shared/models/model-run.interf
     MatIconModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
-    MatSelectModule,
+    MatChipsModule,
     MatPaginatorModule,
-    MatFormFieldModule,
     DatePipe,
     StatusBadgeComponent,
   ],
@@ -44,13 +43,14 @@ export class RunsComponent implements OnInit {
   private readonly modelRunService = inject(ModelRunService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly uiState = inject(UiStateService);
 
   readonly loading = signal(true);
   readonly runs = signal<RunSummary[]>([]);
   readonly totalCount = signal(0);
   readonly page = signal(1);
-  readonly pageSize = signal(20);
-  readonly statusFilter = signal<ModelRunStatus | undefined>(undefined);
+  readonly pageSize = this.uiState.signalFor<number>(UI_STATE_KEYS.runsTablePageSize, 20);
+  readonly statusFilter = this.uiState.signalFor<ModelRunStatus | undefined>(UI_STATE_KEYS.runsTableFilter, undefined);
   readonly batchRequesting = signal(false);
 
   readonly displayedColumns = ['status', 'modelName', 'requestedAtUtc', 'startedAtUtc', 'completedAtUtc', 'errorMessage'];
@@ -68,8 +68,24 @@ export class RunsComponent implements OnInit {
     this.loadRuns();
   }
 
+  /**
+   * Filter-chip click handler. Always exactly one chip is "on":
+   *  - Click All when All is already selected → no-op.
+   *  - Click a non-All chip that is already selected → fall back to All.
+   *  - Click any other chip → select it.
+   */
   onStatusFilterChange(value: ModelRunStatus | undefined): void {
-    this.statusFilter.set(value);
+    const current = this.statusFilter();
+    let next: ModelRunStatus | undefined;
+    if (value === undefined) {
+      if (current === undefined) return;
+      next = undefined;
+    } else if (current === value) {
+      next = undefined;
+    } else {
+      next = value;
+    }
+    this.statusFilter.set(next);
     this.page.set(1);
     this.loadRuns();
   }

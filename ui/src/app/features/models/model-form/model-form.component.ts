@@ -1,4 +1,5 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -9,8 +10,90 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { debounceTime } from 'rxjs/operators';
 import { ModelService } from '../../../core/services/model.service';
+import { UiStateService, UI_STATE_KEYS } from '../../../core/services/ui-state.service';
 import { ModelStatus } from '../../../shared/models/model.interface';
+
+/**
+ * Shape of a persisted model-form draft. Mirrors the reactive form's value
+ * so `patchValue` can restore it directly.
+ */
+interface ModelFormDraft {
+  name: string;
+  description: string;
+  status: ModelStatus;
+  parameters: {
+    distribution: string;
+    mean: number;
+    stdDev: number;
+    sampleSize: number;
+  };
+}
+
+/** Debounce interval for persisting form edits to localStorage. */
+const DRAFT_PERSIST_DEBOUNCE_MS = 300;
+
+/** Defaults used for a brand-new (create-mode) form. */
+const EMPTY_FORM_VALUE: ModelFormDraft = {
+  name: '',
+  description: '',
+  status: 'Draft',
+  parameters: {
+    distribution: 'normal',
+    mean: 0,
+    stdDev: 1.0,
+    sampleSize: 1000,
+  },
+};
+
+/**
+ * Empty baseline used when the form is "cleared" — fully-empty fields. This is
+ * the server-snapshot equivalent against which a cleared form shows no net
+ * change (so submit would be disabled from an all-empty starting state), but
+ * in edit mode it differs from the real server snapshot, so Clear correctly
+ * enables submit.
+ */
+const CLEARED_FORM_VALUE: ModelFormDraft = {
+  name: '',
+  description: '',
+  status: 'Draft',
+  parameters: {
+    distribution: '',
+    mean: null as unknown as number,
+    stdDev: null as unknown as number,
+    sampleSize: null as unknown as number,
+  },
+};
+
+/**
+ * Structural equality for plain JSON-like values (primitives, arrays, plain
+ * objects). Sufficient for comparing form values — which are exactly that.
+ * Inlined to avoid adding a dependency such as lodash.
+ */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
+    return false;
+  }
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  const ao = a as Record<string, unknown>;
+  const bo = b as Record<string, unknown>;
+  const ak = Object.keys(ao);
+  const bk = Object.keys(bo);
+  if (ak.length !== bk.length) return false;
+  for (const k of ak) {
+    if (!Object.prototype.hasOwnProperty.call(bo, k)) return false;
+    if (!deepEqual(ao[k], bo[k])) return false;
+  }
+  return true;
+}
 
 @Component({
   selector: 'app-model-form',
@@ -35,6 +118,8 @@ export class ModelFormComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly modelService = inject(ModelService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly uiState = inject(UiStateService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -55,13 +140,61 @@ export class ModelFormComponent implements OnInit {
     }),
   });
 
+  /**
+   * Baseline against which "net change" is measured. In edit mode this is the
+   * server-loaded snapshot; in create mode it is the all-empty defaults.
+   */
+  private readonly baseline = signal<ModelFormDraft>(EMPTY_FORM_VALUE);
+
+  /**
+   * Live form value as a signal so `hasNetChange` can reactively recompute.
+   * Emits synchronously on every form edit.
+   */
+  private readonly currentValue = toSignal(this.form.valueChanges, {
+    initialValue: this.form.getRawValue(),
+  });
+
+  /**
+   * Live form status as a signal. `AbstractControl.valid` is a plain getter —
+   * not a signal — so a `computed` that reads `form.valid` directly will not
+   * recompute when validity changes. Deriving from `statusChanges` makes the
+   * dependency explicit and reactive.
+   */
+  private readonly formStatus = toSignal(this.form.statusChanges, {
+    initialValue: this.form.status,
+  });
+
+  /** True when the current form value differs from the baseline (deep equality). */
+  readonly hasNetChange = computed(
+    () => !deepEqual(this.currentValue(), this.baseline()),
+  );
+
+  /** Whether the submit button is enabled. */
+  readonly canSubmit = computed(
+    () => this.formStatus() === 'VALID' && !this.saving() && this.hasNetChange(),
+  );
+
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.isEdit.set(true);
       this.modelId.set(id);
       this.loadModel(id);
+    } else {
+      // Create mode baseline is the empty defaults.
+      this.baseline.set(EMPTY_FORM_VALUE);
+      // Restore any in-progress create draft.
+      this.restoreDraft();
     }
+
+    // Persist drafts on value changes (debounced).
+    this.form.valueChanges
+      .pipe(debounceTime(DRAFT_PERSIST_DEBOUNCE_MS), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        // Skip persistence while initial edit-mode hydration is in flight.
+        if (this.loading()) return;
+        this.uiState.set<ModelFormDraft>(this.draftKey(), this.form.getRawValue() as ModelFormDraft);
+      });
   }
 
   onSubmit(): void {
@@ -85,6 +218,7 @@ export class ModelFormComponent implements OnInit {
         parameters: parsedParams,
       }).subscribe({
         next: model => {
+          this.uiState.remove(this.draftKey());
           this.snackBar.open('Model updated', 'OK', { duration: 3000 });
           this.router.navigate(['/models', model.id]);
         },
@@ -101,6 +235,7 @@ export class ModelFormComponent implements OnInit {
         parameters: parsedParams,
       }).subscribe({
         next: model => {
+          this.uiState.remove(this.draftKey());
           this.snackBar.open('Model created', 'OK', { duration: 3000 });
           this.router.navigate(['/models', model.id]);
         },
@@ -113,11 +248,42 @@ export class ModelFormComponent implements OnInit {
     }
   }
 
+  /**
+   * Cancel discards the in-progress edits (including the persisted draft) and
+   * navigates away from the form — back to the model detail in edit mode, or
+   * the list in create mode — analogously to a successful submit.
+   */
   onCancel(): void {
+    this.uiState.remove(this.draftKey());
+    this.form.reset(this.baseline());
     if (this.isEdit()) {
-      this.router.navigate(['/models', this.modelId()]);
+      this.router.navigate(['/models', this.modelId()!]);
     } else {
       this.router.navigate(['/models']);
+    }
+  }
+
+  /**
+   * Empty every field, regardless of mode. Does not persist to the server —
+   * the user must explicitly click Update/Create. In edit mode this leaves the
+   * form in a state that differs from the server baseline, so the submit
+   * button becomes enabled.
+   */
+  onClear(): void {
+    this.uiState.remove(this.draftKey());
+    this.form.reset(CLEARED_FORM_VALUE);
+    this.snackBar.open('Form cleared', 'OK', { duration: 2000 });
+  }
+
+  private draftKey(): string {
+    const id = this.modelId();
+    return id ? UI_STATE_KEYS.modelFormDraftEdit(id) : UI_STATE_KEYS.modelFormDraft;
+  }
+
+  private restoreDraft(): void {
+    const draft = this.uiState.get<ModelFormDraft | null>(this.draftKey(), null);
+    if (draft) {
+      this.form.patchValue(draft);
     }
   }
 
@@ -125,18 +291,23 @@ export class ModelFormComponent implements OnInit {
     this.loading.set(true);
     this.modelService.getModel(id).subscribe({
       next: model => {
-        this.form.patchValue({
+        const serverSnapshot: ModelFormDraft = {
           name: model.name,
           description: model.description ?? '',
           status: model.status,
-          parameters: model.parameters ? {
-            distribution: (model.parameters['distribution'] as string) ?? 'normal',
-            mean: (model.parameters['mean'] as number) ?? 0,
-            stdDev: (model.parameters['stdDev'] as number) ?? 1.0,
-            sampleSize: (model.parameters['sampleSize'] as number) ?? 1000,
-          } : undefined,
-        });
+          parameters: {
+            distribution: (model.parameters?.['distribution'] as string) ?? 'normal',
+            mean: (model.parameters?.['mean'] as number) ?? 0,
+            stdDev: (model.parameters?.['stdDev'] as number) ?? 1.0,
+            sampleSize: (model.parameters?.['sampleSize'] as number) ?? 1000,
+          },
+        };
+        this.form.patchValue(serverSnapshot);
+        // Server snapshot becomes the baseline for net-change detection.
+        this.baseline.set(serverSnapshot);
         this.loading.set(false);
+        // Apply any locally persisted edit-mode draft over the server values.
+        this.restoreDraft();
       },
       error: (err: unknown) => {
         console.error('[ModelFormComponent] Failed to load model for editing', id, err);
