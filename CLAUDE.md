@@ -18,60 +18,90 @@ The development occurs within a VS Code-based Devcontainer, as defined in `.devc
 
 ### Interaction Flow
 
+```mermaid
+flowchart LR
+    user([User])
+    ui[Angular 20 SPA]
+    api[ASP.NET Core API]
+    db[(PostgreSQL)]
+    mq{{RabbitMQ}}
+    de[Python Data Engine]
+
+    user -->|HTTPS + Bearer| ui
+    ui -->|/api/v1/* JWT| api
+    api <-->|EF Core| db
+    api -->|publish model.run.requested.v1| mq
+    mq -->|consume| de
+    de -->|publish model.run.started / completed / failed| mq
+    mq -->|MassTransit consume| api
 ```
-User → Angular SPA → (Bearer token) → ASP.NET Core API → PostgreSQL
-                                            ↓ publish
-                                        RabbitMQ
-                                            ↓ consume
-                                    (future workers)
-```
+
+The API is the system of record; the data engine is a stateless worker. All cross-service communication is either (a) Bearer-authenticated HTTP (browser → API) or (b) RabbitMQ messages keyed by `model.run.*.v1` routing keys with contracts defined in `schemas/`.
 
 ## Project Repository Structure
 
+High-level layout only — a single level of expansion per service, intentionally. Deeper structure is discoverable from the code and should not be mirrored here (it rots fast and adds no value over `ls`).
+
 ```
 /workspace
-├── api/                        # ASP.NET Core .NET 10 REST API
+├── api/                                # ASP.NET Core .NET 10 REST API
 │   ├── src/
-│   │   ├── EA.Api/             # Web API project (controllers, endpoints)
-│   │   ├── EA.Domain/          # Domain models, interfaces, value objects
-│   │   ├── EA.Infrastructure/  # EF Core DbContext, migrations, RabbitMQ integration
-│   │   └── EA.Contracts/       # Shared DTOs, message contracts, JSON schemas
+│   │   ├── EA.Api/                     # Web host: Controllers/, Auth/ handlers, Program.cs, DI wiring
+│   │   ├── EA.Domain/                  # Entities/, Enums/, repository Interfaces/
+│   │   ├── EA.Infrastructure/          # Data/ (DbContext, Configurations/, Interceptors/), Migrations/,
+│   │   │                               #   Facades/, Repositories/, Consumers/, Messaging/, Seeding/
+│   │   └── EA.Contracts/               # Shared DTOs (Models/) and RabbitMQ message records (Messages/)
 │   ├── tests/
-│   │   ├── EA.Api.Tests/            # Unit tests
-│   │   └── EA.Api.IntegrationTests/ # Testcontainers-based integration tests
-│   ├── Dockerfile              # Multi-stage: SDK build → aspnet runtime
-│   ├── Dockerfile.migrations   # EF Core migration bundle image
-│   └── EA.sln
-├── ui/                         # Angular 20 SPA
-│   ├── src/
-│   ├── Dockerfile              # Multi-stage: node build → nginx (local parity only)
-│   ├── angular.json
-│   └── package.json
-├── infra/                      # Terraform (Azure)
-│   ├── main.tf
+│   │   ├── EA.Api.Tests/               # NUnit unit tests
+│   │   └── EA.Api.IntegrationTests/    # Testcontainers (Postgres + RabbitMQ) integration tests (NUnit)
+│   ├── seed/                           # Seed data applied by the migration job
+│   ├── Dockerfile                      # Multi-stage: SDK build → aspnet runtime
+│   └── Dockerfile.migrations           # EF Core migration bundle image
+├── ui/                                 # Angular 20 SPA
+│   ├── src/app/
+│   │   ├── auth/                       # MSAL config, AuthService, BearerAuthInterceptor, guards
+│   │   ├── core/                       # App-wide services (UiStateService, theme, App Insights, HTTP)
+│   │   ├── features/                   # Feature routes (dashboard, landing, models, runs)
+│   │   ├── shared/                     # Reusable components/ and shared model interfaces
+│   │   └── environments/               # Build-time environment shims
+│   ├── e2e/                            # Playwright end-to-end tests
+│   ├── scripts/                        # generate-environment.mjs (runtime env injection)
+│   └── nginx.conf                      # Local prod-parity container only; SWA in cloud
+├── data-engine/                        # Python 3 worker service
+│   └── src/data_engine/
+│       ├── consumers/                  # pika consumers keyed to routing keys
+│       ├── producers/                  # pika publishers for run lifecycle events
+│       ├── workflows/                  # Numerical workflows (numpy / scipy)
+│       ├── models/                     # Pydantic message models
+│       ├── topology.py                 # Exchange / queue / binding declarations
+│       └── config.py                   # Settings loader
+├── schemas/                            # JSON Schema message contracts (source of truth)
+├── deploy/                             # Docker Compose local stack (compose.yaml + overrides)
+├── infra/                              # Terraform
+│   ├── bootstrap/                      # One-time bootstrap stack (remote state backend, root RG, ACR)
+│   ├── envs/                           # Per-environment tfvars (dev.tfvars, production.tfvars)
+│   ├── modules/                        # container-apps, postgres, static-web-app, container-registry,
+│   │                                   #   key-vault, observability, diagnostics, entra-external-id
+│   ├── main.tf                         # Root stack (top-level *.tf files)
 │   ├── variables.tf
 │   ├── outputs.tf
-│   ├── backend.tf
-│   └── modules/
-│       ├── container-apps/
-│       ├── postgres/
-│       ├── static-web-app/
-│       ├── container-registry/
-│       ├── key-vault/
-│       └── observability/
-├── deploy/
-│   ├── compose.yaml            # Full-stack local dev (API + Postgres + RabbitMQ + UI)
-│   └── compose.override.yaml   # Dev overrides (hot reload, debug ports)
+│   ├── locals.tf
+│   └── versions.tf
+├── docs/
+│   ├── adrs/                           # Architecture Decision Records (numbered, immutable)
+│   ├── runbooks/                       # Operational runbooks + SSO/bootstrap helper scripts
+│   ├── summaries/                      # Cross-cutting architecture summaries (observability, etc.)
+│   └── diagrams/                       # Exported architecture diagrams (png/svg/drawio)
 ├── .github/
-│   ├── workflows/
-│   │   ├── ci.yml              # Unit tests (all branches) + integration tests (main)
-│   │   ├── deploy.yml          # Selective image builds, Terraform apply, SWA deploy
-│   │   └── cleanup-acr.yml     # Prune stale ACR images on merge to main
-│   └── scripts/                # CI/CD helper scripts
-├── schemas/                    # JSON Schema message contracts (source of truth)
-├── docs/                       # Architecture decisions, runbooks, API docs
-└── CLAUDE.md                   # This file
+│   ├── workflows/                      # ci.yml, deploy.yml, cleanup-acr.yml
+│   └── scripts/                        # CI helpers (build-and-push-images.sh, build-ui.sh,
+│                                       #   run-migrations-job.sh, smoke-test.sh, clean-acr-images.sh, ...)
+├── .devcontainer/                      # VS Code devcontainer (setup-env.sh installs CLIs and deps)
+├── CLAUDE.md                           # This file — agent-facing project guide
+└── README.md                           # Human-facing executive overview
 ```
+
+Deeper structure (individual components, feature folders, migration files, etc.) is intentionally not mirrored here — it rots fast and `ls` or each service's own `README.md` is a better source.
 
 ## Technology Stack & Versions
 
