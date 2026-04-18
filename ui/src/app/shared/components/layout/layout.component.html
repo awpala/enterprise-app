@@ -5,6 +5,8 @@
   <span class="toolbar-title">Enterprise App</span>
   <span class="spacer"></span>
 
+  <app-theme-toggle></app-theme-toggle>
+
   <button mat-button [matMenuTriggerFor]="accountMenu" class="account-button">
     <mat-icon class="mr-8">account_circle</mat-icon>
     <span>{{ authService.displayName() }}</span>

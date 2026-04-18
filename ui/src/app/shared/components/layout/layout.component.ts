@@ -10,6 +10,7 @@ import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 
 import { AuthService } from '../../../auth/auth.service';
 import { UiStateService, UI_STATE_KEYS } from '../../../core/services/ui-state.service';
+import { ThemeToggleComponent } from '../theme-toggle/theme-toggle.component';
 
 /**
  * Authenticated application shell (toolbar + sidenav + content outlet).
@@ -31,6 +32,7 @@ import { UiStateService, UI_STATE_KEYS } from '../../../core/services/ui-state.s
     MatIconModule,
     MatButtonModule,
     MatMenuModule,
+    ThemeToggleComponent,
   ],
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.scss',

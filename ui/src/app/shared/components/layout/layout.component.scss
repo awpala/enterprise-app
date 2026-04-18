@@ -2,6 +2,35 @@
   position: sticky;
   top: 0;
   z-index: 1000;
+
+  // Icon-buttons inside the primary-tinted toolbar need to read against the
+  // primary surface regardless of theme. Our global binding in `styles.scss`
+  // sets `--mat-icon-button-icon-color: var(--mat-sys-on-surface-variant)` so
+  // icon-buttons elsewhere (tables, cards) stay legible — but that flips with
+  // the theme and turned the hamburger/account-menu arrows dark in dark mode
+  // against the constant primary toolbar background. Scope the override to
+  // icon-buttons inside the toolbar so they track `on-primary` unconditionally.
+  //
+  // `mat-button` (the account button) carries label text; the global
+  // `--mat-button-text-label-text-color` pins that to `on-surface`, which is
+  // similarly wrong on a primary surface. Re-pin both label and icon to
+  // `on-primary` inside the toolbar.
+  // Toolbar icon/text buttons (hamburger, account menu) must stay white in
+  // BOTH themes regardless of what Material's on-primary token resolves to
+  // under the current palette/mode. Use a literal.
+  .mat-mdc-icon-button {
+    --mat-icon-button-icon-color: #fff;
+  }
+
+  .mat-mdc-button {
+    --mat-button-text-label-text-color: #fff;
+    --mat-button-text-icon-color: #fff;
+    color: #fff;
+
+    mat-icon {
+      color: #fff;
+    }
+  }
 }
 
 .toolbar-title {
@@ -15,18 +44,70 @@
   gap: 4px;
 }
 
+// The sidenav container wraps both the drawer (<mat-sidenav>) and the content
+// pane (<mat-sidenav-content>). We let Material's component tokens
+// (--mat-sidenav-container-background-color, --mat-sidenav-content-background-color,
+// --mat-sidenav-container-text-color) drive surface colours — they're mapped
+// to the system tokens in `styles.scss` so they flip with the theme. We only
+// size it here.
 .sidenav-container {
   height: calc(100vh - 64px);
+  transition: background-color 240ms ease, color 240ms ease;
 }
 
 .sidenav {
   width: 220px;
+
+  // Nav-item hover/focus layers.
+  //
+  // Background: Material's default `mat-list-item` hover paints a near-black
+  // state-layer (tied to `on-surface`) which on the dark sidenav surface
+  // reads as a harsh black blob AND shifts the label token dark, making the
+  // text unreadable. We need a clearly visible lift in BOTH themes.
+  //
+  // Light mode: a ~25% tint of `--mat-sys-primary` paints a subtle blue wash
+  // on the lighter sidenav surface — visible without being loud.
+  //
+  // Dark mode: mixing primary into a dark surface doesn't brighten it enough
+  // (the user's prior complaint). A white-tinted state layer at ~12% opacity
+  // reads as a clean lift on the dark surface. We scope the dark override via
+  // `html:has(body.dark-theme)` so light mode keeps its primary-tinted wash.
+  //
+  // Label + icon pinned to `on-surface` under hover/focus so text stays
+  // readable over the translucent wash in both themes.
+  --mat-list-list-item-hover-state-layer-color: color-mix(in srgb, var(--mat-sys-primary) 25%, transparent);
+  --mat-list-list-item-focus-state-layer-color: color-mix(in srgb, var(--mat-sys-primary) 32%, transparent);
+  --mat-list-list-item-hover-label-text-color: var(--mat-sys-on-surface);
+  --mat-list-list-item-focus-label-text-color: var(--mat-sys-on-surface);
+  --mat-list-list-item-hover-leading-icon-color: var(--mat-sys-on-surface);
+  --mat-list-list-item-focus-leading-icon-color: var(--mat-sys-on-surface);
+}
+
+html:has(body.dark-theme) .sidenav {
+  // White-tinted wash reads far more distinctly than a primary mix on the
+  // dark sidenav surface. Focus slightly stronger than hover.
+  --mat-list-list-item-hover-state-layer-color: #ffffff;
+  --mat-list-list-item-focus-state-layer-color: #ffffff;
+  --mat-list-list-item-hover-state-layer-opacity: 0.12;
+  --mat-list-list-item-focus-state-layer-opacity: 0.18;
 }
 
 .content {
   padding: 0;
 }
 
+// Active nav item. We pair the secondary-container surface with its matching
+// on-colour so text + icon stay legible in both light and dark modes. Targets
+// the MDC inner slots because `mat-list-item` paints its label/icon through
+// nested elements; setting colour on the host alone is not enough to beat
+// Material's default `--mat-list-list-item-label-text-color` binding.
 .active-link {
-  background-color: rgba(63, 81, 181, 0.08);
+  background-color: var(--mat-sys-secondary-container);
+
+  .mdc-list-item__primary-text,
+  .mat-mdc-list-item-title,
+  .mat-mdc-list-item-unscoped-content,
+  mat-icon {
+    color: var(--mat-sys-on-secondary-container);
+  }
 }

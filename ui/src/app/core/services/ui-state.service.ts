@@ -9,6 +9,7 @@ export const UI_STATE_KEYS = {
   sidenavOpen: 'ea:ui:sidenav:open',
   modelFormDraft: 'ea:ui:model-form:draft',
   modelFormDraftEdit: (id: string) => `ea:ui:model-form:draft:${id}`,
+  theme: 'ea:ui:theme',
 } as const;
 
 /**

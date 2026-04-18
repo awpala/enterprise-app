@@ -2,18 +2,23 @@
   <div class="page-header">
     <h1 class="page-title">Runs</h1>
     <div class="header-actions">
-      <mat-form-field class="status-filter" appearance="outline" subscriptSizing="dynamic">
-        <mat-label>Status</mat-label>
-        <mat-select [value]="statusFilter()" (selectionChange)="onStatusFilterChange($event.value)">
-          @for (opt of statusOptions; track opt.label) {
-            <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
-          }
-        </mat-select>
-      </mat-form-field>
       <button mat-button (click)="refresh()">
         <mat-icon>refresh</mat-icon> Refresh
       </button>
     </div>
+  </div>
+
+  <div class="filter-bar mb-16">
+    <mat-chip-set role="group" aria-label="Status filter">
+      @for (opt of statusOptions; track opt.label) {
+        <mat-chip
+          [highlighted]="statusFilter() === opt.value"
+          [attr.aria-pressed]="statusFilter() === opt.value"
+          (click)="onStatusFilterChange(opt.value)">
+          {{ opt.label }}
+        </mat-chip>
+      }
+    </mat-chip-set>
   </div>
 
   @if (loading()) {

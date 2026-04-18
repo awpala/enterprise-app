@@ -4,14 +4,40 @@
   gap: 8px;
 }
 
-.status-filter {
-  width: 150px;
-}
-
 .error-cell {
-  color: #d32f2f;
+  color: var(--app-error);
   max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+// Filter chips — mirror the model-list filter-bar styling so the two list
+// views share a visual idiom. Token namespace note: Material 20 reads chip
+// tokens under the `--mat-chip-*` prefix; legacy `--mdc-chip-*` names are
+// no longer consumed.
+//
+// Chip variant note: plain `<mat-chip>` (not chip-option inside chip-listbox)
+// to avoid the listbox's internal selection toggle fighting our click-handler
+// early-return semantics. Active state painted by `[highlighted]`.
+.filter-bar {
+  display: flex;
+  align-items: center;
+}
+
+:host {
+  --mat-chip-elevated-container-color: var(--mat-sys-surface-container-high);
+  --mat-chip-elevated-disabled-container-color: var(--mat-sys-surface-container);
+  --mat-chip-label-text-color: var(--mat-sys-on-surface);
+  --mat-chip-with-icon-icon-color: var(--mat-sys-on-surface-variant);
+  --mat-chip-outline-color: transparent;
+  --mat-chip-outline-width: 0;
+}
+
+// Dark-mode override (background + hover/focus state layers) lives in
+// global styles.scss — see the `html:has(body.dark-theme) .filter-bar` block.
+
+.filter-bar mat-chip {
+  box-shadow: var(--mat-sys-level1);
+  cursor: pointer;
 }

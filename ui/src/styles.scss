@@ -1,3 +1,234 @@
+// -----------------------------------------------------------------------------
+// Global styles + Material 3 theming (light + dark)
+// -----------------------------------------------------------------------------
+// We drive Material 3 theming from source rather than via a prebuilt palette
+// so that light and dark modes can share a single token pipeline. `ThemeService`
+// toggles the `.dark-theme` class on `document.body`; the dark `mat.theme(...)`
+// call below is nested under `html:has(body.dark-theme)` so the emitted selector
+// is SSR-safe (Angular Material 20 warns about class selectors on `body`).
+//
+// App-level CSS custom properties (--app-*) cover chrome that isn't part of
+// Material's token set (app background, links, row hover, muted copy). Where
+// possible they defer to Material's system tokens (`--mat-sys-*`) so one change
+// flows through both layers.
+//
+// Why explicit component-token overrides?
+// `mat.theme(...)` emits only the `--mat-sys-*` system tokens (surface,
+// on-surface, primary, etc.), NOT component tokens. Material's compiled
+// component CSS references its component tokens with system-token fallbacks,
+// e.g.  `color: var(--mat-chip-label-text-color, var(--mat-sys-on-surface-variant))`.
+// For most surfaces the system fallback flips correctly between light/dark,
+// but for several surfaces (sidenav, card, table, paginator, list) Material's
+// component defaults are either unset or hardcoded to light neutrals, so we
+// bind them explicitly to system tokens so the dark flip propagates.
+//
+// IMPORTANT — Material 20 component-token namespaces.
+// In v20 all component tokens are emitted under the `--mat-*` prefix (see
+// `node_modules/@angular/material/core/tokens/_token-utils.scss`, `values()`
+// mixin), NOT `--mdc-*`. Legacy `--mdc-chip-*` / `--mdc-text-button-*` etc.
+// names are no longer read by the compiled component CSS — overrides using
+// them silently do nothing. Always target `--mat-chip-*`, `--mat-button-*`,
+// `--mat-icon-button-*` etc.
+
+@use '@angular/material' as mat;
+
+html {
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      tertiary: mat.$magenta-palette,
+    ),
+    typography: Roboto,
+    density: 0,
+  ));
+}
+
+// Use `html:has(body.dark-theme)` rather than `body.dark-theme` directly — the
+// latter trips Material 20's "SSR-incompatible class style selectors" warning
+// for selectors that target `body` from inside a `mat.theme` include.
+html:has(body.dark-theme) {
+  @include mat.theme((
+    color: (
+      theme-type: dark,
+      primary: mat.$azure-palette,
+      tertiary: mat.$magenta-palette,
+    ),
+    typography: Roboto,
+    density: 0,
+  ));
+}
+
+// ---------------------------------------------------------------------------
+// Component-token bindings
+// ---------------------------------------------------------------------------
+// Route Material component surfaces through the system tokens so light/dark
+// flips propagate. Scoped to `html` (covers both modes) because these values
+// reference `--mat-sys-*`, which `mat.theme(...)` redefines per mode.
+// ---------------------------------------------------------------------------
+html {
+  // Sidenav
+  --mat-sidenav-container-background-color: var(--mat-sys-surface);
+  --mat-sidenav-container-text-color: var(--mat-sys-on-surface);
+  --mat-sidenav-content-background-color: var(--mat-sys-background);
+  --mat-sidenav-content-text-color: var(--mat-sys-on-background);
+  --mat-sidenav-container-divider-color: var(--mat-sys-outline-variant);
+
+  // Card (filled + outlined + elevated all share the same surface slot here)
+  --mat-card-elevated-container-color: var(--mat-sys-surface-container-low);
+  --mat-card-elevated-container-elevation: var(--mat-sys-level1);
+  --mat-card-filled-container-color: var(--mat-sys-surface-container-highest);
+  --mat-card-outlined-container-color: var(--mat-sys-surface);
+  --mat-card-outlined-outline-color: var(--mat-sys-outline-variant);
+  --mat-card-subtitle-text-color: var(--mat-sys-on-surface-variant);
+  --mat-card-title-text-color: var(--mat-sys-on-surface);
+
+  // Table
+  --mat-table-background-color: var(--mat-sys-surface);
+  --mat-table-header-headline-color: var(--mat-sys-on-surface);
+  --mat-table-row-item-label-text-color: var(--mat-sys-on-surface);
+  --mat-table-row-item-outline-color: var(--mat-sys-outline-variant);
+
+  // Paginator (lives under tables; keep it in sync)
+  --mat-paginator-container-background-color: var(--mat-sys-surface);
+  --mat-paginator-container-text-color: var(--mat-sys-on-surface);
+  // Inner controls inside the paginator: page-size select trigger text,
+  // nav icons (prev/next/first/last), and the embedded form field surface.
+  --mat-paginator-select-trigger-text-color: var(--mat-sys-on-surface);
+  --mat-paginator-enabled-icon-color: var(--mat-sys-on-surface-variant);
+  --mat-paginator-disabled-icon-color: var(--mat-sys-on-surface);
+  --mat-paginator-form-field-container-background-color: var(--mat-sys-surface-container-highest);
+  --mat-paginator-form-field-container-text-color: var(--mat-sys-on-surface);
+
+  // Nav list items (inside sidenav) — keep text readable on dark surface
+  --mat-list-list-item-label-text-color: var(--mat-sys-on-surface);
+  --mat-list-list-item-supporting-text-color: var(--mat-sys-on-surface-variant);
+  --mat-list-list-item-leading-icon-color: var(--mat-sys-on-surface-variant);
+  --mat-list-list-item-trailing-supporting-text-color: var(--mat-sys-on-surface-variant);
+  --mat-list-active-indicator-color: color-mix(in srgb, var(--mat-sys-primary) 12%, transparent);
+
+  // Menu (account dropdown in the toolbar)
+  --mat-menu-container-color: var(--mat-sys-surface-container);
+  --mat-menu-item-label-text-color: var(--mat-sys-on-surface);
+  --mat-menu-item-icon-color: var(--mat-sys-on-surface-variant);
+
+  // Dialog
+  --mat-dialog-container-color: var(--mat-sys-surface-container-high);
+  --mat-dialog-headline-color: var(--mat-sys-on-surface);
+  --mat-dialog-supporting-text-color: var(--mat-sys-on-surface-variant);
+
+  // Form field — fill variant (inputs inside cards shouldn't look like light glass).
+  --mat-form-field-filled-container-color: var(--mat-sys-surface-container-highest);
+
+  // Form field — outlined variant. Material leaves many of these unbound, so
+  // the outlined mat-form-field (used e.g. for the Runs status filter) keeps
+  // a light label/text/outline in dark mode. Bind explicitly.
+  --mat-form-field-outlined-label-text-color: var(--mat-sys-on-surface-variant);
+  --mat-form-field-outlined-hover-label-text-color: var(--mat-sys-on-surface);
+  --mat-form-field-outlined-focus-label-text-color: var(--mat-sys-primary);
+  --mat-form-field-outlined-input-text-color: var(--mat-sys-on-surface);
+  --mat-form-field-outlined-input-text-placeholder-color: var(--mat-sys-on-surface-variant);
+  --mat-form-field-outlined-caret-color: var(--mat-sys-primary);
+  --mat-form-field-outlined-outline-color: var(--mat-sys-outline);
+  --mat-form-field-outlined-hover-outline-color: var(--mat-sys-on-surface);
+  --mat-form-field-outlined-focus-outline-color: var(--mat-sys-primary);
+  --mat-form-field-outlined-disabled-outline-color: var(--mat-sys-outline-variant);
+  --mat-form-field-outlined-disabled-label-text-color: var(--mat-sys-on-surface-variant);
+  --mat-form-field-outlined-disabled-input-text-color: var(--mat-sys-on-surface-variant);
+
+  // Select trigger (arrow + value text inside mat-form-field).
+  --mat-select-enabled-trigger-text-color: var(--mat-sys-on-surface);
+  --mat-select-enabled-arrow-color: var(--mat-sys-on-surface-variant);
+  --mat-select-focused-arrow-color: var(--mat-sys-primary);
+  --mat-select-placeholder-text-color: var(--mat-sys-on-surface-variant);
+
+  // MDC buttons — text / outlined / filled / icon. Material 20 reads these
+  // under the `--mat-button-*` and `--mat-icon-button-*` namespaces (the legacy
+  // `--mdc-text-button-*` / `--mdc-outlined-button-*` names aren't wired up in
+  // v20 and were silently no-op'ing in dark mode).
+  --mat-button-text-label-text-color: var(--mat-sys-on-surface);
+  --mat-button-text-disabled-label-text-color: var(--mat-sys-on-surface-variant);
+  --mat-button-outlined-label-text-color: var(--mat-sys-on-surface);
+  --mat-button-outlined-outline-color: var(--mat-sys-outline);
+  --mat-button-outlined-disabled-label-text-color: var(--mat-sys-on-surface-variant);
+  --mat-button-outlined-disabled-outline-color: var(--mat-sys-outline-variant);
+  --mat-icon-button-icon-color: var(--mat-sys-on-surface-variant);
+  --mat-icon-button-disabled-icon-color: var(--mat-sys-on-surface);
+
+  // Expansion / select / option panels
+  --mat-expansion-container-background-color: var(--mat-sys-surface);
+  --mat-expansion-container-text-color: var(--mat-sys-on-surface);
+  --mat-select-panel-background-color: var(--mat-sys-surface-container);
+  --mat-option-label-text-color: var(--mat-sys-on-surface);
+  --mat-option-selected-state-label-text-color: var(--mat-sys-on-secondary-container);
+}
+
+// ---------------------------------------------------------------------------
+// App-level tokens. These cover surfaces that Material doesn't own (outer
+// page background, link colour, hover row, muted helper copy). They default
+// to light values; the `.dark-theme` body class flips them.
+// ---------------------------------------------------------------------------
+:root {
+  --app-bg: var(--mat-sys-background, #fafafa);
+  --app-fg: var(--mat-sys-on-background, rgba(0, 0, 0, 0.87));
+  --app-fg-muted: rgba(0, 0, 0, 0.6);
+  --app-fg-faint: rgba(0, 0, 0, 0.38);
+  --app-link: var(--mat-sys-primary, #3f51b5);
+  --app-row-hover: rgba(0, 0, 0, 0.04);
+  --app-active-link-bg: color-mix(in srgb, var(--mat-sys-primary) 12%, transparent);
+  --app-surface: var(--mat-sys-surface, #ffffff);
+  --app-surface-variant: var(--mat-sys-surface-container, #f5f5f5);
+  --app-border: rgba(0, 0, 0, 0.08);
+  --app-error: var(--mat-sys-error, #d32f2f);
+}
+
+body.dark-theme {
+  --app-fg-muted: rgba(255, 255, 255, 0.7);
+  --app-fg-faint: rgba(255, 255, 255, 0.4);
+  --app-row-hover: rgba(255, 255, 255, 0.06);
+  --app-border: rgba(255, 255, 255, 0.12);
+}
+
+// ---------------------------------------------------------------------------
+// Filter chips (models + runs list views)
+// ---------------------------------------------------------------------------
+// We use plain `<mat-chip>` elements (not chip-option inside chip-listbox) so
+// our click-handler fully controls the active state via `[highlighted]`. The
+// `.mat-mdc-chip-highlighted` class Material adds on `highlighted=true` is
+// still the selected-state hook, so the `:not(.mat-mdc-chip-highlighted)`
+// exclusion below continues to preserve Material's `secondary-container` fill
+// on selected chips.
+//
+// Hover/focus state-layer: Material exposes
+//   --mat-chip-hover-state-layer-color / -opacity
+//   --mat-chip-focus-state-layer-color / -opacity
+// which paint the overlay that gives unselected chips a visible "lift" on
+// pointer-over. Material's compiled defaults resolve these to `on-surface`
+// with low opacity — in dark mode against a translucent-white chip fill,
+// adding MORE on-surface (near-white) at low opacity was subtle but workable.
+// The user called it insufficient; bump both modes to a more visible wash.
+// ---------------------------------------------------------------------------
+
+// Light mode — darken slightly on hover (use on-surface, i.e. near-black).
+html .filter-bar .mat-mdc-standard-chip:not(.mat-mdc-chip-highlighted) {
+  --mat-chip-hover-state-layer-color: var(--mat-sys-on-surface);
+  --mat-chip-hover-state-layer-opacity: 0.08;
+  --mat-chip-focus-state-layer-color: var(--mat-sys-on-surface);
+  --mat-chip-focus-state-layer-opacity: 0.12;
+}
+
+// Dark mode — explicit white wash on hover so the lift is clearly visible
+// against the translucent-white chip fill. Also re-binds the base colours
+// (background + label + icon) which Material's dark palette leaves too dim.
+html:has(body.dark-theme) .filter-bar .mat-mdc-standard-chip:not(.mat-mdc-chip-highlighted) {
+  --mat-chip-elevated-container-color: rgba(255, 255, 255, 0.14);
+  --mat-chip-label-text-color: #f5f5f5;
+  --mat-chip-with-icon-icon-color: #f5f5f5;
+  --mat-chip-hover-state-layer-color: #ffffff;
+  --mat-chip-hover-state-layer-opacity: 0.10;
+  --mat-chip-focus-state-layer-color: #ffffff;
+  --mat-chip-focus-state-layer-opacity: 0.14;
+}
+
 html, body {
   height: 100%;
   margin: 0;
@@ -7,8 +238,9 @@ html, body {
 body {
   font-family: Roboto, 'Helvetica Neue', sans-serif;
   box-sizing: border-box;
-  color: rgba(0, 0, 0, 0.87);
-  background-color: #fafafa;
+  color: var(--app-fg);
+  background-color: var(--app-bg);
+  transition: background-color 240ms ease, color 240ms ease;
 }
 
 *, *::before, *::after {
@@ -16,8 +248,9 @@ body {
 }
 
 a {
-  color: #3f51b5;
+  color: var(--app-link);
   text-decoration: none;
+  transition: color 240ms ease;
 
   &:hover {
     text-decoration: underline;
@@ -76,9 +309,10 @@ a {
 
 .clickable-row {
   cursor: pointer;
+  transition: background-color 160ms ease;
 
   &:hover {
-    background-color: rgba(0, 0, 0, 0.04);
+    background-color: var(--app-row-hover);
   }
 }
 
@@ -94,7 +328,7 @@ a {
   flex-direction: column;
   align-items: center;
   padding: 48px;
-  color: rgba(0, 0, 0, 0.54);
+  color: var(--app-fg-muted);
 
   mat-icon {
     font-size: 48px;
@@ -104,18 +338,55 @@ a {
   }
 }
 
+// Defensive cursor: pointer for interactive elements. Material sets this on
+// most components (buttons, list-items, menu-items) but theme/token overrides
+// and wrapper elements occasionally drop it. Pin it across the app so every
+// clickable affordance reads as clickable, and explicitly restore `not-allowed`
+// for the disabled state.
+button:not(:disabled),
+a[mat-list-item],
+a[mat-button],
+a[mat-flat-button],
+a[mat-stroked-button],
+a[mat-raised-button],
+a[mat-icon-button],
+.mat-mdc-menu-item:not([disabled]),
+.mat-mdc-tab,
+.mat-mdc-paginator .mat-mdc-icon-button:not(:disabled),
+.mat-mdc-select-trigger,
+.mat-mdc-option:not(.mdc-list-item--disabled),
+.mat-sort-header-container {
+  cursor: pointer;
+}
+
+button:disabled,
+.mat-mdc-menu-item[disabled],
+.mat-mdc-option.mdc-list-item--disabled {
+  cursor: not-allowed;
+}
+
+// Chip inner action — Material sets `cursor: auto` on
+// `.mdc-evolution-chip__action--presentational` (non-listbox chips), which
+// overrides inherited cursors from clickable parents. Restore pointer for
+// filter chips (clickable by our handler) and for status badges inside
+// clickable table rows.
+.filter-bar .mdc-evolution-chip__action,
+.clickable-row .mdc-evolution-chip__action {
+  cursor: pointer;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 48px;
-  color: rgba(0, 0, 0, 0.54);
+  color: var(--app-fg-muted);
 
   mat-icon {
     font-size: 48px;
     width: 48px;
     height: 48px;
     margin-bottom: 16px;
-    color: rgba(0, 0, 0, 0.26);
+    color: var(--app-fg-faint);
   }
 }

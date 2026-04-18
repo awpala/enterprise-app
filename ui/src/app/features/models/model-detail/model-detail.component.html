@@ -6,14 +6,14 @@
   } @else if (model(); as m) {
     <div class="page-header">
       <h1 class="page-title">{{ m.name }}</h1>
-      <div>
-        <button mat-button routerLink="/models">
+      <div class="header-actions">
+        <button mat-stroked-button routerLink="/models">
           <mat-icon>arrow_back</mat-icon> Back
         </button>
-        <button mat-button color="primary" [routerLink]="['/models', m.id, 'edit']">
+        <button mat-stroked-button color="primary" [routerLink]="['/models', m.id, 'edit']">
           <mat-icon>edit</mat-icon> Edit
         </button>
-        <button mat-flat-button color="accent" (click)="requestRun()"
+        <button mat-flat-button color="primary" (click)="requestRun()"
                 [disabled]="m.status === 'Archived' || runRequesting()">
           <mat-icon>play_arrow</mat-icon> Run Model
         </button>

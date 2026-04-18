@@ -55,8 +55,24 @@ export class ModelListComponent implements OnInit {
     this.loadModels();
   }
 
+  /**
+   * Filter-chip click handler. Always exactly one chip is "on":
+   *  - Click All when All is already selected → no-op.
+   *  - Click a non-All chip that is already selected → fall back to All.
+   *  - Click any other chip → select it.
+   */
   onStatusFilter(status: ModelStatus | 'All'): void {
-    this.statusFilter.set(status === 'All' ? undefined : status);
+    const current = this.statusFilter();
+    let nextFilter: ModelStatus | undefined;
+    if (status === 'All') {
+      if (current === undefined) return;
+      nextFilter = undefined;
+    } else if (current === status) {
+      nextFilter = undefined;
+    } else {
+      nextFilter = status;
+    }
+    this.statusFilter.set(nextFilter);
     this.page.set(1);
     this.loadModels();
   }

@@ -5,6 +5,11 @@ import { HistogramData } from '../../models/model-run.interface';
 /**
  * Pure presentation component that renders a pre-computed histogram
  * as responsive inline SVG with axes, labels, and hover tooltips.
+ *
+ * Theming: all stroke/fill values come from Material 3 system tokens
+ * (`--mat-sys-primary`, `--mat-sys-on-surface-variant`,
+ * `--mat-sys-outline-variant`) via CSS on the SVG elements, so the chart
+ * tracks the light/dark theme automatically without any JS wiring.
  */
 @Component({
   selector: 'app-histogram',
@@ -16,12 +21,12 @@ import { HistogramData } from '../../models/model-run.interface';
       <!-- Y axis line -->
       <line [attr.x1]="margin.left" [attr.y1]="margin.top"
             [attr.x2]="margin.left" [attr.y2]="margin.top + chartHeight"
-            stroke="rgba(0,0,0,0.2)" stroke-width="1" />
+            class="axis-line" stroke-width="1" />
 
       <!-- X axis line -->
       <line [attr.x1]="margin.left" [attr.y1]="margin.top + chartHeight"
             [attr.x2]="margin.left + chartWidth" [attr.y2]="margin.top + chartHeight"
-            stroke="rgba(0,0,0,0.2)" stroke-width="1" />
+            class="axis-line" stroke-width="1" />
 
       <!-- Y axis ticks and grid lines -->
       @for (tick of yTicks(); track tick.value) {
@@ -29,7 +34,7 @@ import { HistogramData } from '../../models/model-run.interface';
               text-anchor="end" class="axis-label">{{ tick.value }}</text>
         <line [attr.x1]="margin.left" [attr.y1]="tick.y"
               [attr.x2]="margin.left + chartWidth" [attr.y2]="tick.y"
-              stroke="rgba(0,0,0,0.05)" stroke-width="1" />
+              class="grid-line" stroke-width="1" />
       }
 
       <!-- X axis ticks -->
@@ -67,23 +72,32 @@ import { HistogramData } from '../../models/model-run.interface';
     }
 
     .bar {
-      fill: #1976d2;
+      fill: var(--mat-sys-primary);
       opacity: 0.85;
+      transition: opacity 120ms ease;
 
       &:hover {
         opacity: 1;
-        fill: #1565c0;
       }
+    }
+
+    .axis-line {
+      stroke: var(--mat-sys-outline-variant);
+    }
+
+    .grid-line {
+      stroke: var(--mat-sys-outline-variant);
+      opacity: 0.5;
     }
 
     .axis-label {
       font-size: 11px;
-      fill: rgba(0, 0, 0, 0.54);
+      fill: var(--mat-sys-on-surface-variant);
     }
 
     .axis-title {
       font-size: 12px;
-      fill: rgba(0, 0, 0, 0.6);
+      fill: var(--mat-sys-on-surface-variant);
       font-weight: 500;
     }
   `],

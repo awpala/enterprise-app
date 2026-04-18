@@ -1,5 +1,5 @@
 .error-cell {
-  color: #d32f2f;
+  color: var(--app-error);
   max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;

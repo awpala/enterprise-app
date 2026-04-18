@@ -7,15 +7,16 @@
   </div>
 
   <div class="filter-bar mb-16">
-    <mat-chip-listbox aria-label="Status filter">
+    <mat-chip-set role="group" aria-label="Status filter">
       @for (status of statusOptions; track status) {
-        <mat-chip-option
-          [selected]="status === 'All' ? !statusFilter() : statusFilter() === status"
+        <mat-chip
+          [highlighted]="status === 'All' ? !statusFilter() : statusFilter() === status"
+          [attr.aria-pressed]="status === 'All' ? !statusFilter() : statusFilter() === status"
           (click)="onStatusFilter(status)">
           {{ status }}
-        </mat-chip-option>
+        </mat-chip>
       }
-    </mat-chip-listbox>
+    </mat-chip-set>
   </div>
 
   @if (loading()) {
