@@ -189,6 +189,68 @@ describe('ModelFormComponent', () => {
   // ---- edit mode net change -----------------------------------------------
 
   describe('edit mode — net change with deep equality', () => {
+    it('canSubmit flips to true after async server load + edit (mimics real HTTP)', () => {
+      const server = makeModel();
+      const load$ = new Subject<Model>();
+      const modelService = createModelServiceSpy({
+        getModel: vi.fn().mockReturnValue(load$.asObservable()),
+      });
+      configureBed({ routeId: 'model-123', modelService });
+      const fixture = TestBed.createComponent(ModelFormComponent);
+      fixture.detectChanges();
+      const cmp = fixture.componentInstance;
+
+      // Still loading — baseline is whatever the constructor set.
+      expect(cmp.loading()).toBe(true);
+
+      // Async server response arrives.
+      load$.next(server);
+      load$.complete();
+      fixture.detectChanges();
+
+      expect(cmp.loading()).toBe(false);
+      expect(cmp.form.valid).toBe(true);
+      expect(cmp.hasNetChange()).toBe(false);
+      expect(cmp.canSubmit()).toBe(false);
+
+      // User edits a field after async hydration completes.
+      cmp.form.controls.name.setValue('Renamed after async load');
+      expect(cmp.hasNetChange()).toBe(true);
+      expect(cmp.canSubmit()).toBe(true);
+    });
+
+    it('canSubmit flips to true after any valid edit (Update button active)', () => {
+      const server = makeModel();
+      const modelService = createModelServiceSpy({
+        getModel: vi.fn().mockReturnValue(of(server)),
+      });
+      configureBed({ routeId: 'model-123', modelService });
+      const fixture = TestBed.createComponent(ModelFormComponent);
+      fixture.detectChanges();
+      const cmp = fixture.componentInstance;
+
+      // Baseline invariants after load.
+      expect(cmp.isEdit()).toBe(true);
+      expect(cmp.form.valid).toBe(true);
+      expect(cmp.hasNetChange()).toBe(false);
+      expect(cmp.canSubmit()).toBe(false);
+
+      // Edit a top-level field → Update becomes active.
+      cmp.form.controls.name.setValue('Renamed');
+      expect(cmp.hasNetChange()).toBe(true);
+      expect(cmp.form.valid).toBe(true);
+      expect(cmp.canSubmit()).toBe(true);
+
+      // Revert → Update becomes inactive again.
+      cmp.form.controls.name.setValue(server.name);
+      expect(cmp.hasNetChange()).toBe(false);
+      expect(cmp.canSubmit()).toBe(false);
+
+      // Edit a nested parameter → Update becomes active again.
+      cmp.form.controls.parameters.controls.mean.setValue(999);
+      expect(cmp.canSubmit()).toBe(true);
+    });
+
     it('initially hasNetChange=false after load; changes to true on edit; back to false on revert (including nested parameters)', () => {
       const server = makeModel();
       const modelService = createModelServiceSpy({
@@ -208,6 +270,181 @@ describe('ModelFormComponent', () => {
       // Revert back to exact original — hasNetChange returns to false.
       cmp.form.controls.parameters.controls.mean.setValue(server.parameters!['mean'] as number);
       expect(cmp.hasNetChange()).toBe(false);
+    });
+  });
+
+  // ---- canSubmit audit (edit mode) ---------------------------------------
+
+  describe('canSubmit audit — edit mode Update button', () => {
+    it('starts disabled, enables on name edit, disables on revert', () => {
+      const server = makeModel();
+      const modelService = createModelServiceSpy({
+        getModel: vi.fn().mockReturnValue(of(server)),
+      });
+      configureBed({ routeId: 'model-123', modelService });
+      const fixture = TestBed.createComponent(ModelFormComponent);
+      fixture.detectChanges();
+      const cmp = fixture.componentInstance;
+
+      expect(cmp.canSubmit()).toBe(false);
+
+      cmp.form.controls.name.setValue('Changed');
+      expect(cmp.canSubmit()).toBe(true);
+
+      cmp.form.controls.name.setValue(server.name);
+      expect(cmp.canSubmit()).toBe(false);
+    });
+
+    it('enables on description edit', () => {
+      const server = makeModel();
+      const modelService = createModelServiceSpy({
+        getModel: vi.fn().mockReturnValue(of(server)),
+      });
+      configureBed({ routeId: 'model-123', modelService });
+      const fixture = TestBed.createComponent(ModelFormComponent);
+      fixture.detectChanges();
+      const cmp = fixture.componentInstance;
+
+      cmp.form.controls.description.setValue('New description');
+      expect(cmp.canSubmit()).toBe(true);
+    });
+
+    it('enables on status edit', () => {
+      const server = makeModel({ status: 'Active' });
+      const modelService = createModelServiceSpy({
+        getModel: vi.fn().mockReturnValue(of(server)),
+      });
+      configureBed({ routeId: 'model-123', modelService });
+      const fixture = TestBed.createComponent(ModelFormComponent);
+      fixture.detectChanges();
+      const cmp = fixture.componentInstance;
+
+      cmp.form.controls.status.setValue('Archived');
+      expect(cmp.canSubmit()).toBe(true);
+    });
+
+    it('enables on nested parameter edits (distribution/mean/stdDev/sampleSize)', () => {
+      const server = makeModel();
+      const modelService = createModelServiceSpy({
+        getModel: vi.fn().mockReturnValue(of(server)),
+      });
+      configureBed({ routeId: 'model-123', modelService });
+      const fixture = TestBed.createComponent(ModelFormComponent);
+      fixture.detectChanges();
+      const cmp = fixture.componentInstance;
+
+      cmp.form.controls.parameters.controls.distribution.setValue('uniform');
+      expect(cmp.canSubmit()).toBe(true);
+      cmp.form.controls.parameters.controls.distribution.setValue(
+        server.parameters!['distribution'] as string,
+      );
+      expect(cmp.canSubmit()).toBe(false);
+
+      cmp.form.controls.parameters.controls.mean.setValue(999);
+      expect(cmp.canSubmit()).toBe(true);
+      cmp.form.controls.parameters.controls.mean.setValue(
+        server.parameters!['mean'] as number,
+      );
+      expect(cmp.canSubmit()).toBe(false);
+
+      cmp.form.controls.parameters.controls.stdDev.setValue(42);
+      expect(cmp.canSubmit()).toBe(true);
+      cmp.form.controls.parameters.controls.stdDev.setValue(
+        server.parameters!['stdDev'] as number,
+      );
+      expect(cmp.canSubmit()).toBe(false);
+
+      cmp.form.controls.parameters.controls.sampleSize.setValue(123);
+      expect(cmp.canSubmit()).toBe(true);
+    });
+
+    it('stays disabled when saving flag is true even if form is dirty and valid', () => {
+      const server = makeModel();
+      const modelService = createModelServiceSpy({
+        getModel: vi.fn().mockReturnValue(of(server)),
+      });
+      configureBed({ routeId: 'model-123', modelService });
+      const fixture = TestBed.createComponent(ModelFormComponent);
+      fixture.detectChanges();
+      const cmp = fixture.componentInstance;
+
+      cmp.form.controls.name.setValue('Changed');
+      expect(cmp.canSubmit()).toBe(true);
+      cmp.saving.set(true);
+      expect(cmp.canSubmit()).toBe(false);
+    });
+
+    it('stays disabled when form becomes invalid (required field cleared)', () => {
+      const server = makeModel();
+      const modelService = createModelServiceSpy({
+        getModel: vi.fn().mockReturnValue(of(server)),
+      });
+      configureBed({ routeId: 'model-123', modelService });
+      const fixture = TestBed.createComponent(ModelFormComponent);
+      fixture.detectChanges();
+      const cmp = fixture.componentInstance;
+
+      cmp.form.controls.name.setValue('');
+      expect(cmp.form.valid).toBe(false);
+      expect(cmp.canSubmit()).toBe(false);
+    });
+
+    it('activates after async HTTP hydration then user edit (browser-realistic timing)', () => {
+      const server = makeModel();
+      const load$ = new Subject<Model>();
+      const modelService = createModelServiceSpy({
+        getModel: vi.fn().mockReturnValue(load$.asObservable()),
+      });
+      configureBed({ routeId: 'model-123', modelService });
+      const fixture = TestBed.createComponent(ModelFormComponent);
+      fixture.detectChanges();
+      const cmp = fixture.componentInstance;
+
+      // While loading, form is not rendered and canSubmit is trivially false.
+      expect(cmp.loading()).toBe(true);
+      expect(cmp.canSubmit()).toBe(false);
+
+      // Async server emission completes hydration.
+      load$.next(server);
+      load$.complete();
+      fixture.detectChanges();
+
+      expect(cmp.loading()).toBe(false);
+      expect(cmp.canSubmit()).toBe(false);
+
+      cmp.form.controls.name.setValue('After async load');
+      expect(cmp.canSubmit()).toBe(true);
+    });
+
+    it('activates when a persisted edit-mode draft is restored over the server snapshot', () => {
+      const server = makeModel();
+      const draft = {
+        name: 'Draft override',
+        description: server.description,
+        status: server.status,
+        parameters: {
+          distribution: 'uniform',
+          mean: 99,
+          stdDev: 1,
+          sampleSize: 200,
+        },
+      };
+      localStorage.setItem(
+        UI_STATE_KEYS.modelFormDraftEdit('model-123'),
+        JSON.stringify(draft),
+      );
+      const modelService = createModelServiceSpy({
+        getModel: vi.fn().mockReturnValue(of(server)),
+      });
+      configureBed({ routeId: 'model-123', modelService });
+      const fixture = TestBed.createComponent(ModelFormComponent);
+      fixture.detectChanges();
+      const cmp = fixture.componentInstance;
+
+      // Draft is restored AFTER server hydration, so form != baseline.
+      expect(cmp.form.controls.name.value).toBe('Draft override');
+      expect(cmp.hasNetChange()).toBe(true);
+      expect(cmp.canSubmit()).toBe(true);
     });
   });
 

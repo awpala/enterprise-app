@@ -164,15 +164,39 @@ export class ModelFormComponent implements OnInit {
     initialValue: this.form.status,
   });
 
-  /** True when the current form value differs from the baseline (deep equality). */
+  /**
+   * True when the current form value differs from the baseline (deep equality).
+   * This catches the revert-to-original case so the Update button disables
+   * again when the user manually reverts their edits.
+   */
   readonly hasNetChange = computed(
     () => !deepEqual(this.currentValue(), this.baseline()),
   );
 
-  /** Whether the submit button is enabled. */
-  readonly canSubmit = computed(
-    () => this.formStatus() === 'VALID' && !this.saving() && this.hasNetChange(),
-  );
+  /**
+   * Whether the submit button is enabled.
+   *
+   * Gate:
+   *  - Form must be VALID (required + range validators pass).
+   *  - Not currently saving.
+   *  - Either `hasNetChange` (deep-equal check) OR the form has been touched
+   *    since baseline was set (Angular's built-in dirty tracking via
+   *    `markAsPristine()` calls in `loadModel` / `onClear` / `onCancel`).
+   *
+   * The dirty-OR-netchange union is deliberate: deep-equal alone is brittle
+   * against object-reference subtleties across async HTTP hydration, so we
+   * accept Angular's dirty signal as a second, canonical indicator of user
+   * intent. The deep-equal branch still lets users revert edits to disable
+   * Update, which pure dirty-tracking can't do on its own.
+   */
+  readonly canSubmit = computed(() => {
+    // Read currentValue so this computed recomputes on every valueChanges
+    // emission — `form.dirty` is a plain getter, not a signal.
+    this.currentValue();
+    return this.formStatus() === 'VALID'
+      && !this.saving()
+      && (this.form.dirty || this.hasNetChange());
+  });
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -186,8 +210,12 @@ export class ModelFormComponent implements OnInit {
       // and required-field validators gate submit until the user fills them.
       this.form.reset(CLEARED_FORM_VALUE);
       this.baseline.set(CLEARED_FORM_VALUE);
+      this.form.markAsPristine();
       // Restore any in-progress create draft.
       this.restoreDraft();
+      if (this.hasNetChange()) {
+        this.form.markAsDirty();
+      }
     }
 
     // Persist drafts on value changes (debounced).
@@ -259,6 +287,7 @@ export class ModelFormComponent implements OnInit {
   onCancel(): void {
     this.uiState.remove(this.draftKey());
     this.form.reset(this.baseline());
+    this.form.markAsPristine();
     if (this.isEdit()) {
       this.router.navigate(['/models', this.modelId()!]);
     } else {
@@ -275,6 +304,13 @@ export class ModelFormComponent implements OnInit {
   onClear(): void {
     this.uiState.remove(this.draftKey());
     this.form.reset(CLEARED_FORM_VALUE);
+    // In edit mode, clearing differs from the server baseline so the form is
+    // dirty; in create mode it matches the cleared baseline and stays pristine.
+    if (this.isEdit()) {
+      this.form.markAsDirty();
+    } else {
+      this.form.markAsPristine();
+    }
     this.snackBar.open('Form cleared', 'OK', { duration: 2000 });
   }
 
@@ -308,9 +344,18 @@ export class ModelFormComponent implements OnInit {
         this.form.patchValue(serverSnapshot);
         // Server snapshot becomes the baseline for net-change detection.
         this.baseline.set(serverSnapshot);
+        // `form.dirty` is managed manually — clear it now that the form
+        // matches the server snapshot. Subsequent user edits will flip it
+        // back to dirty, which `canSubmit` reads.
+        this.form.markAsPristine();
         this.loading.set(false);
         // Apply any locally persisted edit-mode draft over the server values.
         this.restoreDraft();
+        // If a draft was restored, the form differs from baseline → mark dirty
+        // so the Update button activates.
+        if (this.hasNetChange()) {
+          this.form.markAsDirty();
+        }
       },
       error: (err: unknown) => {
         console.error('[ModelFormComponent] Failed to load model for editing', id, err);
