@@ -38,6 +38,6 @@ allow_dev_auth = false
 # --- Guest-mode failsafe -------------------------------------------------
 # Prod-only demo/prospecting affordance. Surfaces AzureAd__AllowGuest=true
 # on the API container so a synthetic sentinel guest principal (full r/w,
-# no CIAM, no scope-down) is honoured. Paired with ENABLE_GUEST_AUTH=true
+# no CIAM, no scope-down) is honored. Paired with ENABLE_GUEST_AUTH=true
 # on the UI build (set in .github/workflows/deploy.yml on main).
 allow_guest_auth = true

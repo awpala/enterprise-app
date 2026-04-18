@@ -124,7 +124,7 @@ variable "allow_dev_auth" {
 
 #-------------------------------------------------------------------------
 # Guest-mode failsafe — surfaced to the API as AzureAd__AllowGuest. When
-# true, the API honours a synthetic sentinel guest principal (full r/w,
+# true, the API honors a synthetic sentinel guest principal (full r/w,
 # no CIAM, no scope-down). Prod-only demo/prospecting affordance.
 #-------------------------------------------------------------------------
 variable "allow_guest_auth" {

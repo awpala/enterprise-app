@@ -28,7 +28,7 @@ _DISTRIBUTION_GENERATORS: dict[str, Any] = {
 
 
 class UnsupportedDistributionError(Exception):
-    """Raised when the requested distribution is not recognised."""
+    """Raised when the requested distribution is not recognized."""
 
 
 def compute_metrics(parameters: dict[str, Any]) -> tuple[list[MetricResult], ResultSummary, HistogramData]:
