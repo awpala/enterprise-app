@@ -181,8 +181,11 @@ export class ModelFormComponent implements OnInit {
       this.modelId.set(id);
       this.loadModel(id);
     } else {
-      // Create mode baseline is the empty defaults.
-      this.baseline.set(EMPTY_FORM_VALUE);
+      // Create mode: start with fully-empty fields (no prepopulated parameter
+      // defaults). Baseline matches so `hasNetChange` is false on initial load
+      // and required-field validators gate submit until the user fills them.
+      this.form.reset(CLEARED_FORM_VALUE);
+      this.baseline.set(CLEARED_FORM_VALUE);
       // Restore any in-progress create draft.
       this.restoreDraft();
     }

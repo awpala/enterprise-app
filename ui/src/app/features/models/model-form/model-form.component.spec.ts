@@ -91,27 +91,39 @@ describe('ModelFormComponent', () => {
   // ---- canSubmit gating (create mode) -------------------------------------
 
   describe('create mode — net change gating', () => {
-    it('canSubmit is false initially (empty form matches empty baseline)', () => {
+    it('canSubmit is false initially (empty cleared form matches empty baseline)', () => {
       configureBed();
       const fixture = TestBed.createComponent(ModelFormComponent);
       fixture.detectChanges();
       const cmp = fixture.componentInstance;
 
-      // Form starts valid (defaults satisfy validators) but hasNetChange is false
-      // because baseline === defaults in create mode.
+      // Form starts fully empty (no prepopulated parameter defaults) and the
+      // baseline matches — hasNetChange is false; form is also invalid
+      // because required fields are empty.
       expect(cmp.hasNetChange()).toBe(false);
+      expect(cmp.form.valid).toBe(false);
       expect(cmp.canSubmit()).toBe(false);
     });
 
-    it('canSubmit becomes true after typing into name', () => {
+    it('canSubmit becomes true after filling all required fields', () => {
       configureBed();
       const fixture = TestBed.createComponent(ModelFormComponent);
       fixture.detectChanges();
       const cmp = fixture.componentInstance;
 
+      // Typing just the name is not enough — parameter fields are empty and
+      // their Validators.required blocks submit.
       cmp.form.controls.name.setValue('My new model');
-
       expect(cmp.hasNetChange()).toBe(true);
+      expect(cmp.form.valid).toBe(false);
+      expect(cmp.canSubmit()).toBe(false);
+
+      // Fill the rest so the form becomes valid.
+      cmp.form.controls.parameters.controls.distribution.setValue('normal');
+      cmp.form.controls.parameters.controls.mean.setValue(0);
+      cmp.form.controls.parameters.controls.stdDev.setValue(1);
+      cmp.form.controls.parameters.controls.sampleSize.setValue(1000);
+
       expect(cmp.form.valid).toBe(true);
       expect(cmp.canSubmit()).toBe(true);
     });
@@ -140,9 +152,9 @@ describe('ModelFormComponent', () => {
       expect(v.parameters.mean).toBeNull();
       expect(v.parameters.stdDev).toBeNull();
       expect(v.parameters.sampleSize).toBeNull();
-      // Cleared form is NOT equal to the empty-defaults baseline (nulls vs 0/1/1000),
-      // so it DOES differ from baseline in create mode too — submit would gate on
-      // form.valid instead. The important invariant is that draft is removed.
+      // Create-mode baseline is the cleared form, so onClear matches baseline
+      // → hasNetChange is false; draft is removed.
+      expect(cmp.hasNetChange()).toBe(false);
       expect(ui.get(UI_STATE_KEYS.modelFormDraft, 'absent')).toBe('absent');
     });
 
@@ -394,6 +406,12 @@ describe('ModelFormComponent', () => {
       const ui = TestBed.inject(UiStateService);
 
       cmp.form.controls.name.setValue('A new model');
+      // Fill parameter fields since create mode now starts with empty values
+      // and onSubmit() early-returns on form.invalid.
+      cmp.form.controls.parameters.controls.distribution.setValue('normal');
+      cmp.form.controls.parameters.controls.mean.setValue(0);
+      cmp.form.controls.parameters.controls.stdDev.setValue(1);
+      cmp.form.controls.parameters.controls.sampleSize.setValue(1000);
       ui.set(UI_STATE_KEYS.modelFormDraft, { name: 'A new model' });
 
       cmp.onSubmit();
