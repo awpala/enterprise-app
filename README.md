@@ -1,6 +1,6 @@
 # Enterprise App
 
-A Docker-first, event-driven enterprise demo application organised around a generic "model" domain. The system showcases enterprise-grade patterns end to end: SSO with Microsoft Entra ID, async job processing over RabbitMQ, first-class observability, EF Core migrations, and a repeatable Terraform-driven deployment to Azure Container Apps and Static Web Apps.
+A Docker-first, event-driven enterprise demo application organized around a generic "model" domain. The system showcases enterprise-grade patterns end to end: SSO with Microsoft Entra ID, async job processing over RabbitMQ, first-class observability, EF Core migrations, and a repeatable Terraform-driven deployment to Azure Container Apps and Static Web Apps.
 
 See [`CLAUDE.md`](./CLAUDE.md) for the authoritative stack versions, conventions, and deployment pipeline reference.
 
