@@ -50,6 +50,7 @@
         "anthropic.claude-code",
         "docker.docker",
         "tamasfe.even-better-toml",
+        "bierner.markdown-mermaid",
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash",
