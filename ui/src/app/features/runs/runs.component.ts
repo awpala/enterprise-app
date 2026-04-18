@@ -12,6 +12,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { DatePipe } from '@angular/common';
 import { interval, filter, switchMap, tap } from 'rxjs';
 import { ModelRunService } from '../../core/services/model-run.service';
+import { UiStateService, UI_STATE_KEYS } from '../../core/services/ui-state.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { ModelRunStatus, RunSummary } from '../../shared/models/model-run.interface';
 
@@ -42,13 +43,14 @@ export class RunsComponent implements OnInit {
   private readonly modelRunService = inject(ModelRunService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly uiState = inject(UiStateService);
 
   readonly loading = signal(true);
   readonly runs = signal<RunSummary[]>([]);
   readonly totalCount = signal(0);
   readonly page = signal(1);
-  readonly pageSize = signal(20);
-  readonly statusFilter = signal<ModelRunStatus | undefined>(undefined);
+  readonly pageSize = this.uiState.signalFor<number>(UI_STATE_KEYS.runsTablePageSize, 20);
+  readonly statusFilter = this.uiState.signalFor<ModelRunStatus | undefined>(UI_STATE_KEYS.runsTableFilter, undefined);
   readonly batchRequesting = signal(false);
 
   readonly displayedColumns = ['status', 'modelName', 'requestedAtUtc', 'startedAtUtc', 'completedAtUtc', 'errorMessage'];

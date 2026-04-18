@@ -22,6 +22,11 @@ describe('UiStateService', () => {
       expect(UI_STATE_KEYS.sidenavOpen).toBe('ea:ui:sidenav:open');
       expect(UI_STATE_KEYS.modelFormDraft).toBe('ea:ui:model-form:draft');
       expect(UI_STATE_KEYS.modelFormDraftEdit('abc')).toBe('ea:ui:model-form:draft:abc');
+      expect(UI_STATE_KEYS.theme).toBe('ea:ui:theme');
+      expect(UI_STATE_KEYS.modelsTableFilter).toBe('ea:ui:models-table:filter');
+      expect(UI_STATE_KEYS.modelsTablePageSize).toBe('ea:ui:models-table:page-size');
+      expect(UI_STATE_KEYS.runsTableFilter).toBe('ea:ui:runs-table:filter');
+      expect(UI_STATE_KEYS.runsTablePageSize).toBe('ea:ui:runs-table:page-size');
     });
   });
 

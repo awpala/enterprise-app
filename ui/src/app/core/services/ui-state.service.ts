@@ -10,6 +10,10 @@ export const UI_STATE_KEYS = {
   modelFormDraft: 'ea:ui:model-form:draft',
   modelFormDraftEdit: (id: string) => `ea:ui:model-form:draft:${id}`,
   theme: 'ea:ui:theme',
+  modelsTableFilter: 'ea:ui:models-table:filter',
+  modelsTablePageSize: 'ea:ui:models-table:page-size',
+  runsTableFilter: 'ea:ui:runs-table:filter',
+  runsTablePageSize: 'ea:ui:runs-table:page-size',
 } as const;
 
 /**
