@@ -7,9 +7,19 @@
   align-items: center;
   padding: 8px 0;
   border-bottom: 1px solid var(--app-border);
+  min-width: 0;
 
   &:last-child {
     border-bottom: none;
+  }
+
+  // Value slot (every non-label child): take remaining width and wrap long
+  // unbreakable tokens like emails so they stay inside the card.
+  > :not(.label) {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }
 

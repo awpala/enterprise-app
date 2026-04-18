@@ -3,6 +3,14 @@
   top: 0;
   z-index: 1000;
 
+  // Pin toolbar background to the azure palette's tone-40 primary (the light
+  // theme primary) in BOTH themes so the top bar reads identically on every
+  // view regardless of theme or Material's palette flips.
+  --mat-toolbar-container-background-color: #005cbb;
+  --mat-toolbar-container-text-color: #ffffff;
+  background-color: #005cbb;
+  color: #ffffff;
+
   // Icon-buttons inside the primary-tinted toolbar need to read against the
   // primary surface regardless of theme. Our global binding in `styles.scss`
   // sets `--mat-icon-button-icon-color: var(--mat-sys-on-surface-variant)` so
@@ -58,6 +66,24 @@
 .sidenav {
   width: 220px;
 
+  // Kill the rounded top-right / bottom-right corners the drawer inherits from
+  // `--mat-sidenav-container-shape` (M3 default is a large radius).
+  --mat-sidenav-container-shape: 0;
+  border-radius: 0;
+
+  // Rectangular nav items (no pill rounding) in both resting and active states.
+  // `--mat-list-active-indicator-shape` defaults to `--mat-sys-corner-full`
+  // which paints the hover/active state as a pill — pin it to 0 alongside
+  // the resting container shape.
+  --mat-list-list-item-container-shape: 0;
+  --mat-list-active-indicator-shape: 0;
+
+  .mat-mdc-list-item,
+  .mdc-list-item,
+  .mat-mdc-list-item.mdc-list-item--activated {
+    border-radius: 0;
+  }
+
   // Nav-item hover/focus layers.
   //
   // Background: Material's default `mat-list-item` hover paints a near-black
@@ -103,6 +129,7 @@ html:has(body.dark-theme) .sidenav {
 // Material's default `--mat-list-list-item-label-text-color` binding.
 .active-link {
   background-color: var(--mat-sys-secondary-container);
+  border-radius: 0;
 
   .mdc-list-item__primary-text,
   .mat-mdc-list-item-title,
