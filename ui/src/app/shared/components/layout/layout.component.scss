@@ -57,7 +57,7 @@
 // The sidenav container wraps both the drawer (<mat-sidenav>) and the content
 // pane (<mat-sidenav-content>). We let Material's component tokens
 // (--mat-sidenav-container-background-color, --mat-sidenav-content-background-color,
-// --mat-sidenav-container-text-color) drive surface colours — they're mapped
+// --mat-sidenav-container-text-color) drive surface colors — they're mapped
 // to the system tokens in `styles.scss` so they flip with the theme. We only
 // size it here.
 .sidenav-container {
@@ -125,9 +125,9 @@ html:has(body.dark-theme) .sidenav {
 }
 
 // Active nav item. We pair the secondary-container surface with its matching
-// on-colour so text + icon stay legible in both light and dark modes. Targets
+// on-color so text + icon stay legible in both light and dark modes. Targets
 // the MDC inner slots because `mat-list-item` paints its label/icon through
-// nested elements; setting colour on the host alone is not enough to beat
+// nested elements; setting color on the host alone is not enough to beat
 // Material's default `--mat-list-list-item-label-text-color` binding.
 .active-link {
   background-color: var(--mat-sys-secondary-container);

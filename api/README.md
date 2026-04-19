@@ -68,5 +68,5 @@ Integration tests spin up real Postgres and RabbitMQ containers per run — requ
 ## Gotchas
 
 - **Don't skip the outbox.** Calling `IBus.Publish` outside an EF transaction bypasses the outbox guarantees. Use `IPublishEndpoint` within a UoW.
-- **`audit_events.details` is `jsonb`.** Migration `20260417182133_ChangeAuditDetailsToJsonDocument` moved this from text to `JsonDocument`; serialise with `JsonSerializer.SerializeToDocument` to avoid double-encoding.
+- **`audit_events.details` is `jsonb`.** Migration `20260417182133_ChangeAuditDetailsToJsonDocument` moved this from text to `JsonDocument`; serialize with `JsonSerializer.SerializeToDocument` to avoid double-encoding.
 - **Seed data runs via `SeedHostedService`.** It's idempotent but only executes in `Development`.

@@ -23,6 +23,7 @@ You are the code review specialist. You review all changes for correctness, cons
 
 ### All Code
 - [ ] Follows naming conventions from `CLAUDE.md`
+- [ ] American English spelling and grammar in all code, comments, and documentation (e.g., `color` not `colour`, `behavior` not `behaviour`, `initialize` not `initialise`, `serialize` not `serialise`)
 - [ ] No hardcoded secrets, connection strings, or credentials
 - [ ] No `TODO` without a linked issue
 - [ ] Appropriate error handling (not swallowed, not overly broad catches)

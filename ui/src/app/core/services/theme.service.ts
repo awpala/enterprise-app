@@ -3,7 +3,7 @@ import { effect, inject, Injectable } from '@angular/core';
 
 import { UI_STATE_KEYS, UiStateService } from './ui-state.service';
 
-/** Supported colour schemes for the application shell. */
+/** Supported color schemes for the application shell. */
 export type Theme = 'light' | 'dark';
 
 /** CSS class applied to `document.body` when dark mode is active. */

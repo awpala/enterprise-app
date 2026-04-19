@@ -18,7 +18,7 @@ import { MatChipsModule } from '@angular/material/chips';
   // Token namespace note: Material 20 reads `--mat-chip-*` (NOT `--mdc-chip-*`).
   // A `highlighted` chip reads its background from
   // `--mat-chip-elevated-selected-container-color`, so bind that. The label
-  // colour defaults to `--mat-chip-selected-label-text-color` (M3 fallback
+  // color defaults to `--mat-chip-selected-label-text-color` (M3 fallback
   // `on-secondary-container`) which would conflict with these pastel fills
   // in dark mode; pin it to a dark neutral so the status text stays legible
   // on the fixed pastel backgrounds in both themes.

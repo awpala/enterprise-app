@@ -17,7 +17,7 @@ Dev-only: `pytest` + `pytest-cov` for tests, `ruff` for lint, `pyright` (standar
 
 ## Architectural Patterns
 
-- **Topology-first wiring.** `topology.py` declares exchanges, queues, routing keys, and DLQ bindings in one place; `main.py` constructs the runtime from it. Adding a new message type is a localised edit, not a scavenger hunt.
+- **Topology-first wiring.** `topology.py` declares exchanges, queues, routing keys, and DLQ bindings in one place; `main.py` constructs the runtime from it. Adding a new message type is a localized edit, not a scavenger hunt.
 - **Consumer / workflow / producer split.**
   - `consumers/` — pika plumbing (ack, nack, retry, DLQ).
   - `workflows/` — pure functions over validated Pydantic models. Easy to unit-test without a broker.
@@ -59,6 +59,6 @@ Tests under `tests/` target the `workflows/` layer directly without a broker. Co
 
 ## Gotchas
 
-- **Prefetch matters.** pika consumers set a bounded prefetch so a single slow run doesn't starve the other queues. Don't raise it without thinking about DLQ behaviour.
+- **Prefetch matters.** pika consumers set a bounded prefetch so a single slow run doesn't starve the other queues. Don't raise it without thinking about DLQ behavior.
 - **At-least-once, not exactly-once.** Workflows must be idempotent with respect to `messageId` / `correlationId`. The API side reconciles by run ID.
 - **Azure Monitor exporter needs `APPLICATIONINSIGHTS_CONNECTION_STRING`.** Absent in local dev — the engine falls back to stdout logging.
