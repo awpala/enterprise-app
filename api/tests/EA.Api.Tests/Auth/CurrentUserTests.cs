@@ -56,7 +56,7 @@ public class CurrentUserTests
     private static ClaimsPrincipal BuildPrincipal(bool isAuthenticated, params Claim[] claims)
     {
         // A ClaimsIdentity is authenticated iff its AuthenticationType is non-null
-        // and non-empty. Supplying "Test" mirrors the behaviour of any real
+        // and non-empty. Supplying "Test" mirrors the behavior of any real
         // handler-minted identity; passing null models an anonymous request.
         var identity = isAuthenticated
             ? new ClaimsIdentity(claims, authenticationType: "Test")

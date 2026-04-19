@@ -164,7 +164,7 @@ html {
 
 // ---------------------------------------------------------------------------
 // App-level tokens. These cover surfaces that Material doesn't own (outer
-// page background, link colour, hover row, muted helper copy). They default
+// page background, link color, hover row, muted helper copy). They default
 // to light values; the `.dark-theme` body class flips them.
 // ---------------------------------------------------------------------------
 :root {
@@ -217,7 +217,7 @@ html .filter-bar .mat-mdc-standard-chip:not(.mat-mdc-chip-highlighted) {
 }
 
 // Dark mode — explicit white wash on hover so the lift is clearly visible
-// against the translucent-white chip fill. Also re-binds the base colours
+// against the translucent-white chip fill. Also re-binds the base colors
 // (background + label + icon) which Material's dark palette leaves too dim.
 html:has(body.dark-theme) .filter-bar .mat-mdc-standard-chip:not(.mat-mdc-chip-highlighted) {
   --mat-chip-elevated-container-color: rgba(255, 255, 255, 0.14);

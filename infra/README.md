@@ -112,7 +112,7 @@ cp terraform.tfvars.example terraform.tfvars
 #   - leave image_tag = "latest" for the first run
 ```
 
-Then initialise. The root now uses a **partial backend**, so `terraform init` needs backend coordinates. For a brand-new dev deploy (no bootstrap yet), you can still run locally with explicit flags once the bootstrap module has created the storage account (see [CI/CD via GitHub Actions](#cicd-via-github-actions)); or keep using a local backend short-term by commenting the `backend "azurerm"` block out. For the standard path:
+Then initialize. The root now uses a **partial backend**, so `terraform init` needs backend coordinates. For a brand-new dev deploy (no bootstrap yet), you can still run locally with explicit flags once the bootstrap module has created the storage account (see [CI/CD via GitHub Actions](#cicd-via-github-actions)); or keep using a local backend short-term by commenting the `backend "azurerm"` block out. For the standard path:
 
 ```bash
 terraform init \
@@ -345,8 +345,8 @@ Just push. The `deploy` workflow:
 
 Concurrency:
 
-- `dev`: `cancel-in-progress: true` — latest push wins, older runs are cancelled.
-- `production`: `cancel-in-progress: false` — runs serialise, no cancellation.
+- `dev`: `cancel-in-progress: true` — latest push wins, older runs are canceled.
+- `production`: `cancel-in-progress: false` — runs serialize, no cancellation.
 
 ### Tear-down notes
 

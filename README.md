@@ -117,7 +117,7 @@ When `AllowDev` or `AllowGuest` is on alongside real Entra, a **policy scheme** 
 
 | Service | Path | Tech | Responsibility | Azure Target |
 |---|---|---|---|---|
-| UI | `ui/` | Angular 20, MSAL, Material, App Insights JS | SPA; Entra auth; model CRUD + run visualisation | Static Web Apps |
+| UI | `ui/` | Angular 20, MSAL, Material, App Insights JS | SPA; Entra auth; model CRUD + run visualization | Static Web Apps |
 | API | `api/` | ASP.NET Core .NET 10, EF Core, MassTransit | System of record; command origination; audit | Container Apps |
 | Data Engine | `data-engine/` | Python 3.11+, pika, Pydantic, numpy, scipy | Async numerical workflows driven by messages | Container Apps |
 | Broker | — | RabbitMQ 4 (management image) | Transport for `model.run.*` routing keys | Container Apps |

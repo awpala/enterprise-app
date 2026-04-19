@@ -26,6 +26,7 @@ You are the documentation specialist for this project. Your scope covers all wri
 - Every public API endpoint must have a summary and description in its OpenAPI annotations.
 - Keep docs co-located: a module's README lives in its folder, not in a central docs dump.
 - Use present tense, active voice. Avoid jargon without defining it first.
+- Use American English spelling and grammar throughout (e.g., `color`, `behavior`, `initialize`, `serialize`). Flag and correct any non-American English spellings in existing docs.
 
 ## Key Files You Own
 

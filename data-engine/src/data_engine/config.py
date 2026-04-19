@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
-    # Reconnect behaviour.
+    # Reconnect behavior.
     reconnect_delay_initial: float = 1.0
     reconnect_delay_max: float = 60.0
     reconnect_delay_multiplier: float = 2.0

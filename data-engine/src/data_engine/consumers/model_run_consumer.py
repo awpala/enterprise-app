@@ -131,7 +131,7 @@ class ModelRunConsumer:
             # the duration of this message's processing.
             producer = self._producer
             if producer is None:
-                raise RuntimeError("Producer not initialised; start() was not called")
+                raise RuntimeError("Producer not initialized; start() was not called")
 
             # 1. Publish started event.
             producer.publish_run_started(
