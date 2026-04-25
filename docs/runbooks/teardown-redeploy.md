@@ -78,7 +78,7 @@ When performing a hot redeploy for **dev** (frequent, low-risk), follow these ta
 
 - Confirm CI deploy identity for dev (with appropriate clientId) has Contributor on `ea-dev-rg`, or run the deploy with an account that does.
 
-- Ensure GitHub Environment `dev` contains the required External-ID SSO secrets. Use `docs/runbooks/push-sso-secrets.sh dev` if you have the values and `gh` authenticated.
+- Ensure GitHub Environment `dev` contains the required External-ID SSO secrets. Use `docs/runbooks/scripts/push-sso-secrets.sh dev` if you have the values and `gh` authenticated.
 
 - Trigger the deploy (push `main` or run the workflow for dev), and watch the Actions job for Terraform apply and the migrations job. If anything fails, collect the latest `__logs/az-teardown-check__*.log` and Action logs for troubleshooting.
 
@@ -109,7 +109,7 @@ az keyvault purge --name ea-dev-kv-eadev1 --location <region>
 
 - Confirm `dev.tfstate` exists in the bootstrap `tfstate` container.
 - Ensure the dev deploy clientId has Contributor role on `ea-dev-rg` or the subscription, or run the deploy with an account that does.
-- Verify GitHub Environment `dev` contains the External-ID SSO secrets required by the pipeline (use `docs/runbooks/push-sso-secrets.sh` if you have the values and `gh` authenticated).
+- Verify GitHub Environment `dev` contains the External-ID SSO secrets required by the pipeline (use `docs/runbooks/scripts/push-sso-secrets.sh` if you have the values and `gh` authenticated).
 
 ### Recovery actions
 

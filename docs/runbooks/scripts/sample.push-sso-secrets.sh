@@ -22,13 +22,13 @@
 #
 # Workflow:
 #   1. Copy this file:
-#        cp docs/runbooks/sample.push-sso-secrets.sh \
-#           docs/runbooks/push-sso-secrets.sh
+#        cp docs/runbooks/scripts/sample.push-sso-secrets.sh \
+#           docs/runbooks/scripts/push-sso-secrets.sh
 #   2. Open the copy and replace every `<PASTE ...>` placeholder with the real
 #      value captured during the manual bootstrap.
 #   3. Run it:
-#        bash docs/runbooks/push-sso-secrets.sh dev
-#        bash docs/runbooks/push-sso-secrets.sh production
+#        bash docs/runbooks/scripts/push-sso-secrets.sh dev
+#        bash docs/runbooks/scripts/push-sso-secrets.sh production
 #
 # IMPORTANT:
 #   The populated copy (`push-sso-secrets.sh`) is gitignored and MUST NEVER be

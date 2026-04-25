@@ -14,15 +14,15 @@
 #   committing a tenant GUID + subdomain is safe (they are not credentials).
 #
 # Usage:
-#   eval "$(bash docs/runbooks/source-sso-env.sh dev)"
-#   eval "$(bash docs/runbooks/source-sso-env.sh production)"
+#   eval "$(bash docs/runbooks/scripts/source-sso-env.sh dev)"
+#   eval "$(bash docs/runbooks/scripts/source-sso-env.sh production)"
 #
 #   Then:
 #     cd infra && terraform plan
 #
 # Design notes:
 #   - Single source of truth: this helper reuses the already-populated,
-#     gitignored `docs/runbooks/push-sso-secrets.sh` (copied from
+#     gitignored `docs/runbooks/scripts/push-sso-secrets.sh` (copied from
 #     `sample.push-sso-secrets.sh`). The operator populates secret values
 #     exactly once — there. No duplicated populate step here.
 #   - This file itself contains NO secrets and is safe to commit (tracked).
@@ -41,7 +41,7 @@ set -euo pipefail
 ENV="${1:-}"
 if [[ "$ENV" != "dev" && "$ENV" != "production" ]]; then
   echo "Usage: source-sso-env.sh <dev|production>" >&2
-  echo "  eval \"\$(bash docs/runbooks/source-sso-env.sh dev)\"" >&2
+  echo "  eval \"\$(bash docs/runbooks/scripts/source-sso-env.sh dev)\"" >&2
   exit 1
 fi
 
@@ -50,7 +50,7 @@ SECRETS="$SCRIPT_DIR/push-sso-secrets.sh"
 
 if [[ ! -f "$SECRETS" ]]; then
   echo "Error: $SECRETS not found." >&2
-  echo "Copy docs/runbooks/sample.push-sso-secrets.sh to push-sso-secrets.sh and populate it first." >&2
+  echo "Copy docs/runbooks/scripts/sample.push-sso-secrets.sh to push-sso-secrets.sh and populate it first." >&2
   exit 1
 fi
 
