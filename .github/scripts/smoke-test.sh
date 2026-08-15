@@ -16,8 +16,6 @@ readonly PKCE_VERIFIER_RANDOM_BYTES=48
 readonly OAUTH_STATE_RANDOM_BYTES=16
 readonly EXPECTED_HTTP_STATUS="200"
 readonly OAUTH_ERROR_QUERY_FRAGMENT="error="
-readonly AWS_EMAIL_OTP_FACTOR="EMAIL_OTP"
-readonly AWS_NATIVE_IDENTITY_PROVIDER="COGNITO"
 readonly AWS_IDP_PAGE_SIZE=60
 readonly SMOKE_MAX_ATTEMPTS=6
 readonly SMOKE_RETRY_DELAY_SECONDS=10
@@ -103,31 +101,22 @@ check_managed_login() {
 check_aws_customer_auth() {
   [[ "$TF_ROOT" == "$AWS_TF_ROOT" ]] || return 0
 
-  local user_pool_id client_id pool identity_providers client
-  local expected_auth_factors expected_federated_providers expected_client_providers
+  local user_pool_id client_id identity_providers client
+  local expected_federated_providers
   user_pool_id=$(terraform -chdir="$TF_ROOT" output -raw cognito_user_pool_id)
   client_id=$(terraform -chdir="$TF_ROOT" output -raw auth_client_id)
-  pool=$(aws cognito-idp describe-user-pool --user-pool-id "$user_pool_id")
   identity_providers=$(aws cognito-idp list-identity-providers \
     --user-pool-id "$user_pool_id" --max-results "$AWS_IDP_PAGE_SIZE")
   client=$(aws cognito-idp describe-user-pool-client \
     --user-pool-id "$user_pool_id" --client-id "$client_id")
-  expected_auth_factors=$(jq -cn --arg factor "$AWS_EMAIL_OTP_FACTOR" '[$factor]')
   expected_federated_providers=$(printf '%s\n' "${AWS_FEDERATED_IDENTITY_PROVIDERS[@]}" \
     | jq -R . \
     | jq -sc 'sort')
-  expected_client_providers=$(jq -cn \
-    --arg native "$AWS_NATIVE_IDENTITY_PROVIDER" \
-    --argjson federated "$expected_federated_providers" \
-    '([$native] + $federated | sort)')
 
-  jq -e --argjson expected "$expected_auth_factors" \
-    '.UserPool.Policies.SignInPolicy.AllowedFirstAuthFactors == $expected' \
-    <<<"$pool" >/dev/null
   jq -e --argjson expected "$expected_federated_providers" \
     '([.Providers[].ProviderName] | sort) == $expected' \
     <<<"$identity_providers" >/dev/null
-  jq -e --argjson expected "$expected_client_providers" \
+  jq -e --argjson expected "$expected_federated_providers" \
     '([.UserPoolClient.SupportedIdentityProviders[]] | sort) == $expected' \
     <<<"$client" >/dev/null
 }

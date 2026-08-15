@@ -44,8 +44,7 @@ Record these before the first bootstrap:
 
 | Client/sign-in type | Azure behavior | AWS target | Prototype state | Production gate |
 |---|---|---|---|---|
-| Native email account | Entra External ID user flow | Disabled; passwords are not an accepted AWS sign-in method | Implemented | Managed login must not offer password authentication |
-| Email one-time passcode | Entra user flow | Cognito `EMAIL_OTP` choice-based sign-in | Implemented | Provisioned-user login/logout/refresh/revoke test |
+| Native Cognito account | Not part of the application flow | Disabled on the app client | Implemented | Managed login must offer only the required federated providers |
 | Google | Portal-managed Entra federation | Required Cognito Google IdP | Implemented in Terraform; credentials protected | Exact callback, claim mapping, logout test |
 | Microsoft account | Customer Microsoft identity | Required Cognito OIDC provider pinned to the Microsoft consumer tenant | Implemented in Terraform; credentials protected | Outlook personal-account callback, claim mapping, logout test |
 | Enterprise OIDC | Entra federation | Optional Cognito OIDC IdP | Terraform input exists | Discovery, signing-key rotation, claim mapping test |
@@ -136,14 +135,11 @@ aws ecs describe-services --cluster "$CLUSTER" \
 aws rds describe-db-instances --query 'DBInstances[].{id:DBInstanceIdentifier,public:PubliclyAccessible,status:DBInstanceStatus}'
 ```
 
-Complete a real browser journey: native sign-in, optional federated sign-ins, token inspection (`iss`, `client_id`, `scope`, `token_use`), create a model, request a run, observe completion, refresh, logout, and revoked/expired-token rejection. Confirm the audit actor and message headers contain normalized subject/tenant/provider values.
-
-Provision the sole passwordless Cognito email-OTP profile from the existing IAM
-Identity Center `admin` identity with
-`infra/scripts/aws-provision-cognito-admin.sh`; do not copy the administrator's
-email or any OTP into Git, Terraform variables, GitHub configuration, or command
-output. The script suppresses invitations and creates no password. Synthetic dev
-access does not satisfy the real sign-in gate.
+Complete real Google and Microsoft / Outlook browser journeys, including token
+inspection (`iss`, `client_id`, `scope`, `token_use`), creating a model,
+requesting a run, observing completion, refresh, logout, and revoked/expired-token
+rejection. Confirm the audit actor and message headers contain normalized
+subject/tenant/provider values. No local Cognito account is provisioned.
 
 In CloudWatch/X-Ray, capture a correlated trace spanning ALB/API, RabbitMQ publish/consume, and data engine. Confirm alarms are `OK`, log retention matches tfvars, and no secret appears in logs.
 

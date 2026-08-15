@@ -17,7 +17,7 @@ The root composes focused modules and owns only cross-module wiring plus generat
 | `ecs-cluster` | ECS cluster, Cloud Map namespace, and shared task network policy |
 | `ecs-iam` | Task execution/task roles and narrowly scoped secret/telemetry permissions |
 | `postgres` | RDS PostgreSQL, subnet group, and database network policy |
-| `cognito` | User pool, API scope, public PKCE client, managed login, Google/Microsoft federation, and passwordless email OTP |
+| `cognito` | User pool, API scope, public PKCE client, managed login, and Google/Microsoft federation |
 | `secrets-manager` | PostgreSQL connection string and RabbitMQ credential storage |
 | `observability` | CloudWatch log groups, alarms, and operations dashboard |
 | `rabbitmq` | EFS persistence, Cloud Map registration, task definition, and ECS service |

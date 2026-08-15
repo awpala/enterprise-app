@@ -1,6 +1,5 @@
-resource "aws_cognito_user_pool" "passwordless" {
-  name                     = "${var.name_prefix}-passwordless-users"
-  user_pool_tier           = "ESSENTIALS"
+resource "aws_cognito_user_pool" "federated" {
+  name                     = "${var.name_prefix}-federated-users"
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
 
@@ -8,22 +7,9 @@ resource "aws_cognito_user_pool" "passwordless" {
     case_sensitive = false
   }
 
-  sign_in_policy {
-    allowed_first_auth_factors = ["EMAIL_OTP"]
-  }
-
-  password_policy {
-    minimum_length                   = 12
-    require_lowercase                = true
-    require_numbers                  = true
-    require_symbols                  = true
-    require_uppercase                = true
-    temporary_password_validity_days = 7
-  }
-
   account_recovery_setting {
     recovery_mechanism {
-      name     = "verified_email"
+      name     = "admin_only"
       priority = 1
     }
   }
@@ -32,17 +18,13 @@ resource "aws_cognito_user_pool" "passwordless" {
     allow_admin_create_user_only = true
   }
 
-  verification_message_template {
-    default_email_option = "CONFIRM_WITH_CODE"
-  }
-
   tags = var.tags
 }
 
 resource "aws_cognito_resource_server" "api" {
   identifier   = "api://${var.name_prefix}"
   name         = "${var.name_prefix}-api"
-  user_pool_id = aws_cognito_user_pool.passwordless.id
+  user_pool_id = aws_cognito_user_pool.federated.id
 
   scope {
     scope_name        = "access_as_user"
@@ -53,7 +35,7 @@ resource "aws_cognito_resource_server" "api" {
 resource "aws_cognito_identity_provider" "google" {
   count = var.enable_google_identity_provider ? 1 : 0
 
-  user_pool_id  = aws_cognito_user_pool.passwordless.id
+  user_pool_id  = aws_cognito_user_pool.federated.id
   provider_name = "Google"
   provider_type = "Google"
 
@@ -73,7 +55,7 @@ resource "aws_cognito_identity_provider" "google" {
 resource "aws_cognito_identity_provider" "oidc" {
   count = var.upstream_oidc == null ? 0 : 1
 
-  user_pool_id  = aws_cognito_user_pool.passwordless.id
+  user_pool_id  = aws_cognito_user_pool.federated.id
   provider_name = var.upstream_oidc.name
   provider_type = "OIDC"
 
@@ -95,7 +77,7 @@ resource "aws_cognito_identity_provider" "oidc" {
 resource "aws_cognito_identity_provider" "saml" {
   count = var.upstream_saml == null ? 0 : 1
 
-  user_pool_id  = aws_cognito_user_pool.passwordless.id
+  user_pool_id  = aws_cognito_user_pool.federated.id
   provider_name = var.upstream_saml.name
   provider_type = "SAML"
 
@@ -121,7 +103,6 @@ locals {
     var.application_url == null ? null : trimsuffix(var.application_url, "/"),
   ]))
   supported_identity_providers = concat(
-    ["COGNITO"],
     var.enable_google_identity_provider ? ["Google"] : [],
     var.upstream_oidc == null ? [] : [var.upstream_oidc.name],
     var.upstream_saml == null ? [] : [var.upstream_saml.name],
@@ -130,10 +111,10 @@ locals {
 
 resource "aws_cognito_user_pool_client" "ui" {
   name         = "${var.name_prefix}-ui"
-  user_pool_id = aws_cognito_user_pool.passwordless.id
+  user_pool_id = aws_cognito_user_pool.federated.id
 
   generate_secret                      = false
-  explicit_auth_flows                  = ["ALLOW_USER_AUTH"]
+  explicit_auth_flows                  = ["ALLOW_REFRESH_TOKEN_AUTH"]
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes = [
@@ -167,12 +148,12 @@ resource "aws_cognito_user_pool_client" "ui" {
 
 resource "aws_cognito_user_pool_domain" "this" {
   domain                = var.domain_prefix
-  user_pool_id          = aws_cognito_user_pool.passwordless.id
+  user_pool_id          = aws_cognito_user_pool.federated.id
   managed_login_version = 2
 }
 
 resource "aws_cognito_managed_login_branding" "this" {
-  user_pool_id                = aws_cognito_user_pool.passwordless.id
+  user_pool_id                = aws_cognito_user_pool.federated.id
   client_id                   = aws_cognito_user_pool_client.ui.id
   use_cognito_provided_values = true
 }

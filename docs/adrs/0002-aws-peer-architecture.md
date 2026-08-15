@@ -38,10 +38,11 @@ the CloudFront default certificate. Terraform derives Cognito callback/logout
 registration from that generated hostname. No public Route 53 zone, custom
 domain, DNS alias, or operator-managed ACM certificate is part of the design.
 
-Use Cognito Authorization Code flow with PKCE and a public client. Native
-password authentication is not an accepted customer flow. The app client must
-offer the existing Google federation, Microsoft personal-account federation for
-Outlook users, and Cognito email one-time-passcode authentication. Provider
+Use Cognito Authorization Code flow with PKCE and a public client. Cognito acts
+only as the federation broker: its native password and one-time-passcode
+providers are not accepted customer flows and are not enabled on the app
+client. The app client must offer the existing Google federation and Microsoft
+personal-account federation for Outlook users. Provider
 credentials remain protected GitHub Environment secrets and are never
 committed. The Microsoft issuer is resolved from live OIDC discovery metadata;
 no environment-specific identity URL is embedded in the workflow.
@@ -65,9 +66,8 @@ no environment-specific identity URL is embedded in the workflow.
   a custom domain is outside this decision and requires separate explicit
   approval.
 - Cognito federation and logout behavior need end-to-end browser tests for every enabled identity provider.
-- Passwordless email OTP requires a pre-provisioned, confirmed user because the
-  managed sign-up page still requires a password; the provisioning script must
-  suppress invitations and omit temporary passwords.
+- The Cognito app client is federation-only; no local Cognito user provisioning
+  workflow is part of deployment or acceptance.
 - The dev stack is account-backed; the workbook gates merge and production
   promotion on browser and operational evidence.
 
