@@ -10,18 +10,18 @@
 #   single environment per invocation — `dev` or `production`.
 #
 # Usage:
-#   bash docs/runbooks/plan-infra.sh dev
-#   bash docs/runbooks/plan-infra.sh production
+#   bash docs/runbooks/scripts/plan-infra.sh dev
+#   bash docs/runbooks/scripts/plan-infra.sh production
 #
 #   # Save the plan binary for a later `terraform apply <file>`:
-#   bash docs/runbooks/plan-infra.sh dev --out /tmp/dev.tfplan
-#   bash docs/runbooks/plan-infra.sh production -o /tmp/prod.tfplan
+#   bash docs/runbooks/scripts/plan-infra.sh dev --out /tmp/dev.tfplan
+#   bash docs/runbooks/scripts/plan-infra.sh production -o /tmp/prod.tfplan
 #
 #   Runnable from any working directory — the script resolves its own
 #   location and `cd`s into /workspace/infra internally.
 #
 # Prerequisites:
-#   - docs/runbooks/push-sso-secrets.sh populated (copied from
+#   - docs/runbooks/scripts/push-sso-secrets.sh populated (copied from
 #     sample.push-sso-secrets.sh and filled in per Part D of the SSO runbook).
 #     This script reuses source-sso-env.sh — the single source of truth for
 #     exporting TF_VAR_* from that populated file. Nothing is duplicated here.
@@ -64,8 +64,8 @@ usage() {
 Usage: plan-infra.sh <dev|production> [--out <file> | -o <file>]
 
 Examples:
-  bash docs/runbooks/plan-infra.sh dev
-  bash docs/runbooks/plan-infra.sh production --out /tmp/prod.tfplan
+  bash docs/runbooks/scripts/plan-infra.sh dev
+  bash docs/runbooks/scripts/plan-infra.sh production --out /tmp/prod.tfplan
 USAGE
 }
 
@@ -118,7 +118,7 @@ fi
 
 if [[ ! -f "$SECRETS" ]]; then
   echo "Error: $SECRETS not found." >&2
-  echo "Copy docs/runbooks/sample.push-sso-secrets.sh to push-sso-secrets.sh and populate it (see Part D of the SSO runbook)." >&2
+  echo "Copy docs/runbooks/scripts/sample.push-sso-secrets.sh to push-sso-secrets.sh and populate it (see Part D of the SSO runbook)." >&2
   exit 1
 fi
 

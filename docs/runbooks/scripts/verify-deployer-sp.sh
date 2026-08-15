@@ -17,7 +17,7 @@
 # Usage:
 #   # First time only: sign in to the target External ID tenant.
 #   az login --tenant <external-tenant-id> --allow-no-subscriptions
-#   bash docs/runbooks/verify-deployer-sp.sh <dev|production>
+#   bash docs/runbooks/scripts/verify-deployer-sp.sh <dev|production>
 #
 # Re-run this any time the deployer SP's secret is rotated
 # (docs/runbooks/sso-manual-bootstrap.md §11) or when CI begins failing

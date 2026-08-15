@@ -36,8 +36,8 @@ Before starting, confirm:
 - [ ] The GitHub repo already has Environments named `dev` and `production` (Settings -> Environments).
 - [ ] You have decided on the tenant display names and subdomains (defaults used below: `eacustomerdev` / `eacustomerprod`).
 - [ ] You have a terminal open in `/workspace` so you can run `gh` commands.
-- [ ] You are aware that [`docs/runbooks/source-sso-env.sh`](./source-sso-env.sh) is a tracked companion helper that exports `TF_VAR_*` values from the populated `push-sso-secrets.sh` (no secrets baked in; DRY with Part D).
-- [ ] You are aware that [`docs/runbooks/plan-infra.sh`](./plan-infra.sh) is a tracked companion helper that wraps the full local-plan workflow (source env + `az account show` + `terraform init/plan`) into a single command, used in [Part F](#8-part-f---verification). It passes `-refresh=false` to `terraform plan` by default so the local preview is advisory and does not require the operator's `az login` identity to hold every data-source read permission (notably Key Vault Secrets); the full-refresh plan is done by CI under the platform SP.
+- [ ] You are aware that [`docs/runbooks/scripts/source-sso-env.sh`](./scripts/source-sso-env.sh) is a tracked companion helper that exports `TF_VAR_*` values from the populated `push-sso-secrets.sh` (no secrets baked in; DRY with Part D).
+- [ ] You are aware that [`docs/runbooks/scripts/plan-infra.sh`](./scripts/plan-infra.sh) is a tracked companion helper that wraps the full local-plan workflow (source env + `az account show` + `terraform init/plan`) into a single command, used in [Part F](#8-part-f---verification). It passes `-refresh=false` to `terraform plan` by default so the local preview is advisory and does not require the operator's `az login` identity to hold every data-source read permission (notably Key Vault Secrets); the full-refresh plan is done by CI under the platform SP.
 - [ ] As the final step of [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env), the captured tenant GUID + subdomain must be pasted into the committed `infra/envs/<env>.tfvars` file for that environment. `-var-file` beats `TF_VAR_*`, so without this step `terraform plan` silently uses the placeholder strings. Tenant GUIDs and subdomains are public identifiers, not secrets.
 - [ ] You are aware that [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) is a separate one-time portal step that runs **after** Part F's first successful `terraform apply` (same out-of-band pattern as Part A's tenant creation). The end-to-end sign-in smoke test in Part F Step 3 will not pass until Part G is complete.
 
@@ -123,7 +123,7 @@ Run this twice - once in each External ID tenant.
 >
 > ```bash
 > az login --tenant <external-tenant-id> --allow-no-subscriptions
-> bash docs/runbooks/verify-deployer-sp.sh <dev|production>
+> bash docs/runbooks/scripts/verify-deployer-sp.sh <dev|production>
 > ```
 >
 > The script asserts the SP is single-tenant (`AzureADMyOrg`), has at least one unexpired client secret, and holds admin-consent on all three required Graph application roles (`Application.ReadWrite.All`, `IdentityProvider.ReadWrite.All`, `Policy.ReadWrite.AuthenticationFlows`). Non-zero exit on any failure - safe to chain into CI or pre-apply gating.
@@ -176,23 +176,23 @@ Reference: [Add Google as an identity provider](https://learn.microsoft.com/en-u
 
 Set secrets/variables into each GitHub Environment. Tenant subdomain is **not sensitive** and goes in as a variable; everything else is a secret.
 
-Rather than running the `gh` commands by hand per environment, use the companion script at [`docs/runbooks/sample.push-sso-secrets.sh`](./sample.push-sso-secrets.sh). It takes a single positional argument (`dev` or `production`) and runs the same `gh secret set` / `gh variable set` calls under the hood.
+Rather than running the `gh` commands by hand per environment, use the companion script at [`docs/runbooks/scripts/sample.push-sso-secrets.sh`](./scripts/sample.push-sso-secrets.sh). It takes a single positional argument (`dev` or `production`) and runs the same `gh secret set` / `gh variable set` calls under the hood.
 
 1. Copy the sample to a local, populated copy (the destination filename drops the `sample.` prefix):
 
    ```bash
-   cd docs/runbooks
+   cd docs/runbooks/scripts
    cp sample.push-sso-secrets.sh push-sso-secrets.sh
    ```
 
-   The repo's `.gitignore` excludes `docs/runbooks/push-sso-secrets.sh` as belt-and-suspenders - the populated copy must **never** be committed.
+   The repo's `.gitignore` excludes `docs/runbooks/scripts/push-sso-secrets.sh` as belt-and-suspenders - the populated copy must **never** be committed.
 
 2. Open `push-sso-secrets.sh` in an editor and replace each `<PASTE ...>` placeholder with the real value recorded during Parts A-B. The `TENANT_SUBDOMAIN` values (`eacustomerdev` / `eacustomerprod`) are already inlined in the script and do not need populating.
 
 3. Run the script once per environment:
 
    ```bash
-   cd docs/runbooks
+   cd docs/runbooks/scripts
    chmod +x push-sso-secrets.sh   # if needed
    ./push-sso-secrets.sh dev
    ./push-sso-secrets.sh production
@@ -210,12 +210,12 @@ gh variable list --env production
 Once verification passes, delete your local populated copy - the values now live in GitHub Environment storage:
 
 ```bash
-rm docs/runbooks/push-sso-secrets.sh
+rm docs/runbooks/scripts/push-sso-secrets.sh
 ```
 
 > **Note on inert GitHub objects**: the `EXTERNAL_TENANT_ID` secret and the `TENANT_SUBDOMAIN` variable pushed by `push-sso-secrets.sh` are now **functionally inert** - Terraform / CI reads both of these values from the committed `infra/envs/<env>.tfvars` file (populated per the final step of [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env)) because `-var-file` beats `TF_VAR_*`. They remain in `push-sso-secrets.sh` for reference and so the script keeps a complete picture of what Parts A/B capture; you do not need to remove them. This is the same pattern as the existing "orphaned in GitHub Environment secrets" callout for `GOOGLE_OIDC_CLIENT_ID` / `GOOGLE_OIDC_CLIENT_SECRET` in [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers).
 >
-> Correspondingly, [`docs/runbooks/source-sso-env.sh`](./source-sso-env.sh) now exports just the **two** external-tenant SP credentials as `TF_VAR_*` values (`TF_VAR_external_tenant_client_id`, `TF_VAR_external_tenant_client_secret`). The `external_tenant_id` and `tenant_subdomain` values used to be exported here as well; they have been dropped because the tfvars file is authoritative.
+> Correspondingly, [`docs/runbooks/scripts/source-sso-env.sh`](./scripts/source-sso-env.sh) now exports just the **two** external-tenant SP credentials as `TF_VAR_*` values (`TF_VAR_external_tenant_client_id`, `TF_VAR_external_tenant_client_secret`). The `external_tenant_id` and `tenant_subdomain` values used to be exported here as well; they have been dropped because the tfvars file is authoritative.
 
 > **Note to infra agent**: [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml) still supplies `TF_VAR_external_tenant_client_id` and `TF_VAR_external_tenant_client_secret` from the GitHub Environment secrets. `external_tenant_id` and `tenant_subdomain` come from the committed tfvars and no longer need to be wired through `TF_VAR_*`. The Google client ID / secret are no longer Terraform inputs (user flow + Google IDP moved to portal-managed via [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers)); that wiring is Terraform work, not part of this manual runbook.
 
@@ -267,24 +267,24 @@ After Parts A through E, and after the infra agent's Terraform lands:
 
 - You have completed [Parts A-E](#3-part-a---create-the-entra-external-id-tenant-one-per-env).
 - `infra/envs/<env>.tfvars` has been populated with the real `external_tenant_id` (GUID) and `tenant_subdomain` values captured in [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env). **This is the key gating step** - if the tfvars still holds `<PLACEHOLDER: ...>` strings, `-var-file` beats `TF_VAR_*` and the plan silently uses the placeholder, which then blows up inside the `azuread.external` provider.
-- You have populated `docs/runbooks/push-sso-secrets.sh` (from [Part D](#6-part-d---push-secrets-and-variables-to-github)) and pushed the values into the GitHub Environment secrets. (The local file is the DRY source that `source-sso-env.sh` reuses; if you already deleted it after Part D, restore it from your password manager or re-copy from `sample.push-sso-secrets.sh` and repopulate.)
+- You have populated `docs/runbooks/scripts/push-sso-secrets.sh` (from [Part D](#6-part-d---push-secrets-and-variables-to-github)) and pushed the values into the GitHub Environment secrets. (The local file is the DRY source that `source-sso-env.sh` reuses; if you already deleted it after Part D, restore it from your password manager or re-copy from `sample.push-sso-secrets.sh` and repopulate.)
 - You have authenticated against the **workforce** tenant with `az login` so the AzureRM and AzureAD providers can initialize. Note: `plan-infra.sh` passes `-refresh=false` to `terraform plan` by default, so the local preview is advisory and does **not** require your `az login` identity to hold every data-source read permission (notably Key Vault Secrets - those typically require the `deployer_officer` role). The full-refresh plan is done by CI under the platform SP.
 
 **Command**:
 
-Run the tracked wrapper [`docs/runbooks/plan-infra.sh`](./plan-infra.sh) with the target environment:
+Run the tracked wrapper [`docs/runbooks/scripts/plan-infra.sh`](./scripts/plan-infra.sh) with the target environment:
 
 ```bash
-bash docs/runbooks/plan-infra.sh dev
+bash docs/runbooks/scripts/plan-infra.sh dev
 ```
 
 To save the plan binary for a later apply, pass `--out`:
 
 ```bash
-bash docs/runbooks/plan-infra.sh dev --out /tmp/dev.tfplan
+bash docs/runbooks/scripts/plan-infra.sh dev --out /tmp/dev.tfplan
 ```
 
-`plan-infra.sh` is a tracked wrapper over `eval "$(source-sso-env.sh <env>)"` + `az account show --query id -o tsv` + `terraform init`/`terraform plan`, so the operator does not have to assemble those steps by hand. It resolves its own location and can be invoked from any working directory, sources `TF_VAR_*` via [`docs/runbooks/source-sso-env.sh`](./source-sso-env.sh) (no duplication), fetches the current subscription ID from `az account show`, runs `terraform init -upgrade` against the env-specific backend key (`dev.tfstate` / `production.tfstate`) with the fixed backend config (resource group `ea-tfstate-rg`, storage account `eatfstateeaboot`, container `tfstate`), and runs `terraform plan -var-file=envs/<env>.tfvars -var subscription_id="<resolved>" -refresh=false`. Omit `--out` for a read-only preview.
+`plan-infra.sh` is a tracked wrapper over `eval "$(source-sso-env.sh <env>)"` + `az account show --query id -o tsv` + `terraform init`/`terraform plan`, so the operator does not have to assemble those steps by hand. It resolves its own location and can be invoked from any working directory, sources `TF_VAR_*` via [`docs/runbooks/scripts/source-sso-env.sh`](./scripts/source-sso-env.sh) (no duplication), fetches the current subscription ID from `az account show`, runs `terraform init -upgrade` against the env-specific backend key (`dev.tfstate` / `production.tfstate`) with the fixed backend config (resource group `ea-tfstate-rg`, storage account `eatfstateeaboot`, container `tfstate`), and runs `terraform plan -var-file=envs/<env>.tfvars -var subscription_id="<resolved>" -refresh=false`. Omit `--out` for a read-only preview.
 
 **What to expect in a clean first-run plan**:
 
@@ -338,17 +338,17 @@ Note: the user flow, Google IDP, and Email one-time passcode method are **not** 
 
 ### Step 5. Full snapshot validation (closed-loop)
 
-5. Run the tracked validator [`docs/runbooks/validate-sso-snapshot.sh`](./validate-sso-snapshot.sh) as the closing loop on Parts B, F, and G. It consolidates ~20 minutes of ad-hoc CLI (switching between the workforce subscription and the two External ID tenants, spot-checking Container App env vars, app registrations, and Graph-managed IDPs) into one invocation with uniform `PASS:` / `FAIL:` lines, genericized `expected:` / `actual:` echo pairs for side-by-side visual comparison, and a single non-zero process exit on any failure.
+5. Run the tracked validator [`docs/runbooks/scripts/validate-sso-snapshot.sh`](./scripts/validate-sso-snapshot.sh) as the closing loop on Parts B, F, and G. It consolidates ~20 minutes of ad-hoc CLI (switching between the workforce subscription and the two External ID tenants, spot-checking Container App env vars, app registrations, and Graph-managed IDPs) into one invocation with uniform `PASS:` / `FAIL:` lines, genericized `expected:` / `actual:` echo pairs for side-by-side visual comparison, and a single non-zero process exit on any failure.
 
-   **Prerequisites**: `az login` completed against the workforce tenant (subscription `5eeebca2-f232-415b-a8cf-6b6688ca5e8f`), and `docs/runbooks/push-sso-secrets.sh` populated (from [Part D](#6-part-d---push-secrets-and-variables-to-github)) — the deployer-SP credentials used to read `/beta/identity/identityProviders` come from there via [`source-sso-env.sh`](./source-sso-env.sh).
+   **Prerequisites**: `az login` completed against the workforce tenant (subscription `5eeebca2-f232-415b-a8cf-6b6688ca5e8f`), and `docs/runbooks/scripts/push-sso-secrets.sh` populated (from [Part D](#6-part-d---push-secrets-and-variables-to-github)) — the deployer-SP credentials used to read `/beta/identity/identityProviders` come from there via [`source-sso-env.sh`](./scripts/source-sso-env.sh).
 
    ```bash
-   bash docs/runbooks/validate-sso-snapshot.sh
+   bash docs/runbooks/scripts/validate-sso-snapshot.sh
    ```
 
    **What it checks**:
    - Section 1 (workforce subscription): both dev + prod API Container Apps expose the expected `AzureAd__Enabled`, `AzureAd__AllowGuest` (`false` for dev, `true` for prod), `AzureAd__Authority`, `AzureAd__Audience`, `AzureAd__ClientId`, `AzureAd__TenantId` env vars — confirms the latest `terraform apply` wired everything.
-   - Section 2 (dev External ID tenant): runs [`verify-deployer-sp.sh dev`](./verify-deployer-sp.sh) (Part B rollup), asserts `ea-api-dev` + `ea-spa-dev` app registrations exist (Part F), and authenticates as the deployer SP to read Microsoft Graph `/beta/identity/identityProviders` — expects `EmailOtpSignup-OAUTH`, `EmailPassword-OAUTH`, `Google-OAUTH` (Part G).
+   - Section 2 (dev External ID tenant): runs [`verify-deployer-sp.sh dev`](./scripts/verify-deployer-sp.sh) (Part B rollup), asserts `ea-api-dev` + `ea-spa-dev` app registrations exist (Part F), and authenticates as the deployer SP to read Microsoft Graph `/beta/identity/identityProviders` — expects `EmailOtpSignup-OAUTH`, `EmailPassword-OAUTH`, `Google-OAUTH` (Part G).
    - Section 3 (production External ID tenant): same shape against the prod tenant.
 
    The script will `az login --tenant <external-tenant-id> --allow-no-subscriptions` interactively for Sections 2 and 3 if the current session is not already on that tenant. It does **not** short-circuit on the first failure — every section runs to completion so the operator sees the full snapshot in one pass.
@@ -372,7 +372,7 @@ Run this **once per tenant**, immediately after the first successful `terraform 
 >   - **Part B** - the `ea-terraform-deployer` SP and its client secret. Terraform still uses these to manage the `ea-api-<env>` / `ea-spa-<env>` app registrations, SPs, identifier URI, and SPA pre-authorization.
 >   - **Part C** - the Google Cloud OAuth client and its client ID / client secret. These are now consumed by the portal paste in [G.2](#g2---configure-the-tenant-level-identity-providers) below rather than by Terraform. Keep them in your password manager; all future rotations go portal-side (see [Section 10](#10-secret-rotation)).
 >   - **Part E** - workforce-tenant Graph consent (`Application.ReadWrite.OwnedBy`, `IdentityProvider.ReadWrite.All`). Still required for `azuread` app-registration management in CI.
-> - **You likely have NOT yet populated `infra/envs/dev.tfvars` (and/or `production.tfvars`) with real `external_tenant_id` + `tenant_subdomain`.** The runbook previously did not instruct this. Do it now - see the extended final step of [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env) - before re-running `bash docs/runbooks/plan-infra.sh <env>`. Without this, `-var-file` wins over `TF_VAR_*` and the plan blows up inside the `azuread.external` provider with an opaque unmarshal error.
+> - **You likely have NOT yet populated `infra/envs/dev.tfvars` (and/or `production.tfvars`) with real `external_tenant_id` + `tenant_subdomain`.** The runbook previously did not instruct this. Do it now - see the extended final step of [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env) - before re-running `bash docs/runbooks/scripts/plan-infra.sh <env>`. Without this, `-var-file` wins over `TF_VAR_*` and the plan blows up inside the `azuread.external` provider with an opaque unmarshal error.
 > - **`source-sso-env.sh` no longer exports `TF_VAR_external_tenant_id` or `TF_VAR_tenant_subdomain`.** Those two values now live in the committed tfvars (see above). `push-sso-secrets.sh` still contains them for reference and for the (now-inert) GitHub secret / variable push; those GitHub objects are harmless and may be left in place.
 > - **Now orphaned in GitHub Environment secrets**: `GOOGLE_OIDC_CLIENT_ID` and `GOOGLE_OIDC_CLIENT_SECRET` under **both** the `dev` and `production` environments. Terraform no longer reads these. Options:
 >   - Leave them in place - harmless; they are simply unused.
@@ -522,8 +522,8 @@ Flip `allow_guest_auth` back to `false` in `infra/envs/production.tfvars`, merge
 | CI pipeline fails with `AADSTS700016` when touching External ID | CI SP missing Graph permissions or admin consent in workforce tenant | Rerun [Part E](#7-part-e---grant-workforce-tenant-graph-permissions-one-time). |
 | `idp` claim absent on an ID token | User signed in via email OTP (local account) - this is expected | Backend defaults `ICurrentUser.Idp` to `"email"` for absent claims - see the [SSO plan](../../) phase 2A notes. |
 | `Log in as Guest` button redirects to the External ID sign-in page instead of navigating to `/dashboard` | `ui/src/app/auth/auth.guard.ts` - both `authGuard` and `authGuardChild` are missing the `if (auth.isGuestSession()) return true;` short-circuit, so guest navigation falls through to `MsalGuard.canActivate`, which has no MSAL account and triggers `loginRedirect`. Symmetric with the `isDevSession()` branch that is already present. | Add the guest short-circuit to both guards, immediately after the existing dev-session branch. The interceptor at `ui/src/app/auth/bearer-auth.interceptor.ts` already handles guest correctly - only the guards need the fix. |
-| `azuread.external` provider fails with `cannot unmarshal response: invalid character '<' looking for beginning of value` | `infra/envs/<env>.tfvars` still has `<PLACEHOLDER: ...>` for `external_tenant_id` (and/or `tenant_subdomain`). `-var-file` beats `TF_VAR_*`, so Terraform is trying to authenticate against the literal placeholder string instead of the real GUID. | Paste the real values per the final step of [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env), commit the tfvars change, then re-run `bash docs/runbooks/plan-infra.sh <env>`. |
-| `terraform plan` aborts during refresh with `ForbiddenByRbac` reading a Key Vault secret | Your `az login` identity does not currently hold the `deployer_officer` role, so data-source refresh cannot read Key Vault Secrets. | Use [`docs/runbooks/plan-infra.sh`](./plan-infra.sh) (which passes `-refresh=false`) for a local preview - refresh-free plans are advisory and sufficient for the safety check. Full-refresh plans are performed by CI under the platform SP. **Do not** attempt to grant yourself `deployer_officer` manually just to run a preview. |
+| `azuread.external` provider fails with `cannot unmarshal response: invalid character '<' looking for beginning of value` | `infra/envs/<env>.tfvars` still has `<PLACEHOLDER: ...>` for `external_tenant_id` (and/or `tenant_subdomain`). `-var-file` beats `TF_VAR_*`, so Terraform is trying to authenticate against the literal placeholder string instead of the real GUID. | Paste the real values per the final step of [Part A](#3-part-a---create-the-entra-external-id-tenant-one-per-env), commit the tfvars change, then re-run `bash docs/runbooks/scripts/plan-infra.sh <env>`. |
+| `terraform plan` aborts during refresh with `ForbiddenByRbac` reading a Key Vault secret | Your `az login` identity does not currently hold the `deployer_officer` role, so data-source refresh cannot read Key Vault Secrets. | Use [`docs/runbooks/scripts/plan-infra.sh`](./scripts/plan-infra.sh) (which passes `-refresh=false`) for a local preview - refresh-free plans are advisory and sufficient for the safety check. Full-refresh plans are performed by CI under the platform SP. **Do not** attempt to grant yourself `deployer_officer` manually just to run a preview. |
 | `400 InvalidAccessTokenVersion: Unable to create application. Access Token Accepted Version may not be 1 or null` on `azuread_application.*` | The app registration is missing `api { requested_access_token_version = 2 }`. External ID tenants reject v1 tokens, so every app reg - including public-client SPAs that do not themselves issue access tokens - must declare v2 up front, or the create call is rejected. | Verify the module's SPA app reg has the `api {}` block with `requested_access_token_version = 2`. This is resolved in the infra module as of the [Part G](#9-part-g---portal-configure-the-user-flow-and-identity-providers) pivot; if you are still seeing it, pull the latest module and re-plan. |
 | `403 Authorization_RequestDenied: Insufficient privileges to complete the operation` on `azuread_application_identifier_uri` | The `ea-terraform-deployer` SP has `Application.ReadWrite.OwnedBy` rather than `Application.ReadWrite.All`. `.OwnedBy` can create an app registration but cannot patch `identifierUris` on it post-create - a known Graph quirk. | Upgrade the permission per the true-up callout at the end of [Part B](#4-part-b---create-the-terraform-service-principal-inside-the-external-id-tenant), then re-run the apply. |
 | `403 Authorization_RequestDenied: When using this permission, the backing application of the service principal being created must in the local tenant` on `azuread_service_principal` | Same `.OwnedBy` vs `.All` gap - creating a service principal for a just-created app registration is gated behind `Application.ReadWrite.All` even when the app is single-tenant. | Upgrade the permission per the true-up callout at the end of [Part B](#4-part-b---create-the-terraform-service-principal-inside-the-external-id-tenant), then re-run the apply. |

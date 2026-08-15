@@ -37,16 +37,16 @@
 #   # subscription where Container Apps live).
 #   az login
 #
-#   bash docs/runbooks/validate-sso-snapshot.sh
+#   bash docs/runbooks/scripts/validate-sso-snapshot.sh
 #
 #   # Safe to gate CI / merges on the exit code:
-#   if bash docs/runbooks/validate-sso-snapshot.sh; then
+#   if bash docs/runbooks/scripts/validate-sso-snapshot.sh; then
 #     echo "SSO snapshot healthy"
 #   fi
 #
 # Prerequisites:
 #   - `az` CLI available on PATH (the script aborts early if not).
-#   - `docs/runbooks/push-sso-secrets.sh` populated (copied from
+#   - `docs/runbooks/scripts/push-sso-secrets.sh` populated (copied from
 #     sample.push-sso-secrets.sh and filled in per Part D of the SSO runbook).
 #     The deployer-SP client id + secret come from there, via source-sso-env.sh.
 #   - An initial `az login` against the workforce tenant (subscription
@@ -112,9 +112,9 @@ API_APP_RG_PROD="ea-prod-rg"
 
 # --- companion-file paths (absolute; this script is pinned to /workspace) -----
 
-VERIFY_DEPLOYER="/workspace/docs/runbooks/verify-deployer-sp.sh"
-SOURCE_SSO_ENV="/workspace/docs/runbooks/source-sso-env.sh"
-SECRETS_FILE="/workspace/docs/runbooks/push-sso-secrets.sh"
+VERIFY_DEPLOYER="/workspace/docs/runbooks/scripts/verify-deployer-sp.sh"
+SOURCE_SSO_ENV="/workspace/docs/runbooks/scripts/source-sso-env.sh"
+SECRETS_FILE="/workspace/docs/runbooks/scripts/push-sso-secrets.sh"
 
 if [[ ! -f "$VERIFY_DEPLOYER" ]]; then
   echo "ERROR: companion helper not found: $VERIFY_DEPLOYER" >&2
@@ -126,7 +126,7 @@ if [[ ! -f "$SOURCE_SSO_ENV" ]]; then
 fi
 if [[ ! -f "$SECRETS_FILE" ]]; then
   echo "ERROR: $SECRETS_FILE not found." >&2
-  echo "Copy docs/runbooks/sample.push-sso-secrets.sh to push-sso-secrets.sh and populate it (see Part D of the SSO runbook)." >&2
+  echo "Copy docs/runbooks/scripts/sample.push-sso-secrets.sh to push-sso-secrets.sh and populate it (see Part D of the SSO runbook)." >&2
   exit 1
 fi
 

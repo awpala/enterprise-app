@@ -28,4 +28,4 @@ infra/bootstrap/terraform.tfvars
 infra/bootstrap/*.tfplan
 
 # SSO bootstrap secrets (populated copy of sample.push-sso-secrets.sh; never committed)
-docs/runbooks/push-sso-secrets.sh
+docs/runbooks/scripts/push-sso-secrets.sh
