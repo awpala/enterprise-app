@@ -85,6 +85,16 @@ else
   fi
 fi
 
+# ---- OpenAI Codex CLI: install globally via npm ----
+echo "--- Installing OpenAI Codex CLI globally ---"
+if command -v codex >/dev/null 2>&1; then
+  echo "Codex CLI already available"
+else
+  npm install -g @openai/codex 2>&1 || echo "Codex CLI global install failed (will retry manually)"
+fi
+echo "Codex CLI version:"
+codex --version 2>/dev/null || echo "not available"
+
 # ---- Angular frontend: install npm dependencies ----
 UI_DIR="${WORKSPACE_DIR}/ui"
 if [ -f "${UI_DIR}/package.json" ]; then

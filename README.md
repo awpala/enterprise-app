@@ -2,7 +2,7 @@
 
 A Docker-first, event-driven enterprise demo application organized around a generic "model" domain. The system showcases enterprise-grade patterns end to end: SSO with Microsoft Entra ID, async job processing over RabbitMQ, first-class observability, EF Core migrations, and a repeatable Terraform-driven deployment to Azure Container Apps and Static Web Apps.
 
-See [`CLAUDE.md`](./CLAUDE.md) for the authoritative stack versions, conventions, and deployment pipeline reference.
+See [`AGENTS.md`](./AGENTS.md) for the authoritative stack versions, conventions, and deployment pipeline reference.
 
 ## Service Topology
 
@@ -111,7 +111,7 @@ When `AllowDev` or `AllowGuest` is on alongside real Entra, a **policy scheme** 
 
 ### Audit identity
 
-`AuditStampingInterceptor` reads `oid`, `tid`, `idp`, `name`, and email from the authenticated principal (via the request-scoped `ICurrentUser`) and stamps them onto `audit_events` rows and onto outbound RabbitMQ messages via `UserContextPublishFilter<T>` (headers `x-user-oid`, `x-user-tid`, `x-user-idp`, `x-user-name`, `x-user-email`). See `CLAUDE.md › Observability` for the audited event list.
+`AuditStampingInterceptor` reads `oid`, `tid`, `idp`, `name`, and email from the authenticated principal (via the request-scoped `ICurrentUser`) and stamps them onto `audit_events` rows and onto outbound RabbitMQ messages via `UserContextPublishFilter<T>` (headers `x-user-oid`, `x-user-tid`, `x-user-idp`, `x-user-name`, `x-user-email`). See `AGENTS.md › Observability` for the audited event list.
 
 ## Services
 
@@ -158,4 +158,4 @@ Image tags: `sha-<sha7>` on `main`, `<branch-slug>-<sha7>` elsewhere.
 
 ## Repository Layout
 
-See `CLAUDE.md` for the canonical tree. Top-level folders: `api/`, `ui/`, `data-engine/`, `infra/`, `deploy/`, `schemas/` (JSON Schema message contracts, Draft 2020-12), `docs/`, and `.github/`.
+See `AGENTS.md` for the canonical tree. Top-level folders: `api/`, `ui/`, `data-engine/`, `infra/`, `deploy/`, `schemas/` (JSON Schema message contracts, Draft 2020-12), `docs/`, and `.github/`.

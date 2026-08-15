@@ -2,7 +2,7 @@
 
 JSON Schema (Draft 2020-12) contracts for every RabbitMQ message exchanged between the .NET API (MassTransit publisher/consumer) and the Python data-engine (pika consumer/producer). **These files are the source of truth.** The .NET records in `api/src/EA.Contracts/Messages/` and the Pydantic models in `data-engine/src/data_engine/models/messages.py` mirror them and must stay in lockstep.
 
-Routing keys — and their `.vN` suffixes — follow the project-wide convention `{domain}.{entity}.{action}.{version}` (see `CLAUDE.md` › Messaging Contracts).
+Routing keys — and their `.vN` suffixes — follow the project-wide convention `{domain}.{entity}.{action}.{version}` (see `AGENTS.md` › Messaging Contracts).
 
 ## Envelope conventions
 
