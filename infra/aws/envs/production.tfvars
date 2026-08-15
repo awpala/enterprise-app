@@ -8,5 +8,5 @@ postgres_multi_az       = true
 desired_count           = 1
 maximum_desired_count   = 3
 allow_dev_auth          = false
-allow_guest_auth        = false
+allow_guest_auth        = true
 log_retention_days      = 90
