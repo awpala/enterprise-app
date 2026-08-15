@@ -2,8 +2,8 @@ namespace EA.Domain.Interfaces;
 
 /// <summary>
 /// Abstraction over the authenticated principal for the current request.
-/// Resolved from the JWT (via <c>IHttpContextAccessor</c>) in production,
-/// or a fixed dev principal when <c>Authentication:Enabled = false</c>.
+/// The principal may come from a validated OIDC access token or from an
+/// explicitly enabled synthetic development or guest authentication scheme.
 /// </summary>
 /// <remarks>
 /// Lives in <c>EA.Domain</c> so infrastructure components (EF Core interceptors,
@@ -28,7 +28,8 @@ public interface ICurrentUser
 
     /// <summary>
     /// The upstream identity provider, normalized from Entra <c>idp</c>, Cognito
-    /// federation metadata, or the configured OIDC issuer.
+    /// federation metadata, or a provider-neutral fallback for authenticated
+    /// principals without provider metadata.
     /// </summary>
     string? IdentityProvider { get; }
 

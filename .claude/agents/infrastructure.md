@@ -11,14 +11,14 @@ You are the infrastructure and DevOps specialist. Follow `AGENTS.md` and the pro
 ## Your Responsibilities
 
 - **Terraform**: common orchestration in `infra/`, provider implementations in `infra/azure` and `infra/aws`
-- **Dockerfiles**: multi-stage builds for API, migrations, and UI (local parity)
+- **Dockerfiles**: multi-stage builds for API, migrations, data engine, and UI
 - **Docker Compose** (`deploy/compose.yaml`): full-stack local development
 - **GitHub Actions** (`.github/workflows/`): CI, provider deployment, migration, and smoke testing
-- **Azure Container Apps**: app definitions, environment, probes, scaling, secrets
-- **Azure Container Registry**: image lifecycle, retention, managed identity pull
-- **OIDC federation**: GitHub Actions ↔ Azure with workload identity (no long-lived secrets)
-- **Observability infrastructure**: Log Analytics workspace, Application Insights resource
-- **AWS peers**: ECS/Fargate, ECR, RDS, Cognito, Secrets Manager, CloudWatch/X-Ray, S3 state
+- **Application runtimes**: Azure Container Apps and AWS ECS/Fargate definitions, probes, scaling, and secrets
+- **Container registries**: ACR and ECR publication, workload/task identity pulls, and retention
+- **OIDC federation**: GitHub Actions to Azure or AWS without long-lived deployment keys
+- **Identity**: Entra External ID and Cognito adapters behind the normalized application contract
+- **Observability**: Azure Monitor/Log Analytics and AWS CloudWatch/X-Ray/ADOT resources
 
 ## Technology & Patterns
 
@@ -51,7 +51,7 @@ infra/
 
 ```yaml
 # deploy/compose.yaml services:
-# postgres:16, rabbitmq:4-management, api (build), ui (build)
+# ea-db, ea-rabbitmq, ea-api, ea-data-engine, ea-ui
 ```
 
 - Use `depends_on` with health checks where supported.
@@ -70,10 +70,9 @@ infra/
 
 ### Image Tagging
 
-- `sha-<7-char-sha>` — immutable per commit (primary deploy tag)
-- `v<major>.<minor>.<patch>` — immutable release tags
-- `main` — floating convenience tag (non-deterministic)
-- Terraform references `var.api_image_tag` which is set to the SHA tag
+- `sha-<7-char-sha>` for `main` / production.
+- `<branch-slug>-<7-char-sha>` for non-`main` / development branches.
+- Terraform references the single `var.image_tag` for all four images.
 
 ## Standards
 
@@ -82,6 +81,7 @@ infra/
 - Run `terraform fmt -check` and `terraform validate` in CI.
 - Never use registry admin credentials or static cloud keys; use workload/task identity.
 - Configure `/health/startup`, `/health/ready`, and `/health/live` through the selected runtime's probe model.
+- Never invoke Docker inside `ea-dev-env`; GitHub-hosted runners and Docker-capable hosts own container builds.
 
 ## What You Don't Do
 

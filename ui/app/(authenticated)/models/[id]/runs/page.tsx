@@ -13,6 +13,7 @@ import { errorMessage } from '@/lib/format';
 import { useApi } from '@/lib/use-api';
 import type { ModelRun } from '@/lib/types';
 
+/** Renders the complete run history for one model. */
 export default function ModelRunsPage() {
   const { id } = useParams<{ id: string }>();
   const api = useApi();

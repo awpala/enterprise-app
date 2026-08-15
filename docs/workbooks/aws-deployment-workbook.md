@@ -2,17 +2,17 @@
 
 ## Purpose and status
 
-This is the evidence workbook for turning the accountless AWS Terraform prototype into a deployable environment. It records inputs, commands, expected evidence, parity decisions, risks, rollback points, and production gates. It is intentionally CLI-first so another operator can reproduce the result.
+This workbook records the evidence, risks, rollback points, and production gates for the AWS implementation. The command sequence lives in the scripted [AWS deployment runbook](../runbooks/aws-deployment.md); this document remains CLI-first so another operator can reproduce and review the result without an ad hoc console procedure.
 
-Current status: **account onboarding in progress**. The dedicated AWS account and non-root IAM Identity Center administrator are verified. Terraform syntax and provider schemas are validated locally. Application infrastructure, browser application SSO, load, and recovery evidence remain pending.
+Current status: **development implementation deployed and repeatedly verified**. The dedicated account, IAM Identity Center administrator, remote state, GitHub OIDC trust, Terraform application stack, generated CloudFront HTTPS origin, migrations, smoke tests, and Google plus Microsoft/Outlook browser SSO are implemented. Production remains blocked on the unchecked readiness gates in section 11, particularly least-privilege review, recovery exercises, load/capacity evidence, and operational handoff.
 
 ## 1. Baseline inventory and mapping
 
-| Responsibility | Existing Azure convention | AWS prototype | Evidence required |
+| Responsibility | Azure peer | AWS implementation | Evidence required |
 |---|---|---|---|
 | State bootstrap | Azure Blob container | Versioned encrypted S3 bucket with native lock file | Bootstrap outputs and state-lock contention test |
 | CI trust | Entra federated credential | GitHub OIDC provider and environment-scoped IAM role | Successful `sts:GetCallerIdentity` from GitHub |
-| Network | Container Apps-managed network plus public PaaS endpoints | CloudFront HTTPS, CloudFront-restricted ALB, two/three AZ VPC, private ECS/RDS/EFS, NAT | VPC diagram, reachability analyzer, no direct public ALB/task/RDS access |
+| Network | Container Apps-managed network plus public PaaS endpoints | CloudFront HTTPS, CloudFront-restricted ALB, two/three AZ VPC, private ECS/RDS/EFS, NAT | VPC diagram, reachability analysis, ALB ingress restricted to the CloudFront origin-facing prefix list, and no public task/RDS access |
 | Registry | ACR, immutable deployment tags | Four ECR repositories, immutable tags, scan-on-push | Scan report and tag rejection test |
 | Runtime | Container Apps and Job | Autoscaled Fargate services and one-off task | Stable services, target-tracking activity, health checks, migration exit code |
 | UI | Next.js Container App on 3000 | Next.js ECS task on 3000 | Same image digest in both provider registries |
@@ -29,20 +29,20 @@ Record these before the first bootstrap:
 | Input | Dev | Production | Owner / evidence |
 |---|---|---|---|
 | AWS account ID | Verified dedicated account | Same dedicated account unless separated before production | Verified with non-root `sts:GetCallerIdentity` |
-| Region | `us-east-1` proposed | `us-east-1` proposed | Data residency and service availability approval |
-| GitHub organization/repository | `awpala/enterprise-app` | `awpala/enterprise-app` | GitHub CLI admin access verified |
-| State bucket name | Pending | Pending | Bootstrap output |
-| Deployment role ARN | Pending | Pending | Bootstrap output |
+| Region | Configured in the ignored deploy environment and committed tfvars | Must be explicitly approved | `aws sts get-caller-identity` plus region preflight |
+| GitHub organization/repository | Read from the deploy environment | Same repository, explicit per config | `gh repo view` and script preflight |
+| State bucket name | Provisioned | Reuse the shared bootstrap bucket with a separate production state key | Bootstrap output; never hardcode here |
+| Deployment role ARN | Provisioned | Provision through the production bootstrap | Bootstrap output; never hardcode here |
 | VPC CIDR | `10.40.0.0/16` | Must be non-overlapping | Network approval |
 | Public application origin | AWS-generated CloudFront URL | AWS-generated CloudFront URL | Terraform output |
-| Cognito domain prefix | Pending | Pending | Uniqueness check |
+| Cognito domain prefix | Configured | Required before production onboarding | Uniqueness check |
 | Google OAuth credentials | Existing protected `dev` values | Existing protected `production` values | Secret names and callback test; never print values |
 | Microsoft personal-account OIDC | Scripted app registration | Scripted app registration | Fixed consumer issuer, protected credential, callback test |
-| Budget/alert threshold | Pending | Pending | AWS Budget identifier |
+| Budget/alert threshold | Configured by onboarding | Required before production onboarding | AWS Budget identifier |
 
 ## 3. Authentication parity matrix
 
-| Client/sign-in type | Azure behavior | AWS target | Prototype state | Production gate |
+| Client/sign-in type | Azure behavior | AWS target | Implementation state | Production gate |
 |---|---|---|---|---|
 | Native Cognito account | Not part of the application flow | Disabled on the app client | Implemented | Managed login must offer only the required federated providers |
 | Google | Portal-managed Entra federation | Required Cognito Google IdP | Implemented in Terraform; credentials protected | Exact callback, claim mapping, logout test |
@@ -57,6 +57,10 @@ The parity goal is equivalent business access, not identical provider screens. D
 ## 4. Workstation and account preflight
 
 ```bash
+set -a
+source infra/aws/envs/dev.deploy.env
+set +a
+
 terraform version
 aws --version
 node --version
@@ -65,7 +69,7 @@ gh --version
 
 aws sts get-caller-identity
 aws ec2 describe-availability-zones \
-  --region us-east-1 \
+  --region "$AWS_REGION" \
   --query 'AvailabilityZones[?State==`available`].[ZoneName,ZoneId]' \
   --output table
 ```
@@ -82,7 +86,7 @@ Capture the state bucket and role ARN emitted by the script. The script creates 
 
 Terraform state contains generated database and broker credentials because Terraform creates the secret versions. Treat the versioned, encrypted state bucket as a secret store: block public access, restrict read access to the deployment role and break-glass operators, log access, and never publish state or unredacted plan artifacts.
 
-Gate: review the prototype IAM policy before attaching it to production. Use CloudTrail from a dev apply to derive a least-privilege policy and separate plan from apply if organizational controls require it.
+Gate: review the bootstrap IAM policy before attaching it to production. Use CloudTrail from a development apply to derive a least-privilege policy and separate plan from apply if organizational controls require it.
 
 ## 6. Validate and plan the application stack
 
@@ -145,27 +149,21 @@ In CloudWatch/X-Ray, capture a correlated trace spanning ALB/API, RabbitMQ publi
 
 ## 10. Failure, rollback, and teardown
 
-- **Bad application revision:** update the image tag to the last known-good digest and apply. ECS deployment circuit breakers roll back failed service stabilization.
+- **Bad application revision before stabilization:** ECS deployment circuit breakers roll the service back to its previous task definition.
+- **Bad application revision after stabilization:** deploy a forward fix. If an application rollback is schema-compatible, restore the retained manifest or digest under a new immutable tag and apply that tag; the cleanup job removes old tags, so do not assume a historical tag still exists.
 - **Migration failure before schema change:** inspect the migration log stream, correct configuration/image, and rerun the one-off task.
 - **Migration failure after schema change:** stop application rollout and follow the migration's forward-fix or database restore plan. Do not improvise destructive SQL.
 - **Identity failure:** keep synthetic modes disabled in production; restore the prior app client/provider configuration from Terraform and verify exact redirect URIs.
 - **Broker failure:** capture logs and EFS state before replacement. Validate queue durability and replay semantics.
 - **RDS recovery:** restore to a new instance, validate it, then rotate the connection-string secret and redeploy tasks.
 
-For an approved disposable dev environment, first snapshot evidence and ensure the state key/account are exact:
-
-```bash
-terraform -chdir=infra/aws plan -destroy -var-file=envs/dev.tfvars
-terraform -chdir=infra/aws destroy -var-file=envs/dev.tfvars
-```
-
-Production teardown requires an explicit change record, retained RDS snapshot, retained logs as required, and Secrets Manager recovery-window review.
+There is not yet a supported scripted teardown adapter that rehydrates the exact backend and protected identity-provider inputs. Do not substitute an ad hoc sequence of partial AWS/Terraform commands. Adding and exercising that script is a production gate. Production teardown also requires an explicit change record, retained RDS snapshot, retained logs as required, and Secrets Manager recovery-window review.
 
 ## 11. Production readiness checklist
 
 - [ ] Dedicated AWS accounts and environment isolation approved.
 - [ ] Account-backed plans contain no policy/security critical findings.
-- [ ] IAM reduced from bootstrap prototype to observed least privilege.
+- [ ] IAM reduced from bootstrap permissions to observed least privilege.
 - [ ] AWS Budgets and cost anomaly detection configured.
 - [ ] CloudFront default TLS and generated-hostname callback/logout URLs verified; no custom DNS or operator-managed ACM certificate is configured.
 - [ ] Required SSO client types pass the parity matrix.
@@ -182,4 +180,6 @@ Production teardown requires an explicit change record, retained RDS snapshot, r
 
 | Date | Environment | Commit/image digests | Activity | Result / artifact |
 |---|---|---|---|---|
-| 2026-08-15 | Accountless | Current branch | Terraform schema validation | Passed locally; no provider API calls |
+| 2026-08-15 | Development | Feature branch immutable images | Account bootstrap, Terraform apply, migration, smoke test, and repeated push deployment | Passed; verify current run with `gh run list --workflow deploy.yml` |
+| 2026-08-15 | Development | Deployed application | Google and Microsoft/Outlook sign-in, callback, authenticated API access, logout, and model workflow | Passed interactively; no credentials or generated URLs recorded here |
+| Pending | Production | — | Security, recovery, load, alert-routing, and independent-operator gates | Not approved |

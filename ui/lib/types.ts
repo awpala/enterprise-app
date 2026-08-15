@@ -1,6 +1,9 @@
+/** Runtime hosting target selected by deployment configuration. */
 export type DeploymentTarget = 'local' | 'azure' | 'aws';
+/** Browser authentication adapter selected by deployment configuration. */
 export type AuthProvider = 'entra' | 'cognito' | 'none';
 
+/** Public, non-secret configuration returned by `/api/runtime-config`. */
 export interface RuntimeConfig {
   readonly deploymentTarget: DeploymentTarget;
   readonly apiUrl: string;
@@ -15,9 +18,12 @@ export interface RuntimeConfig {
   readonly enableGuestAuth: boolean;
 }
 
+/** Lifecycle states exposed by the model API. */
 export type ModelStatus = 'Draft' | 'Active' | 'Archived';
+/** Lifecycle states exposed by the model-run API. */
 export type ModelRunStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
 
+/** Model representation returned by the API. */
 export interface Model {
   readonly id: string;
   readonly name: string;
@@ -30,6 +36,7 @@ export interface Model {
   readonly createdBy: string;
 }
 
+/** Mutable model fields accepted by create and update operations. */
 export interface ModelInput {
   readonly name: string;
   readonly description?: string | null;
@@ -37,6 +44,7 @@ export interface ModelInput {
   readonly parameters?: Record<string, unknown> | null;
 }
 
+/** Generic API page with its total item count. */
 export interface PagedResult<T> {
   readonly items: T[];
   readonly totalCount: number;
@@ -44,6 +52,7 @@ export interface PagedResult<T> {
   readonly pageSize: number;
 }
 
+/** Model-run representation shared by list and detail views. */
 export interface ModelRun {
   readonly id: string;
   readonly modelId: string;
@@ -55,16 +64,19 @@ export interface ModelRun {
   readonly errorMessage: string | null;
 }
 
+/** Cross-model run summary with its parent model name. */
 export interface RunSummary extends ModelRun {
   readonly modelName: string;
 }
 
+/** Precomputed histogram bins returned for a completed run. */
 export interface HistogramData {
   readonly binEdges: number[];
   readonly counts: number[];
   readonly sampleSize: number;
 }
 
+/** Computed numeric metric returned for a completed run. */
 export interface ModelMetric {
   readonly id: string;
   readonly modelRunId: string;
@@ -73,6 +85,7 @@ export interface ModelMetric {
   readonly calculatedAtUtc: string;
 }
 
+/** Detailed model run with computed metrics and histogram data. */
 export interface ModelRunDetail extends ModelRun {
   readonly metrics: ModelMetric[];
   readonly sampleData: HistogramData | null;

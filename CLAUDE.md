@@ -35,8 +35,8 @@ Reusable workflow skills are available in `.claude/skills/` for focused scaffold
 | Add Terraform Module | `add-terraform-module/` | New Terraform module for an Azure or AWS resource concern |
 | Scaffold API Endpoint | `scaffold-api-endpoint/` | New REST endpoint with domain entity, EF config, DTOs, and migration |
 | Scaffold Next.js Feature | `scaffold-nextjs-feature/` | New App Router feature with components, API client, and tests |
-| Scaffold Data Engine Worker | `scaffold-data-engine-worker/` | New Python RabbitMQ consumer, Pydantic model, workflow, and test stubs |
+| Scaffold Data Engine Worker | `scaffold-data-engine-worker/` | Python RabbitMQ lifecycle handling, Pydantic contracts, workflows, and tests |
 
-## Hooks
+## Local settings
 
-Session and tool hooks live in `.claude/hooks/`; local permission and environment settings live in `.claude/settings.local.json`.
+Claude Code may generate `.claude/settings.local.json` for machine-specific permissions. That file is ignored and must never be committed because command history can contain user identifiers, deployment URLs, or environment-specific resource IDs. No tracked Claude hooks are currently defined.

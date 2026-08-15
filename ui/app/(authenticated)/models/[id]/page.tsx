@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Edit3, Play } from 'lucide-react';
 import { ErrorNotice } from '@/components/ErrorNotice';
 import { Loading } from '@/components/Loading';
@@ -14,6 +14,7 @@ import { errorMessage } from '@/lib/format';
 import { useApi } from '@/lib/use-api';
 import type { Model, ModelRun } from '@/lib/types';
 
+/** Renders model details and the model's recent runs. */
 export default function ModelDetailPage() {
   const { id } = useParams<{ id: string }>();
   const api = useApi();
@@ -23,6 +24,7 @@ export default function ModelDetailPage() {
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState('');
+  const requestInFlight = useRef(false);
 
   const loadRuns = useCallback(async () => {
     if (!api) return;
@@ -38,18 +40,29 @@ export default function ModelDetailPage() {
       .finally(() => setLoading(false));
   }, [api, id]);
 
+  const hasActiveRuns = runs.some(run => run.status === 'Pending' || run.status === 'Running');
+
   useEffect(() => {
-    if (!runs.some(run => run.status === 'Pending' || run.status === 'Running')) return;
-    const timer = window.setInterval(() => void loadRuns().catch(reason => setError(errorMessage(reason))), 5000);
+    if (!hasActiveRuns) return;
+    let pollInFlight = false;
+    const timer = window.setInterval(() => {
+      if (pollInFlight) return;
+      pollInFlight = true;
+      void loadRuns()
+        .catch(reason => setError(errorMessage(reason)))
+        .finally(() => { pollInFlight = false; });
+    }, 5000);
     return () => window.clearInterval(timer);
-  }, [runs, loadRuns]);
+  }, [hasActiveRuns, loadRuns]);
 
   const requestRun = async () => {
-    if (!api) return;
+    if (!api || requestInFlight.current) return;
+    requestInFlight.current = true;
     setRequesting(true);
+    setError('');
     try { await api.requestRun(id); await loadRuns(); }
     catch (reason) { setError(errorMessage(reason)); }
-    finally { setRequesting(false); }
+    finally { requestInFlight.current = false; setRequesting(false); }
   };
 
   if (loading) return <Loading label="Loading model" />;

@@ -15,6 +15,8 @@
 #          - Policy.ReadWrite.AuthenticationFlows
 #
 # Usage:
+#   export DEV_EXTERNAL_TENANT_ID='<load from approved configuration>'
+#   # Or use PRODUCTION_EXTERNAL_TENANT_ID for production.
 #   # First time only: sign in to the target External ID tenant.
 #   az login --tenant <external-tenant-id> --allow-no-subscriptions
 #   bash docs/runbooks/scripts/azure-verify-deployer-sp.sh <dev|production>
@@ -37,10 +39,16 @@ fi
 
 ENV="$1"
 case "$ENV" in
-  dev)        TENANT_ID="a400a39c-97cf-4459-932e-6dfccf2adf1c" ;;
-  production) TENANT_ID="8ce01097-ed0b-4425-a49a-2f42c41a1119" ;;
+  dev)        TENANT_VARIABLE="DEV_EXTERNAL_TENANT_ID" ;;
+  production) TENANT_VARIABLE="PRODUCTION_EXTERNAL_TENANT_ID" ;;
   *) echo "Unknown environment '$ENV' (expected 'dev' or 'production')." >&2; exit 1 ;;
 esac
+TENANT_ID="${!TENANT_VARIABLE:-}"
+if [[ -z "$TENANT_ID" ]]; then
+  echo "Required environment variable is unset: $TENANT_VARIABLE" >&2
+  echo "Load it from the approved non-repository configuration source and retry." >&2
+  exit 2
+fi
 
 # Preflight: az must be signed into the target tenant. External ID tenants
 # typically have no linked Azure subscription, so --allow-no-subscriptions

@@ -18,6 +18,7 @@ import type { ModelRunStatus, RunSummary } from '@/lib/types';
 
 const options: Array<ModelRunStatus | 'All'> = ['All', 'Pending', 'Running', 'Completed', 'Failed'];
 
+/** Renders the cross-model paged run table and status filter. */
 export default function RunsPage() {
   const api = useApi();
   const router = useRouter();

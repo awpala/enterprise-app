@@ -90,8 +90,8 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
                 return separator > 0 ? username![..separator] : "cognito";
             }
 
-            // No idp claim is emitted for local email-OTP accounts in External ID.
-            // Only default to "email" when the principal is actually authenticated.
+            // If an authenticated principal has no provider metadata, retain a
+            // stable provider-neutral fallback instead of returning an empty value.
             return Principal.Identity?.IsAuthenticated == true ? "email" : null;
         }
     }
@@ -111,8 +111,7 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
             if (Principal is null)
                 return null;
 
-            // External ID ID tokens carry an "emails" array for local accounts.
-            // FindAll returns each value; take the first non-empty entry.
+            // Prefer the provider's emails claim, then common OIDC email claims.
             var emails = Principal.FindFirst("emails")?.Value;
             if (!string.IsNullOrWhiteSpace(emails))
                 return emails;

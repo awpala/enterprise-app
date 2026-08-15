@@ -40,3 +40,4 @@ disable-model-invocation: true
 - `ENV PYTHONUNBUFFERED=1` for Python services
 - Compose: use `depends_on` for startup ordering, named volumes for data persistence
 - Compose environment variables use same keys as production (different values)
+- Do not run Docker inside `ea-dev-env`; validate container builds in CI or on a Docker-capable host.

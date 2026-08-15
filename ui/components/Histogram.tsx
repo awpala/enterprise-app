@@ -1,5 +1,6 @@
 import type { HistogramData } from '@/lib/types';
 
+/** Renders precomputed histogram data as an accessible responsive SVG. */
 export function Histogram({ data }: { readonly data: HistogramData }) {
   const width = 640;
   const height = 280;

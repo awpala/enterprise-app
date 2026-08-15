@@ -4,8 +4,7 @@
 #
 # Purpose:
 #   One-shot push of the four External-ID SSO values into a GitHub Environment
-#   (`azure-dev` or `azure-production`, selected from a logical `dev` or
-#   `production` argument). Replaces the inline `gh secret set` /
+#   (`dev` or `production`). Replaces the inline `gh secret set` /
 #   `gh variable set` commands from Part D (Section 6) of
 #   docs/runbooks/azure-sso-manual-bootstrap.md.
 #
@@ -50,18 +49,18 @@ if [[ $# -ne 1 ]]; then
 fi
 
 ENV="$1"
-GITHUB_ENVIRONMENT="azure-${ENV}"
+GITHUB_ENVIRONMENT="$ENV"
 
 case "$ENV" in
   dev)
     EXTERNAL_TENANT_ID="<PASTE DEV EXTERNAL_TENANT_ID>"
-    TENANT_SUBDOMAIN="eacustomerdev"
+    TENANT_SUBDOMAIN="<PASTE DEV TENANT_SUBDOMAIN>"
     EXTERNAL_TENANT_CLIENT_ID="<PASTE DEV EXTERNAL_TENANT_CLIENT_ID>"
     EXTERNAL_TENANT_CLIENT_SECRET="<PASTE DEV EXTERNAL_TENANT_CLIENT_SECRET>"
     ;;
   production)
     EXTERNAL_TENANT_ID="<PASTE PRODUCTION EXTERNAL_TENANT_ID>"
-    TENANT_SUBDOMAIN="eacustomerprod"
+    TENANT_SUBDOMAIN="<PASTE PRODUCTION TENANT_SUBDOMAIN>"
     EXTERNAL_TENANT_CLIENT_ID="<PASTE PRODUCTION EXTERNAL_TENANT_CLIENT_ID>"
     EXTERNAL_TENANT_CLIENT_SECRET="<PASTE PRODUCTION EXTERNAL_TENANT_CLIENT_SECRET>"
     ;;
@@ -75,6 +74,7 @@ esac
 # Guard: refuse to run if any sensitive value is still a placeholder.
 for name in \
   EXTERNAL_TENANT_ID \
+  TENANT_SUBDOMAIN \
   EXTERNAL_TENANT_CLIENT_ID \
   EXTERNAL_TENANT_CLIENT_SECRET
 do

@@ -8,6 +8,7 @@ import { Card, CardBody } from './ui/Card';
 import { Page, PageHeader } from './ui/Page';
 import { useModelForm } from '@/hooks/useModelForm';
 
+/** Renders the create or edit model form based on the optional model identifier. */
 export function ModelForm({ modelId }: { readonly modelId?: string }) {
   const { cancel, clear, error, form, loading, saving, submit, update, valid } = useModelForm(modelId);
 

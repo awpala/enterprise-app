@@ -5,17 +5,15 @@ namespace EA.Infrastructure.Messaging;
 
 /// <summary>
 /// MassTransit send/publish filter that stamps the current authenticated user's
-/// identity onto every outbound message as transport headers. Downstream
-/// consumers (including the Python data engine) read these headers to attribute
-/// a command back to the originating HTTP caller without expanding the message
-/// body contract.
+/// identity onto every outbound message as transport headers. This makes caller
+/// context available to downstream consumers without expanding the message body
+/// contract; consumers opt in to reading the headers they need.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Registered as an open generic against <see cref="SendContext{T}"/> — MassTransit v8
-/// dispatches the typed variant for both <c>Publish</c> and <c>Send</c> pipelines
-/// when wired via <c>ConfigureSend</c> / <c>ConfigurePublish</c> with
-/// <c>UseSendFilter(typeof(UserContextPublishFilter&lt;&gt;), context)</c>.
+/// <c>Program.cs</c> registers the open generic with both
+/// <c>UseSendFilter</c> and <c>UsePublishFilter</c>, matching the two filter
+/// interfaces implemented by this type.
 /// </para>
 /// <para>
 /// The filter depends on the request-scoped <see cref="ICurrentUser"/>; MassTransit

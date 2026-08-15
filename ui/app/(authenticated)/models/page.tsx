@@ -19,6 +19,7 @@ import { createModelTableColumns } from '@/utils/modelTableColumns';
 
 const statusOptions: Array<ModelStatus | 'All'> = ['All', 'Draft', 'Active', 'Archived'];
 
+/** Renders the paged, filterable model table. */
 export default function ModelsPage() {
   const api = useApi();
   const router = useRouter();

@@ -49,9 +49,11 @@
 #   - `docs/runbooks/scripts/azure-push-sso-secrets.sh` populated (copied from
 #     sample.azure-push-sso-secrets.sh and filled in per Part D of the SSO runbook).
 #     The deployer-SP client id + secret come from there, via azure-source-sso-env.sh.
-#   - An initial `az login` against the workforce tenant (subscription
-#     5eeebca2-f232-415b-a8cf-6b6688ca5e8f). The script sets that subscription
-#     explicitly before reading Container App env vars.
+#   - An initial `az login` against the workforce tenant. The script sets the
+#     configured subscription explicitly before reading Container App env vars.
+#   - WORKFORCE_SUBSCRIPTION_ID, WORKFORCE_TENANT_ID,
+#     DEV_EXTERNAL_TENANT_ID, and PRODUCTION_EXTERNAL_TENANT_ID loaded from an
+#     approved non-repository configuration source.
 #
 # Behavior notes:
 #   - Sections 2 and 3 will run `az login --tenant <external-tenant-id>
@@ -67,14 +69,6 @@
 #     captures (e.g. `az ad app list ... -o table`) go to STDOUT so the
 #     operator can redirect them independently if desired.
 #
-# Hardcoded identifiers (mirrored from Part A captures in
-# docs/runbooks/azure-sso-manual-bootstrap.md — keep in sync if anything drifts):
-#   WORKFORCE_SUB        5eeebca2-f232-415b-a8cf-6b6688ca5e8f
-#   WORKFORCE_TENANT     06e9d0d5-1d26-4dfb-aa61-4675a6616fba
-#   DEV_EXTERNAL_TENANT  a400a39c-97cf-4459-932e-6dfccf2adf1c
-#   PROD_EXTERNAL_TENANT 8ce01097-ed0b-4425-a49a-2f42c41a1119
-# These are tenant / subscription GUIDs — treated as public and safe to commit.
-#
 # Exit codes:
 #   0   all checks PASS
 #   1   one or more checks FAIL (or a hard precondition is missing); non-zero
@@ -83,12 +77,25 @@
 
 set -euo pipefail
 
-# --- hardcoded identifiers (public; see header for rationale) -----------------
+# --- deployment identifiers (never committed populated) ----------------------
 
-WORKFORCE_SUB="5eeebca2-f232-415b-a8cf-6b6688ca5e8f"
-WORKFORCE_TENANT="06e9d0d5-1d26-4dfb-aa61-4675a6616fba"
-DEV_EXTERNAL_TENANT="a400a39c-97cf-4459-932e-6dfccf2adf1c"
-PROD_EXTERNAL_TENANT="8ce01097-ed0b-4425-a49a-2f42c41a1119"
+required_identifier_variables=(
+  WORKFORCE_SUBSCRIPTION_ID
+  WORKFORCE_TENANT_ID
+  DEV_EXTERNAL_TENANT_ID
+  PRODUCTION_EXTERNAL_TENANT_ID
+)
+for variable_name in "${required_identifier_variables[@]}"; do
+  [[ -n "${!variable_name:-}" ]] || {
+    echo "ERROR: required environment variable is unset: $variable_name" >&2
+    exit 2
+  }
+done
+
+WORKFORCE_SUB="$WORKFORCE_SUBSCRIPTION_ID"
+WORKFORCE_TENANT="$WORKFORCE_TENANT_ID"
+DEV_EXTERNAL_TENANT="$DEV_EXTERNAL_TENANT_ID"
+PROD_EXTERNAL_TENANT="$PRODUCTION_EXTERNAL_TENANT_ID"
 
 # --- repeated fixed strings (hoisted for single-source-of-truth) --------------
 

@@ -7,6 +7,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/Spinner';
 
+/** Renders the public sign-in landing page and available authentication entry points. */
 export default function LandingPage() {
   const router = useRouter();
   const auth = useAuth();

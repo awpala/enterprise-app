@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. 2026-08-15. Account-backed planning and deployment validation remain pending because no dedicated AWS account is available.
+Accepted and implemented for development. 2026-08-15. Account-backed planning, deployment, generated HTTPS, Google and Microsoft/Outlook federation, migrations, smoke testing, and repeated push deployments are verified. Production remains subject to the workbook gates.
 
 ## Context
 
@@ -18,7 +18,7 @@ Implement AWS as a peer Terraform root under `infra/aws`, with its own S3 state 
 |---|---|---|
 | Web/API/worker runtime | Container Apps | ECS services on Fargate |
 | One-off migrations | Container Apps Job | ECS one-off task |
-| Public routing | Container Apps ingress | Application Load Balancer |
+| Public routing | Container Apps generated HTTPS ingress | CloudFront generated HTTPS origin over a restricted Application Load Balancer |
 | UI | Next.js Container App | Next.js ECS service |
 | PostgreSQL | Flexible Server | RDS PostgreSQL 16 |
 | Images | ACR | ECR |
@@ -29,9 +29,9 @@ Implement AWS as a peer Terraform root under `infra/aws`, with its own S3 state 
 | Logs/APM | Log Analytics and Application Insights | CloudWatch, X-Ray, and ADOT sidecars |
 | CI identity | Entra workload identity | IAM role trusted through GitHub OIDC |
 
-Use a two-to-three-AZ VPC. Place the ALB in public subnets and ECS, RDS, RabbitMQ, and EFS in private subnets. Use one NAT gateway in development and one per AZ in production. Encrypt RDS, EFS, ECR, Secrets Manager, and S3 state using AWS-managed encryption for the prototype; revisit customer-managed keys during hardening.
+Use a two-to-three-AZ VPC. Place the ALB in public subnets and ECS, RDS, RabbitMQ, and EFS in private subnets. Use one NAT gateway in development and one per AZ in production. Encrypt RDS, EFS, ECR, Secrets Manager, and S3 state using AWS-managed encryption for the initial implementation; revisit customer-managed keys during hardening.
 
-Use one ALB origin for the Next.js UI and API. Route `/api/v1/*`, health,
+Use one ALB origin for the Next.js UI and API. Route `/api/*`, health,
 OpenAPI, and Scalar paths to the API; route all other paths to Next.js. The
 public application origin is the AWS-generated CloudFront HTTPS hostname with
 the CloudFront default certificate. Terraform derives Cognito callback/logout
@@ -73,7 +73,7 @@ no environment-specific identity URL is embedded in the workflow.
 
 ## Alternatives considered
 
-- **EKS:** rejected for the prototype because Kubernetes adds cluster operations without changing the application shape.
+- **EKS:** rejected because Kubernetes adds cluster operations without changing the application shape.
 - **App Runner:** rejected because the private worker, RabbitMQ, EFS, migration task, and shared routing requirements align more directly with ECS.
 - **Amazon MQ:** deferred. It may improve broker operations, but RabbitMQ-in-container is the closest behavioral match for initial parity.
 - **Aurora PostgreSQL:** deferred because RDS PostgreSQL is the closer like-for-like baseline and has a lower minimum footprint.

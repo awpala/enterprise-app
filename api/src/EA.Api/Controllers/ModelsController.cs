@@ -236,8 +236,8 @@ public class ModelsController(
     }
 
     /// <summary>
-    /// Renders the Phase 2A/2B audit columns as a single string for the wire
-    /// format. Prefers the captured display name; falls back to the normalized
+    /// Renders the creation-audit columns as a single string for the wire format.
+    /// Prefers the captured display name; falls back to the normalized
     /// subject identifier for rows created by principals with no name claim.
     /// </summary>
     private static string FormatCreatedBy(string? createdByName, Guid createdBy) =>

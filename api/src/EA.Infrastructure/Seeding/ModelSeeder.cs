@@ -7,9 +7,9 @@ using Microsoft.Extensions.Logging;
 namespace EA.Infrastructure.Seeding;
 
 /// <summary>
-/// Runtime seed applier that upserts <see cref="Model"/> rows from JSON files
-/// under the configured seed directory. Uses "seed on absence" semantics —
-/// missing rows are inserted, existing rows (matched by id) are left untouched.
+/// Runtime seed applier that inserts missing <see cref="Model"/> rows from JSON
+/// files under the configured seed directory. Existing rows matched by identifier
+/// are left untouched.
 /// </summary>
 public sealed class ModelSeeder(ILogger<ModelSeeder> logger)
 {

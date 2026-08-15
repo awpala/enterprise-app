@@ -10,6 +10,7 @@ const STATUS_STYLES: Readonly<Record<string, string>> = {
   running: 'bg-primary-soft text-primary',
 };
 
+/** Renders a semantic color badge for a model or run status. */
 export function StatusBadge({ status }: { readonly status: string }) {
   return (
     <span className={cx(

@@ -6,6 +6,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { ErrorNotice } from '@/components/ErrorNotice';
 import { Spinner } from '@/components/Spinner';
 
+/** Completes the browser OIDC redirect and returns to the authenticated dashboard. */
 export default function AuthCallbackPage() {
   const { loading, completeLogin } = useAuth();
   const router = useRouter();

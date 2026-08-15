@@ -9,9 +9,9 @@
 #   injects from GitHub Environment secrets.
 #
 #   Non-secret tenant identifiers (external_tenant_id, tenant_subdomain) are
-#   NOT exported here — they now live in infra/azure/envs/<env>.tfvars directly,
-#   because -var-file has higher precedence than TF_VAR_* env vars, and
-#   committing a tenant GUID + subdomain is safe (they are not credentials).
+#   NOT exported here because the current Terraform root reads them from the
+#   selected env tfvars file. Do not duplicate populated identifiers in this
+#   tracked helper.
 #
 # Usage:
 #   eval "$(bash docs/runbooks/scripts/azure-source-sso-env.sh dev)"

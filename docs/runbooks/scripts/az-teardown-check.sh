@@ -17,18 +17,26 @@ logi(){ echo "[INFO] $*"; }
 logw(){ echo "[WARN] $*"; }
 loge(){ echo "[ALERT] $*"; }
 
-declare -A RG=( [dev]=ea-dev-rg [prod]=ea-prod-rg )
+: "${AZURE_DEV_RESOURCE_GROUP:?Set AZURE_DEV_RESOURCE_GROUP from the approved operator configuration.}"
+: "${AZURE_PRODUCTION_RESOURCE_GROUP:?Set AZURE_PRODUCTION_RESOURCE_GROUP from the approved operator configuration.}"
+: "${AZURE_DEV_KEY_VAULT:?Set AZURE_DEV_KEY_VAULT from the approved operator configuration.}"
+: "${AZURE_PRODUCTION_KEY_VAULT:?Set AZURE_PRODUCTION_KEY_VAULT from the approved operator configuration.}"
+: "${TFSTATE_RESOURCE_GROUP:?Set TFSTATE_RESOURCE_GROUP from the Azure bootstrap output.}"
+: "${TFSTATE_STORAGE_ACCOUNT:?Set TFSTATE_STORAGE_ACCOUNT from the Azure bootstrap output.}"
+: "${TFSTATE_CONTAINER:?Set TFSTATE_CONTAINER from the Azure bootstrap output.}"
+
+declare -A RG=( [dev]="$AZURE_DEV_RESOURCE_GROUP" [prod]="$AZURE_PRODUCTION_RESOURCE_GROUP" )
 ENVS=(dev prod)
 
 # Key Vault names per environment (check soft-delete)
-declare -A KV=( [dev]=ea-dev-kv-eadev1 [prod]=ea-prod-kv-eaprd1 )
+declare -A KV=( [dev]="$AZURE_DEV_KEY_VAULT" [prod]="$AZURE_PRODUCTION_KEY_VAULT" )
 
 overall_status=0
 
 # Bootstrap / TFSTATE backend details (required for redeploy)
-BOOTSTRAP_RG="ea-tfstate-rg"
-BOOTSTRAP_SA="eatfstateeaboot"
-BOOTSTRAP_CONTAINER="tfstate"
+BOOTSTRAP_RG="$TFSTATE_RESOURCE_GROUP"
+BOOTSTRAP_SA="$TFSTATE_STORAGE_ACCOUNT"
+BOOTSTRAP_CONTAINER="$TFSTATE_CONTAINER"
 TFSTATE_KEYS=(dev.tfstate production.tfstate)
 
 for e in "${ENVS[@]}"; do
@@ -90,12 +98,8 @@ for e in "${ENVS[@]}"; do
     echo "${regs}" | while IFS= read -r acr; do
       echo "- ${acr}"
       repo_count=$(az acr repository list -n "${acr}" -o tsv 2>/dev/null | wc -l || echo 0)
-      if [[ ${repo_count} -gt 0 ]]; then
-        loge "  ${repo_count} repository(ies) in ${acr} — image storage cost risk"
-        overall_status=2
-      else
-        logi "  ${acr} has no repositories"
-      fi
+      loge "  registry ${acr} remains (repositories: ${repo_count}) — review its current SKU cost"
+      overall_status=2
     done
   fi
 
@@ -169,25 +173,6 @@ else
   fi
 fi
 
-# Per-environment deploy client IDs (each environment has its own clientId)
-declare -A DEPLOY_CLIENT=( [dev]=4744e902-b8ce-4ec7-a6d8-861f9d2570fc [prod]=77abc59b-a03b-4af7-b6cf-809dea776cd4 )
-for e in "${ENVS[@]}"; do
-  cid=${DEPLOY_CLIENT[$e]}
-  if [[ -z "${cid}" ]]; then
-    continue
-  fi
-  logi "Checking role assignments for env clientId (${e}): ${cid}"
-  # List assignments for the clientId (informational)
-  logi "Listing role assignments for clientId ${cid} (env=${e})"
-  az role assignment list --assignee "${cid}" --query "[].{role:roleDefinitionName,scope:scope}" -o table 2>/dev/null || logw "Unable to list role assignments for ${cid} (may lack permission)"
-  has_roles=$(az role assignment list --assignee "${cid}" --query "[?roleDefinitionName=='Owner' || roleDefinitionName=='Contributor'] | length(@)" -o tsv 2>/dev/null || echo 0)
-  if [[ "${has_roles}" -eq 0 ]]; then
-    logw "ClientId ${cid} does not have Owner/Contributor role assignments (env=${e}) — informational only"
-  else
-    logi "ClientId ${cid} has Owner/Contributor roles (env=${e})"
-  fi
-done
-
 echo
 logi "Checking GitHub CLI (GH) for secrets / OIDC checks"
 if command -v gh >/dev/null 2>&1; then
@@ -213,7 +198,7 @@ fi
 
 echo
 if [[ ${overall_status} -eq 0 ]]; then
-  logi "No high-cost resources detected and bootstrap state is intact. Good to go for hot redeploy."
+  logi "No targeted runtime resources detected and bootstrap state is intact."
   exit 0
 else
   loge "One or more checks failed. Review above output and fix before redeploy."

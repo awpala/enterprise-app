@@ -21,6 +21,8 @@ Follow `AGENTS.md` as the canonical project guide. You own code under `ui/`.
 
 - Use Server Components by default and `'use client'` only when browser APIs or state require it.
 - Keep TypeScript strict and avoid `any`.
+- Use Tailwind utility classes and shared primitives under `ui/components/ui/`; keep `app/globals.css` limited to the Tailwind import and semantic theme tokens.
+- Name component files in PascalCase to match their primary export. Put React/browser hooks in `ui/hooks/` and framework-independent helpers in `ui/utils/`.
 - Send API traffic through `lib/api.ts`; attach access tokens only to the configured API.
 - Never expose secrets from the runtime-configuration route.
 - Keep provider-specific authentication behavior inside the auth adapter.

@@ -54,15 +54,20 @@ fi
 if ! grep -q '^export data_engine=' "$BASH_ALIASES" 2>/dev/null; then
   echo 'export data_engine="/workspace/data-engine"' >> "$BASH_ALIASES"
 fi
-if ! grep -q '^alias run-ui=' "$BASH_ALIASES" 2>/dev/null; then
-  echo "alias run-ui='cd \"\$ui\" && npm run dev'" >> "$BASH_ALIASES"
-fi
-if ! grep -q '^alias run-api=' "$BASH_ALIASES" 2>/dev/null; then
-  echo "alias run-api='cd \"\$api\" && dotnet run'" >> "$BASH_ALIASES"
-fi
-if ! grep -q '^alias run-data-engine=' "$BASH_ALIASES" 2>/dev/null; then
-  echo "alias run-data-engine='cd \"\$data_engine\" && .venv/bin/python -m data_engine.main'" >> "$BASH_ALIASES"
-fi
+upsert_alias() {
+  local alias_name=$1
+  local alias_value=$2
+  if grep -q "^alias ${alias_name}=" "$BASH_ALIASES" 2>/dev/null; then
+    sed -i "s|^alias ${alias_name}=.*$|alias ${alias_name}='${alias_value}'|" "$BASH_ALIASES"
+  else
+    echo "alias ${alias_name}='${alias_value}'" >> "$BASH_ALIASES"
+  fi
+}
+
+LOCAL_SERVICE_RUNNER="${WORKSPACE_DIR}/.devcontainer/scripts/run-local-service.sh"
+upsert_alias run-ui "${LOCAL_SERVICE_RUNNER} ui"
+upsert_alias run-api "${LOCAL_SERVICE_RUNNER} api"
+upsert_alias run-data-engine "${LOCAL_SERVICE_RUNNER} data-engine"
 
 on_error() {
   rc=$?

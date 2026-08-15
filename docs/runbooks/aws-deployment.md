@@ -51,8 +51,9 @@ Edit `infra/aws/envs/dev.deploy.env`:
 AWS_PROFILE=ea-bootstrap
 AWS_REGION=us-east-1
 AWS_NAME_SUFFIX=replace1
-GITHUB_OWNER=awpala
-GITHUB_REPO=enterprise-app
+GITHUB_OWNER=replace-with-repository-owner
+GITHUB_REPO=replace-with-repository-name
+DEPLOYMENT_TARGETS=aws
 COGNITO_DOMAIN_PREFIX=replace-with-globally-unique-prefix
 AWS_MONTHLY_BUDGET_USD=100
 AWS_BUDGET_EMAIL=
@@ -62,16 +63,15 @@ GITHUB_PRODUCTION_REVIEWER=
 
 `AWS_NAME_SUFFIX` must be 4-10 lowercase letters or numbers and makes the S3 state bucket globally unique. `AWS_BUDGET_EMAIL` is optional; when empty, the budget is created without an email subscriber. `DEPLOY_REF` must contain the committed AWS workflow and application revision to deploy. The script requires a clean worktree and verifies that local `HEAD` exactly matches that remote ref, ensuring the reviewed plan and GitHub build use one commit.
 
-The selected region must match `aws_region` in `infra/aws/envs/dev.tfvars`. CloudFront supplies the public HTTPS hostname; no custom domain, Route 53 zone, DNS configuration, or ACM certificate is used.
+The selected region must match `aws_region` in `infra/aws/envs/dev.tfvars`. CloudFront supplies the public HTTPS hostname; no custom domain, public Route 53 hosted zone, public DNS record, or ACM certificate is used. Cloud Map still manages private service-discovery DNS inside the VPC.
 
-## Onboard, plan, and deploy
+## Onboard and plan
 
-Run one command:
+Run the supported onboarding command without deployment first:
 
 ```bash
 infra/scripts/aws-onboard.sh dev \
-  --config infra/aws/envs/dev.deploy.env \
-  --deploy
+  --config infra/aws/envs/dev.deploy.env
 ```
 
 The script displays the resolved account and requires the operator to type its account ID. Use `--yes` only in an already controlled non-interactive environment.
@@ -85,16 +85,17 @@ The command is idempotent and performs the entire CLI-amenable sequence:
 5. Reuses the logical `dev` GitHub Environment so the already-configured Google OAuth credentials are not duplicated, and sets every AWS variable required by the workflow.
 6. Reconciles customer SSO through `aws-configure-customer-sso.sh`: it reuses the protected Google values, creates or updates the Microsoft personal-account registration through the authenticated CLI, and writes its generated credential directly to the protected GitHub Environment.
 7. Initializes, formats, validates, and saves the account-backed application plan at `infra/aws/aws-dev.tfplan`; non-secret placeholders model the unreadable GitHub secrets without copying them locally.
-8. Dispatches `deploy.yml` for AWS/dev. The GitHub-hosted runner creates ECR, builds and pushes all four images, applies the stack, creates the AWS-generated CloudFront HTTPS endpoint, runs migrations, and smoke-tests it.
+8. When `--deploy` is present, dispatches `deploy.yml` for AWS/dev. The GitHub-hosted runner creates ECR, builds and pushes all four images, applies the stack, creates the AWS-generated CloudFront HTTPS endpoint, runs migrations, and smoke-tests it.
 
-Omit `--deploy` to stop after the saved application plan:
+The initial non-deploying run prints the exact Cognito federation callback. Add it to the reused Google OAuth client as described below, review `infra/aws/aws-dev.tfplan`, and only then rerun with `--deploy`:
 
 ```bash
 infra/scripts/aws-onboard.sh dev \
-  --config infra/aws/envs/dev.deploy.env
+  --config infra/aws/envs/dev.deploy.env \
+  --deploy
 ```
 
-After reviewing the plan, rerun the same command with `--deploy`. Existing state, OIDC, role, and GitHub variables are reconciled rather than recreated.
+Existing state, OIDC, role, and GitHub variables are reconciled rather than recreated.
 
 To reconcile or rotate customer SSO independently of onboarding, run:
 
@@ -113,19 +114,23 @@ at both providers is
 Microsoft is reconciled through its CLI. Google does not expose an equivalent
 supported CLI for editing an existing OAuth client's redirect URIs, so add that
 exact URI once in Google Cloud Console under **APIs & Services → Credentials →
-the reused OAuth 2.0 Client ID → Authorized redirect URIs**. Keep the existing
-Azure redirect URI on the client.
+the reused OAuth 2.0 Client ID → Authorized redirect URIs**. Preserve every
+existing authorized redirect URI on the reused client.
 
 ## Monitor and verify
 
 ```bash
+set -a
+source infra/aws/envs/dev.deploy.env
+set +a
+
 gh run list \
-  --repo awpala/enterprise-app \
+  --repo "$GITHUB_OWNER/$GITHUB_REPO" \
   --workflow deploy.yml \
   --limit 1
 
 gh run watch <run-id> \
-  --repo awpala/enterprise-app \
+  --repo "$GITHUB_OWNER/$GITHUB_REPO" \
   --exit-status
 ```
 

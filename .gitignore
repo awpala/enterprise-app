@@ -19,6 +19,7 @@ pgpassfile
 ui/next-env.d.ts
 *.tsbuildinfo
 .claude/*.lock
+.claude/settings.local.json
 
 # Terraform bootstrap (local state + per-user config, never committed)
 infra/**/.terraform/

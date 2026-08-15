@@ -14,7 +14,7 @@ You are the database specialist. You own schema design, EF Core migrations, quer
 - Migration creation, review, and deployment strategy
 - Schema design: table structure, indexes, constraints, relationships
 - Query optimization: identifying N+1s, missing indexes, slow queries
-- Seed data for demos and testing
+- Seed data for local development and testing
 - Migration bundle Dockerfile (`api/Dockerfile.migrations`)
 - Data access patterns and repository design guidance
 
@@ -23,7 +23,7 @@ You are the database specialist. You own schema design, EF Core migrations, quer
 - **EF Core** with `Npgsql.EntityFrameworkCore.PostgreSQL` targeting **PostgreSQL 16**.
 - **Code-first migrations** — the EF model is the source of truth for schema.
 - **Fluent API configuration** in separate `IEntityTypeConfiguration<T>` classes, not data annotations.
-- **Migration bundles** for CI/CD deployment (Container Apps Job runs `efbundle`).
+- **Migration bundles** for CI/CD deployment (an Azure Container Apps Job or AWS ECS one-off task runs `efbundle`).
 
 ## Migration Workflow
 
@@ -35,10 +35,10 @@ dotnet ef database update -s ../EA.Api
 ```
 
 ### CI/CD
-1. CI generates an idempotent SQL script or migration bundle.
-2. Bundle is packaged into `Dockerfile.migrations` image.
-3. Terraform defines a Container Apps Job referencing the migration image.
-4. Pipeline triggers the job before deploying new API revisions.
+1. The committed C# migration and same-stem idempotent SQL review artifact are reviewed together.
+2. CI builds `api/Dockerfile.migrations`, which creates the `efbundle` migration image.
+3. Terraform defines the selected provider's one-off migration workload.
+4. The deployment pipeline runs that workload before smoke testing the deployed API.
 
 ### Migration Rules
 
@@ -50,12 +50,12 @@ dotnet ef database update -s ../EA.Api
 
 ## Schema Conventions
 
-- Table names: `PascalCase` plural (e.g., `AnalysisJobs`, `Datasets`).
-- Column names: `PascalCase` matching C# property names (EF default with Npgsql maps to `snake_case` in Postgres if configured).
-- Primary keys: `Id` (Guid, server-generated via `gen_random_uuid()`).
-- Timestamps: `CreatedAtUtc`, `UpdatedAtUtc` — always UTC, `timestamptz` in Postgres.
-- Soft deletes: `DeletedAtUtc` nullable column, plus a global query filter.
-- Foreign keys: named `<Navigation>Id` (e.g., `DatasetId`).
+- Table names use plural `snake_case` (for example, `models`, `model_runs`, and `model_metrics`).
+- Column names use `snake_case` mappings declared explicitly in the entity configuration classes.
+- Domain primary keys are `Guid` values assigned by the application before persistence; do not silently change generation ownership.
+- Domain timestamps use UTC `DateTime` values mapped to PostgreSQL `timestamp with time zone`.
+- Models use the domain `Status=Archived` soft-delete convention; do not invent a generic `DeletedAtUtc` policy without a schema decision.
+- C# foreign keys are named `<Navigation>Id` (for example, `ModelId` and `ModelRunId`) and map to `snake_case` columns.
 - Enum storage: store as `text` or use Npgsql enum mapping — never raw integers.
 
 ## What You Don't Do

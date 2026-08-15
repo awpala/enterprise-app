@@ -16,6 +16,7 @@ import { createModelTableColumns } from '@/utils/modelTableColumns';
 
 const modelColumns = createModelTableColumns({ compact: true });
 
+/** Renders aggregate model/run totals and recent model activity. */
 export default function DashboardPage() {
   const api = useApi();
   const router = useRouter();

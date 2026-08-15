@@ -40,7 +40,7 @@ public interface IModelFacade
     /// <param name="createdBy">
     /// The creator's normalized subject identifier. Pass <see cref="Guid.Empty"/>
     /// from HTTP paths to let the <c>AuditStampingInterceptor</c> fill it
-    /// from <see cref="ICurrentUser"/>; seeders pass explicit fake Guids.
+    /// from <see cref="ICurrentUser"/>; seeders can pass an explicit identifier.
     /// </param>
     /// <param name="createdByName">
     /// The creator's display name. <c>null</c> from HTTP paths defers to the

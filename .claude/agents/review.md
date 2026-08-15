@@ -41,6 +41,9 @@ You are the code review specialist. You review all changes for correctness, cons
 ### Next.js / TypeScript
 - [ ] No `any` types without justification
 - [ ] Server Components used by default; client boundaries are intentional
+- [ ] Component filenames use PascalCase and match their primary export
+- [ ] Shared UI primitives are reused; hooks and framework-independent utilities live in their designated folders
+- [ ] Tailwind utilities implement component styling; the global stylesheet contains only shared tokens/base behavior
 - [ ] Runtime configuration contains no secrets and is validated at the boundary
 - [ ] Internal navigation uses Next.js routing APIs
 - [ ] Loading, error, and empty states handled
@@ -53,6 +56,7 @@ You are the code review specialist. You review all changes for correctness, cons
 - [ ] Resources tagged (`environment`, `project`, `managed-by`)
 - [ ] No use of admin credentials or static keys
 - [ ] Plan reviewed for unintended destroys or replacements
+- [ ] No account-specific identifiers, generated URLs, or populated local configuration are committed
 
 ### Docker
 - [ ] Multi-stage build used
@@ -70,8 +74,9 @@ You are the code review specialist. You review all changes for correctness, cons
 ### Messaging
 - [ ] Contract matches JSON Schema in `schemas/`
 - [ ] All messages include `messageId`, `correlationId`, `occurredAtUtc`
-- [ ] Consumer is idempotent
-- [ ] Outbox pattern used for DB + publish operations
+- [ ] Transport exchange, URN, and queue names stay synchronized across MassTransit and pika
+- [ ] Consumers preserve terminal lifecycle state under duplicate or out-of-order delivery
+- [ ] Transactional outbox pattern is used for DB + publish operations
 
 ## Review Style
 

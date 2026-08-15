@@ -8,8 +8,8 @@ namespace EA.Api.Auth;
 
 /// <summary>
 /// Authentication handler used when <c>Authentication:Enabled = false</c>.
-/// Synthesizes a fixed dev principal so curl, docker-compose, and integration
-/// tests can keep exercising guarded endpoints without a real token.
+/// Synthesizes a fixed development principal so local clients can exercise
+/// guarded endpoints without contacting an external identity provider.
 /// </summary>
 public sealed class DevAuthHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -23,8 +23,7 @@ public sealed class DevAuthHandler(
     public const string SchemeName = "Dev";
 
     /// <summary>
-    /// Sentinel object identifier for the dev principal. Matches the value
-    /// documented in the Phase 2A plan.
+    /// Sentinel object identifier for the development principal.
     /// </summary>
     public static readonly Guid DevOid = new("00000000-0000-0000-0000-000000000001");
 

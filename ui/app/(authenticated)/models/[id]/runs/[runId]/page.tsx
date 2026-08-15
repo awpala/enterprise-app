@@ -21,6 +21,7 @@ const metricColumns: readonly DataTableColumn<ModelMetric>[] = [
   { id: 'calculated', header: 'Calculated', cell: metric => formatDate(metric.calculatedAtUtc) },
 ];
 
+/** Renders one model run with lifecycle timestamps, metrics, and histogram data. */
 export default function RunDetailPage() {
   const { id, runId } = useParams<{ id: string; runId: string }>();
   const api = useApi();

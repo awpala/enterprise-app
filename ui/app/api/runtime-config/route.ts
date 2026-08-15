@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { AuthProvider, DeploymentTarget, RuntimeConfig } from '@/lib/types';
 
+/** Forces runtime configuration to be evaluated per request. */
 export const dynamic = 'force-dynamic';
 
 function asBoolean(value: string | undefined): boolean {
@@ -19,6 +20,7 @@ function authProvider(value: string | undefined): AuthProvider {
   throw new Error(`Unsupported AUTH_PROVIDER '${value}'.`);
 }
 
+/** Returns validated, non-secret browser runtime configuration. */
 export function GET(): NextResponse<RuntimeConfig> {
   const target = deploymentTarget(process.env.DEPLOYMENT_TARGET);
   const provider = authProvider(process.env.AUTH_PROVIDER);

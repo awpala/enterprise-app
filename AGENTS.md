@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-A Docker-first, event-driven enterprise demo application focused around a generic "model," deployable to Azure or AWS through peer Terraform roots and provider CLIs. The system demonstrates SSO, async job processing, observability, and repeatable infrastructure-as-code deployments.
+A containerized, event-driven enterprise demo application focused around a generic "model," deployable to Azure or AWS through peer Terraform roots and provider CLIs. The system demonstrates SSO, async job processing, observability, and repeatable infrastructure-as-code deployments.
 
 The development occurs within a VS Code-based Devcontainer, as defined in `.devcontainer`. Any missing CLIs, dependencies, should be updated accordingly in setup script `.devcontainer/scripts/setup-env.sh`.
 
@@ -38,7 +38,7 @@ flowchart LR
     mq -->|MassTransit consume| api
 ```
 
-The API is the system of record; the data engine is a stateless worker. All cross-service communication is either (a) Bearer-authenticated HTTP (browser → API) or (b) RabbitMQ messages keyed by `model.run.*.v1` routing keys with contracts defined in `schemas/`.
+The API is the system of record; the data engine is a stateless worker. All cross-service communication is either (a) Bearer-authenticated HTTP (browser → API) or (b) RabbitMQ messages with logical `model.run.*.v1` contracts defined in `schemas/`. The current MassTransit/pika transport maps those contracts to CLR-type fanout exchanges and per-consumer queues declared in `data-engine/src/data_engine/topology.py` and `Program.cs`.
 
 ## Project Repository Structure
 
@@ -55,7 +55,7 @@ High-level layout only — a single level of expansion per service, intentionall
 │   │   └── EA.Contracts/               # Shared DTOs (Models/) and RabbitMQ message records (Messages/)
 │   ├── tests/
 │   │   ├── EA.Api.Tests/               # NUnit unit tests
-│   │   └── EA.Api.IntegrationTests/    # Testcontainers (Postgres + RabbitMQ) integration tests (NUnit)
+│   │   └── EA.Api.IntegrationTests/    # PostgreSQL Testcontainer + MassTransit in-memory harness (NUnit)
 │   ├── seed/                           # Seed data applied by the migration job
 │   ├── Dockerfile                      # Multi-stage: SDK build → aspnet runtime
 │   └── Dockerfile.migrations           # EF Core migration bundle image
@@ -102,7 +102,7 @@ Deeper structure (individual components, feature folders, migration files, etc.)
 | API runtime | .NET | 10 | `mcr.microsoft.com/dotnet/sdk:10.0` / `aspnet:10.0` |
 | API framework | ASP.NET Core | 10 | Minimal APIs preferred; controllers acceptable |
 | ORM | EF Core + Npgsql | latest stable | Npgsql.EntityFrameworkCore.PostgreSQL |
-| Messaging (.NET) | MassTransit | latest stable | RabbitMQ transport, outbox, sagas |
+| Messaging (.NET) | MassTransit | latest stable | RabbitMQ transport and lifecycle consumers; EF outbox package referenced |
 | Frontend | Next.js / React | 16 / 19 | App Router, standalone server output |
 | Frontend auth | oidc-client-ts | latest stable | Auth code flow + PKCE via Entra or Cognito |
 | Database | PostgreSQL | 16 | Azure Flexible Server, AWS RDS, or `postgres:16` locally |
@@ -126,7 +126,11 @@ run-data-engine
 
 All three processes are required for the model-run lifecycle; without `run-data-engine`, requested runs remain pending because no worker consumes the RabbitMQ command.
 
-### Local Development (Docker-first)
+The aliases invoke `.devcontainer/scripts/run-local-service.sh`, which records application output and explicit start/exit lifecycle entries under ignored `__logs/local/`. Each service also has a stable `<service>-latest.log` symlink for immediate diagnosis. Use these aliases instead of invoking the underlying process commands directly so unexpected exits remain attributable.
+
+The complete user-facing runner contract, log format, restart procedure, and troubleshooting commands are documented in the top-level [`README.md`](./README.md#local-development).
+
+### Local development on a Docker-capable host
 
 The Compose workflow below is for host environments with Docker, not for use inside `ea-dev-env`.
 
@@ -147,7 +151,7 @@ docker compose -f deploy/compose.yaml up --build
 # API unit tests
 dotnet test api/tests/EA.Api.Tests/
 
-# API integration tests (requires Docker for Testcontainers)
+# API integration tests (requires Docker for the PostgreSQL Testcontainer)
 dotnet test api/tests/EA.Api.IntegrationTests/
 
 # UI tests
@@ -224,9 +228,10 @@ The generated `.sql` pairs with the C# migration of the same stem (e.g. `2026041
 ### Messaging Contracts
 
 - Message types live in `schemas/` as JSON Schema (Draft 2020-12).
-- Routing keys are versioned: `analysis.job.requested.v1`.
+- Logical contract names are versioned: `model.run.requested.v1`. Transport exchange/queue names must stay synchronized across .NET and Python.
 - All messages must include: `messageId` (uuid), `correlationId` (uuid), `occurredAtUtc` (ISO 8601).
 - Use the outbox pattern (MassTransit) for transactional consistency between DB writes and message publishing.
+- **Current delivery gap:** `ModelFacade.CreateAndPublishRunAsync` saves a run and then publishes in a separate operation; no MassTransit EF bus outbox is configured in `Program.cs`. Do not claim transactional or at-least-once run-command publication until that implementation is completed and tested.
 
 ## API Design
 
@@ -234,7 +239,7 @@ The generated `.sql` pairs with the C# migration of the same stem (e.g. `2026041
 - URL-path versioning (`/api/v1/...`).
 - Consistent error responses using ProblemDetails.
 - OpenAPI document generated via Scalar; keep it in sync.
-- Health endpoints: `/health/live`, `/health/ready`, `/health/startup`.
+- Health endpoints: `/health/live`, `/health/ready`, `/health/startup`. Readiness currently probes PostgreSQL; RabbitMQ readiness is a known coverage gap.
 
 ## Observability
 
@@ -247,7 +252,7 @@ The generated `.sql` pairs with the C# migration of the same stem (e.g. `2026041
 ## Deployment Pipeline
 
 ### CI (`ci.yml`)
-- **Every push/PR** → API/UI tests, both Terraform roots and bootstraps, shell adapters, and all four portable container builds.
+- **Every push/PR** → API/UI unit checks, both Terraform roots and bootstraps, shell adapters, and all four portable container builds. Data-engine tests are run locally today; add them to CI before claiming full automated test coverage.
 - **Pull requests and `main`** → integration tests (Testcontainers) after unit tests pass.
 
 ### Deploy (`deploy.yml`)

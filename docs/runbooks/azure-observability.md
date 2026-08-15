@@ -6,7 +6,19 @@ This runbook covers post-deploy verification and day-2 operation of the Azure ob
 
 **Who runs this**: any operator with **Reader** on the resource group plus **Monitoring Reader** on the Application Insights instance. Sections that exec into the RabbitMQ container additionally require **Container Apps Contributor** (for `az containerapp exec`); section 4 (Postgres Query Editor) requires the Postgres admin password from Key Vault.
 
-**Naming convention used below**: replace `{env}` with `dev` or `production`, and `{suffix}` with the random suffix Terraform appends (visible in the resource group). Example resource names: `ea-dev-appi-a1b2c3`, `ea-production-pgsql-a1b2c3`, `ea-production-rg`.
+Resolve live names from Terraform and Azure rather than copying environment identifiers into this runbook:
+
+```bash
+RESOURCE_GROUP=$(terraform -chdir=infra/azure output -raw resource_group_name)
+API_APP=$(terraform -chdir=infra/azure output -raw api_app_name)
+DATA_ENGINE_APP=$(terraform -chdir=infra/azure output -raw data_engine_app_name)
+KEY_VAULT=$(terraform -chdir=infra/azure output -raw key_vault_name)
+POSTGRES_FQDN=$(terraform -chdir=infra/azure output -raw postgres_fqdn)
+APP_INSIGHTS=$(az resource list --resource-group "$RESOURCE_GROUP" \
+  --resource-type Microsoft.Insights/components --query '[0].name' --output tsv)
+RABBITMQ_APP=$(az containerapp list --resource-group "$RESOURCE_GROUP" \
+  --query "[?contains(name, 'rabbitmq')].name | [0]" --output tsv)
+```
 
 **Prerequisites**:
 
@@ -22,7 +34,7 @@ Run this every time after `terraform apply` + image rebuild + `az containerapp u
 
 ### Step 1. Live Metrics tick
 
-1. In the portal, top search bar -> type the App Insights name (`ea-{env}-appi-{suffix}`) -> click the resource.
+1. In the portal, search for the Application Insights resource resolved as `$APP_INSIGHTS`.
 2. Left nav -> **Investigate** group -> **Live metrics**.
 3. In a separate terminal, hit the API health endpoint a few times:
 
@@ -33,14 +45,14 @@ Run this every time after `terraform apply` + image rebuild + `az containerapp u
    done
    ```
 
-   The API FQDN is the `ingress` URL on the `ea-{env}-api` Container App (Container App overview blade -> **Application Url**).
+   Obtain the API origin with `terraform -chdir=infra/azure output -raw api_url`.
 
 4. Confirm the Live Metrics **Incoming Requests** chart ticks within 5-10 seconds. The **Servers** column on the right should list at least one entry whose **Role Name** is `ea-api`. If the chart stays at zero, jump to [Section 8 - Troubleshooting "no telemetry"](#8-troubleshooting-no-telemetry).
 
 ### Step 2. Application Map shows the instrumented service path
 
 1. From the same Application Insights blade, left nav -> **Investigate** group -> **Application map**.
-2. In another terminal, drive one end-to-end flow that exercises the whole stack. The minimum is a single create-model call from the Next.js UI, which produces: browser request -> API HTTP request -> Postgres write -> RabbitMQ publish -> data engine consume.
+2. In another terminal, create or open a model and then request a model run from the Next.js UI. Creating a model exercises UI -> API -> PostgreSQL; requesting the run adds RabbitMQ publish/consume and data-engine processing.
 
    If you do not have a UI session handy, the equivalent CLI path is:
 
@@ -107,7 +119,7 @@ requests
 | project timestamp, name, itemCount
 ```
 
-`itemCount` should be approximately `5` (one of every five spans was kept at the `0.2` sampling rate). On dev the same query returns `itemCount = 1` because dev keeps 100% of traces.
+The deployed Azure containers run with production runtime settings. The API and data engine are therefore configured for a 0.2 trace sampling ratio in both committed Azure environments; retained telemetry commonly reports an `itemCount` near `5`. Local Development runs can report `1`.
 
 ---
 
@@ -117,16 +129,16 @@ Two custom workbooks ship as Terraform-managed `azurerm_application_insights_wor
 
 1. From the App Insights blade, left nav -> **Monitoring** group -> **Workbooks**.
 2. Click the **Workbooks** tab (portal versions may label this **Shared reports** instead — either way, it is the tab that lists custom workbooks, not the **Quick start** / Microsoft templates tab).
-3. The two custom workbooks are listed as `ea-{env} — Overview` and `ea-{env} — Errors`:
+3. The two custom workbooks use the selected environment prefix and end in `— Overview` and `— Errors`:
    - **Overview** - golden-signals view across instrumented services. Tiles for request rate, P50 / P95 / P99 latency, success rate, and a request-count breakdown by `cloud_RoleName`. Use this for "is the system healthy?" at a glance.
    - **Errors** - failure-focused view. Top exceptions grouped by `cloud_RoleName` and `type`, failed-request waterfall, and a recent failures table with `traceId` for click-through into end-to-end transaction view. Use this when investigating an alert.
 4. Click into either to open it. Time range defaults to the last 24 hours - change via the **Time Range** pill at the top of the workbook.
 
 ---
 
-## 4. RabbitMQ management UI access (AzureRM 4.68 workaround)
+## 4. RabbitMQ management access
 
-The RabbitMQ Container App's ingress is internal-only AMQP TCP on `5672`. The management UI on port `15672` is not externally reachable because `azurerm_container_app.ingress` in **AzureRM 4.68** does not expose `additional_port_mappings`. Until the provider gains that field (tracked in [ADR 0001](../adrs/0001-azure-native-observability.md) "Constraint note"), the operator path is `az containerapp exec` plus the in-container `rabbitmqctl` CLI.
+The RabbitMQ Container App exposes only internal AMQP TCP on `5672`. The management UI on port `15672` is not published by the current Terraform module. The supported operator path is `az containerapp exec` plus the in-container `rabbitmqctl` CLI; do not assume a browser management endpoint exists.
 
 ### Inspect queues, connections, and consumers
 
@@ -136,20 +148,20 @@ az account set --subscription <subscription-id>
 
 # Quick peek - one-shot list_queues
 az containerapp exec \
-  --name ea-{env}-rabbitmq \
-  --resource-group ea-{env}-rg \
+  --name "$RABBITMQ_APP" \
+  --resource-group "$RESOURCE_GROUP" \
   --command "rabbitmqctl list_queues name messages consumers"
 
 # Connection inventory
 az containerapp exec \
-  --name ea-{env}-rabbitmq \
-  --resource-group ea-{env}-rg \
+  --name "$RABBITMQ_APP" \
+  --resource-group "$RESOURCE_GROUP" \
   --command "rabbitmqctl list_connections user peer_host state"
 
 # Consumer inventory
 az containerapp exec \
-  --name ea-{env}-rabbitmq \
-  --resource-group ea-{env}-rg \
+  --name "$RABBITMQ_APP" \
+  --resource-group "$RESOURCE_GROUP" \
   --command "rabbitmqctl list_consumers"
 ```
 
@@ -157,8 +169,8 @@ az containerapp exec \
 
 ```bash
 az containerapp exec \
-  --name ea-{env}-rabbitmq \
-  --resource-group ea-{env}-rg \
+  --name "$RABBITMQ_APP" \
+  --resource-group "$RESOURCE_GROUP" \
   --command /bin/bash
 ```
 
@@ -173,16 +185,16 @@ rabbitmqctl list_bindings source destination routing_key
 
 Type `exit` to leave the container.
 
-> Port-forwarding the management UI from a Container App is not first-class on Container Apps Environments today. Stick to the exec-based CLI recipes above. Revisit the proper port-forward / second-ingress pattern when AzureRM 4.x exposes `additional_port_mappings`.
+> Use the exec-based CLI recipes above. Any future management endpoint requires a reviewed Terraform/networking change and authentication; do not expose it ad hoc.
 
 ### Credentials (for tooling that must speak AMQP from a workstation - rare)
 
 - **Username**: from the `rabbitmq_username` tfvar (committed in `infra/azure/envs/{env}.tfvars`).
-- **Password**: secret name `rabbitmq-password` in Key Vault `ea-{env}-kv-{suffix}`. To retrieve:
+- **Password**: secret name `rabbitmq-password` in the resolved Key Vault. To retrieve:
 
   ```bash
   az keyvault secret show \
-    --vault-name ea-{env}-kv-{suffix} \
+    --vault-name "$KEY_VAULT" \
     --name rabbitmq-password \
     --query value -o tsv
   ```
@@ -197,21 +209,21 @@ For ad-hoc reads against the live database. Two paths depending on your Flexible
 
 ### Path A — Portal Query Editor (General Purpose / Memory Optimized SKUs only)
 
-The **Query editor (preview)** blade is only available on General Purpose and Memory Optimized tier Flexible Servers. It does **not** appear on Burstable-tier SKUs (e.g. `B_Standard_B1ms`, the current dev default).
+The **Query editor (preview)** blade is only available on General Purpose and Memory Optimized tier Flexible Servers. It does **not** appear on the `B_Standard_B1ms` Burstable SKU currently configured by the Terraform module.
 
 If your server is on an eligible SKU:
 
 1. In the portal top search bar, type **PostgreSQL flexible server** and select the matching service.
-2. From the result list, click the server `ea-{env}-pgsql-{suffix}`.
+2. From the result list, select the server matching `$POSTGRES_FQDN`.
 3. Left nav -> **Settings** group -> **Query editor (preview)**.
 4. On the login pane:
    - **Authentication type**: *PostgreSQL authentication*.
    - **Login**: value of the `postgres_admin_username` tfvar (committed in `infra/azure/envs/{env}.tfvars`).
-   - **Password**: value of the `postgres-admin-password` secret in Key Vault `ea-{env}-kv-{suffix}`. Retrieve with:
+   - **Password**: value of the `postgres-admin-password` secret in `$KEY_VAULT`. Retrieve with:
 
      ```bash
      az keyvault secret show \
-       --vault-name ea-{env}-kv-{suffix} \
+       --vault-name "$KEY_VAULT" \
        --name postgres-admin-password \
        --query value -o tsv
      ```
@@ -226,12 +238,12 @@ Use this path when the server is on the Burstable tier, or when you prefer a CLI
 ```bash
 # Retrieve the admin password from Key Vault
 PG_PASS=$(az keyvault secret show \
-  --vault-name ea-{env}-kv-{suffix} \
+  --vault-name "$KEY_VAULT" \
   --name postgres-admin-password \
   --query value -o tsv)
 
 # Connect and run a query
-psql "host=ea-{env}-pgsql-{suffix}.postgres.database.azure.com \
+psql "host=${POSTGRES_FQDN} \
       port=5432 dbname=ea sslmode=require \
       user=eaadmin password=${PG_PASS}" \
   -c 'select count(*) from models;'
@@ -326,22 +338,22 @@ ORDER BY occurred_at_utc DESC;
 1. Portal top search bar -> **Cost Management + Billing** -> **Cost analysis**.
 2. **Scope**: select the subscription that owns the App Insights instance.
 3. Top-left filter pill -> **Add filter** -> **Service name** = *Azure Monitor*.
-4. Group by **Resource** to see per-instance ingestion cost. Look for `ea-{env}-appi-{suffix}`.
+4. Group by **Resource** to see per-instance ingestion cost. Locate `$APP_INSIGHTS`.
 5. Time range: **Last 30 days** for trend, or **This month** for budget tracking.
 
-The first 5 GB / month / subscription is free under Azure Monitor pricing. With prod sampling at 20%, you should see ingestion comfortably inside that threshold for the current traffic shape.
+Do not hardcode a free-ingestion allowance or expected bill. Pricing and traffic change; compare the current Azure pricing terms with the live billed-usage query for the selected subscription.
 
 ### Confirm prod sampling is actually working
 
-The cheapest sanity check is the `itemCount` query from [Section 2 query E](#step-3-kql-starter-queries) - if `itemCount` is consistently `1` in the prod App Insights instance, sampling is silently disabled and ingestion will balloon. Expected value is approximately `5` (one of every five spans was kept at the `0.2` sampling rate). If you see `1`:
+The cheapest sanity check is the `itemCount` query from [Section 2 query E](#step-3-kql-starter-queries). The deployed Azure API and worker use a 0.2 trace sampling ratio, so retained telemetry commonly reports an `itemCount` near `5`. If it is consistently `1`:
 
 - Confirm the API container is running with the prod build (sampling is gated on `IsDevelopment` in [`api/src/EA.Api/Program.cs`](../../api/src/EA.Api/Program.cs)).
 - Confirm the data engine container has `OTEL_TRACES_SAMPLER=parentbased_traceidratio` and `OTEL_TRACES_SAMPLER_ARG=0.2` set:
 
   ```bash
   az containerapp show \
-    --name ea-production-data-engine \
-    --resource-group ea-production-rg \
+    --name "$DATA_ENGINE_APP" \
+    --resource-group "$RESOURCE_GROUP" \
     --query "properties.template.containers[0].env[?name=='OTEL_TRACES_SAMPLER' || name=='OTEL_TRACES_SAMPLER_ARG']"
   ```
 
@@ -371,36 +383,9 @@ These confirm the pipeline catches the failures it is supposed to catch. Run on 
 
 This validates server-side failure telemetry. Browser failures are outside the current telemetry contract until a provider-neutral real-user monitoring adapter is selected.
 
-### Publish a malformed message, confirm data engine exception correlates
+### Verify a successful asynchronous trace
 
-1. Publish a malformed message via the API (use a known-bad payload your contract validation rejects downstream of the publish):
-
-   ```bash
-   curl -X POST https://<api-fqdn>/api/v1/models/<id>/analyze \
-     -H "Authorization: Bearer <token>" \
-     -H "Content-Type: application/json" \
-     -d '{"intentionally":"broken"}'
-   ```
-
-2. Capture the request's `traceId` from the response correlation header (`request-id`) or from the `requests` table:
-
-   ```kql
-   requests
-   | where cloud_RoleName == "ea-api"
-   | where url endswith "/analyze"
-   | top 1 by timestamp desc
-   | project timestamp, operation_Id, name
-   ```
-
-3. Use that `operation_Id` to pull the correlated exception on the data engine:
-
-   ```kql
-   exceptions
-   | where operation_Id == "<paste operation_Id>"
-   | project timestamp, cloud_RoleName, type, outerMessage
-   ```
-
-   Expect an exception row with `cloud_RoleName == "ea-data-engine"` and the same `operation_Id`. This proves W3C trace-context propagated across the RabbitMQ hop.
+Request a model run through `POST /api/v1/models/<model-id>/runs`, wait for the run to complete, and locate the corresponding API request in Application Insights. Follow its operation/dependency data into the RabbitMQ and data-engine spans when present. The public API intentionally rejects unsupported model parameters before publishing; this runbook does not invent a malformed-message endpoint or publish an invalid broker payload into a deployed environment.
 
 ---
 
@@ -414,13 +399,13 @@ For each running container, confirm the env var is present:
 
 ```bash
 az containerapp show \
-  --name ea-{env}-api \
-  --resource-group ea-{env}-rg \
+  --name "$API_APP" \
+  --resource-group "$RESOURCE_GROUP" \
   --query "properties.template.containers[0].env[?name=='APPLICATIONINSIGHTS_CONNECTION_STRING']"
 
 az containerapp show \
-  --name ea-{env}-data-engine \
-  --resource-group ea-{env}-rg \
+  --name "$DATA_ENGINE_APP" \
+  --resource-group "$RESOURCE_GROUP" \
   --query "properties.template.containers[0].env[?name=='APPLICATIONINSIGHTS_CONNECTION_STRING']"
 ```
 
@@ -444,8 +429,8 @@ Both services require `OBSERVABILITY_EXPORTER=azuremonitor` (mapped to `Observab
 
 ```bash
 az containerapp logs show \
-  --name ea-{env}-data-engine \
-  --resource-group ea-{env}-rg \
+  --name "$DATA_ENGINE_APP" \
+  --resource-group "$RESOURCE_GROUP" \
   --tail 200 --follow
 ```
 
@@ -457,8 +442,8 @@ If telemetry lands but the Application Map shows everything as `<unknown>`, `OTE
 
 ```bash
 az containerapp show \
-  --name ea-{env}-data-engine \
-  --resource-group ea-{env}-rg \
+  --name "$DATA_ENGINE_APP" \
+  --resource-group "$RESOURCE_GROUP" \
   --query "properties.template.containers[0].env[?name=='OTEL_SERVICE_NAME']"
 ```
 

@@ -12,8 +12,8 @@ selector to end users.
 
 ```bash
 # Validate without credentials
-./infra/scripts/deploy.sh validate azure
-./infra/scripts/deploy.sh validate aws
+./infra/scripts/deploy.sh validate azure dev
+./infra/scripts/deploy.sh validate aws dev
 
 # Plan/apply after the provider-specific bootstrap and login
 ./infra/scripts/deploy.sh plan aws dev
@@ -39,7 +39,7 @@ resource addresses or vice versa.
 | Messaging | RabbitMQ Container App | RabbitMQ ECS service with EFS |
 | Secrets | Key Vault | Secrets Manager |
 | Customer identity | Entra External ID | Cognito user pools |
-| UI runtime / entry point | Next.js on Container Apps | Next.js on ECS behind an Application Load Balancer |
+| UI runtime / entry point | Next.js on Container Apps generated HTTPS origins | Next.js on ECS behind a CloudFront generated HTTPS origin |
 | Logs/dashboard | Log Analytics + Application Insights workbooks | CloudWatch Logs + dashboard |
 | CI federation | Entra workload identity | IAM GitHub OIDC role |
 | State | Azure Blob | S3 native state locking |
@@ -51,4 +51,4 @@ for prerequisites, phase gates, and operational verification.
 
 `.github/workflows/deploy.yml` is the common delivery entry point. It never assumes a provider: dispatches require a target input, and push deployments require `DEPLOYMENT_TARGETS=azure`, `aws`, or `both`. The entry workflow calls the reusable `deploy-azure.yml` and `deploy-aws.yml` adapters and passes one normalized change set to each selected target.
 
-Provider credentials, state coordinates, and approval rules belong to the explicitly named `azure-{environment}` and `aws-{environment}` GitHub Environments. Common scripts require `TF_ROOT`; they do not default to either provider.
+Deployment jobs use the logical `dev` and `production` GitHub Environments. Provider adapters read only their own credential, state, and identity inputs from the selected environment or repository scope; sharing an environment name does not make Azure and AWS identity resources interchangeable. The separately dispatched image-cleanup workflow uses provider-qualified environments because registry maintenance targets one provider at a time. Common scripts require `TF_ROOT`; they do not default to either provider.

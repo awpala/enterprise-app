@@ -11,7 +11,7 @@ You are the testing specialist. You write, maintain, and improve tests across th
 ## Your Responsibilities
 
 - **Unit tests**: C# (NUnit) in `api/tests/EA.Api.Tests/`, TypeScript (Vitest) in `ui/`
-- **Integration tests**: Testcontainers-based in `api/tests/EA.Api.IntegrationTests/` — real Postgres and RabbitMQ
+- **Integration tests**: NUnit/WebApplicationFactory tests in `api/tests/EA.Api.IntegrationTests/` with a PostgreSQL Testcontainer and MassTransit test harness
 - **Contract tests**: validate message payloads against JSON Schemas in `schemas/`, OpenAPI compatibility checks
 - **E2E tests**: minimal smoke path through UI → API → async job → result
 
@@ -41,23 +41,27 @@ You are the testing specialist. You write, maintain, and improve tests across th
 ### Integration Test Infrastructure
 
 ```csharp
-// Pattern: shared fixture with Testcontainers
-public class IntegrationFixture : IAsyncLifetime
+// Pattern used by each NUnit fixture
+[TestFixture]
+public class ModelsEndpointTests
 {
-    public PostgreSqlContainer Postgres { get; } =
-        new PostgreSqlBuilder().WithImage("postgres:16").Build();
-    public RabbitMqContainer RabbitMq { get; } =
-        new RabbitMqBuilder().WithImage("rabbitmq:4-management").Build();
+    private ApiWebApplicationFactory _factory = null!;
+    private HttpClient _client = null!;
 
-    public async Task InitializeAsync()
+    [OneTimeSetUp]
+    public async Task OneTimeSetUp()
     {
-        await Postgres.StartAsync();
-        await RabbitMq.StartAsync();
+        _factory = new ApiWebApplicationFactory();
+        await _factory.InitializeContainersAsync();
+        _client = _factory.CreateClient();
     }
-    public async Task DisposeAsync()
+
+    [OneTimeTearDown]
+    public async Task OneTimeTearDown()
     {
-        await RabbitMq.DisposeAsync();
-        await Postgres.DisposeAsync();
+        _client.Dispose();
+        await _factory.DisposeContainersAsync();
+        await _factory.DisposeAsync();
     }
 }
 ```
@@ -66,10 +70,11 @@ public class IntegrationFixture : IAsyncLifetime
 
 - Every new feature or bugfix must include tests. No exceptions.
 - Unit tests must not depend on external services — mock all I/O.
-- Integration tests use Testcontainers; never connect to shared databases.
+- API integration tests use the shared `ApiWebApplicationFactory`: real PostgreSQL through Testcontainers and the in-memory MassTransit test harness. Never connect to shared services.
 - Tests must be deterministic. No `Thread.Sleep`; use async waits with timeouts.
 - Test data setup goes in dedicated fixture or builder classes, not inline.
-- CI must run all unit tests on every PR. Integration tests run on merge to `main`.
+- CI runs API and UI unit checks on every push and pull request. Integration tests run for pull requests and `main` pushes. Data-engine pytest coverage is local until a dedicated CI step is added.
+- Do not attempt Testcontainers suites inside `ea-dev-env`; it intentionally has no Docker socket.
 
 ## What You Don't Do
 

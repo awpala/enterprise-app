@@ -6,24 +6,24 @@ disable-model-invocation: false
 
 ## Inputs
 
-- **Target** (e.g., `POST /api/v1/analysis-jobs` or `AnalysisJobRequestedV1Consumer`)
-- **Dependencies needed** (`postgres`, `rabbitmq`, or both)
+- **Target** (for example, `POST /api/v1/models/{id}/runs` or `ModelRunCompletedConsumer`)
+- **Dependencies needed** (PostgreSQL Testcontainer, MassTransit test harness, or an explicitly justified live RabbitMQ fixture)
 - **Scenario description** (e.g., "creating a job persists to DB and publishes message")
 
 ## What It Produces
 
-1. **Test class** in `api/tests/Demo.Api.IntegrationTests/{Target}Tests.cs`
-2. **Shared fixture** usage (`IntegrationFixture` with Testcontainers for Postgres + RabbitMQ)
-3. **WebApplicationFactory** setup with overridden connection strings pointing to containers
+1. **Test class** in `api/tests/EA.Api.IntegrationTests/{Target}Tests.cs`
+2. **Shared factory** usage through `Infrastructure/ApiWebApplicationFactory.cs`
+3. **WebApplicationFactory** setup with PostgreSQL Testcontainer configuration and the MassTransit test harness
 4. **Test methods** following `MethodName_Scenario_ExpectedResult` naming
 5. **Assertions** using FluentAssertions
 
 ## Conventions Applied
 
-- Use `IClassFixture<IntegrationFixture>` for container lifecycle
-- Override `ConfigureWebHost` to point connection strings at Testcontainers
-- Apply EF migrations in test setup (`context.Database.Migrate()`)
+- Use NUnit `[OneTimeSetUp]` and `[OneTimeTearDown]` for factory and container lifecycle.
+- Extend `ApiWebApplicationFactory.ConfigureWebHost` only when shared test wiring must change.
+- Preserve the factory's current database initialization policy; do not mix `EnsureCreated` and migrations casually.
 - Use `HttpClient` from `WebApplicationFactory` for HTTP tests
-- For MassTransit tests, use the test harness (`AddMassTransitTestHarness`)
+- Use `AddMassTransitTestHarness` unless the test specifically verifies RabbitMQ transport behavior.
 - Clean up test data between tests (transaction rollback or database reset)
 - No `Thread.Sleep` — use async polling with timeout

@@ -181,8 +181,8 @@ builder.Services.AddOpenApi();
 // Authentication uses one deployment-neutral OIDC contract. Terraform selects
 // Entra External ID for Azure or Cognito for AWS and supplies normalized values.
 //
-// When Authentication:Enabled=true AND Authentication:AllowGuest=true (the
-// demo failsafe), a policy scheme "JwtOrGuest" is registered as the default
+// When Authentication:Enabled=true AND Authentication:AllowGuest=true, a
+// policy scheme "JwtOrGuest" is registered as the default
 // and forwards per-request: requests with an Authorization: Bearer ... header
 // go to JwtBearer for real token validation; everything else is handled by
 // GuestAuthHandler, which synthesizes a fixed guest principal. Guests get
@@ -390,11 +390,9 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 
-    // TODO(phase 2A, Scalar OAuth): wire the External ID auth-code + PKCE
-    // flow so Scalar's "Try It" can acquire a real Bearer token. Plan
-    // budgeted ~half a day for this; leaving a minimal default here so the
-    // rest of Phase 2A ships. Config values are already available under
-    // Authentication:Authority / Authentication:ClientId / RequiredScope.
+    // Scalar advertises the preferred OAuth2 security scheme. Interactive
+    // token acquisition is intentionally not configured here; callers supply
+    // a token issued through the application's browser OIDC flow.
     app.MapScalarApiReference(options =>
     {
         options.AddPreferredSecuritySchemes("OAuth2");

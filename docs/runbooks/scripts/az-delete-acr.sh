@@ -1,61 +1,21 @@
 #!/usr/bin/env bash
 
-# az-delete-acr.sh — FULL DELETE of Azure cost, by way of the registries.
+# az-delete-acr.sh — explicitly delete only the configured Azure registries.
 #
-# ---------------------------------------------------------------------------
-# THIS IS THE COMPLETE AZURE COST TEARDOWN.
-#
-# Despite the narrow name, deleting the two Container Registries removes
-# 100% of Azure spend on this subscription. That is not an assumption — it
-# was established from the Cost Management API before this script was written:
-#
-#   July 2026 actual:   $5.16 total  — ea-prod-rg / Container Registry $5.16
-#                                      every other service line $0.00
-#   Aug 1-15 actual:    $2.43 total  — eaprodacreaprd1 $2.42
-#                                      eadevacreadev1  $0.01
-#                                      Postgres, Log Analytics, Storage $0.00
-#
-# Every other resource in ea-dev-rg / ea-prod-rg bills $0: Postgres (free-tier
-# window), Container Apps (consumption free grant), Log Analytics and App
-# Insights (no billable ingestion), Static Web Apps (Free SKU), Key Vaults,
-# managed identities, workbooks, the CIAM directories, and the tfstate
-# storage account. Deleting them would save nothing and would destroy the
-# identities and baseline configs wanted for a future relaunch.
-#
-# So: "registries only" and "full cost delete" are the same action here.
-# After this script runs, expected Azure run-rate is ~$0/mo.
-# ---------------------------------------------------------------------------
-#
-# Why this is NOT az-teardown.sh:
-#   az-teardown.sh deletes ACR *repositories* (the images) but leaves the
-#   *registry* in place. ACR Basic bills a flat SKU fee (~$5/mo each) that is
-#   independent of stored image size, and both registries sit at ~0.28 GiB
-#   against a 10 GiB included allowance. Deleting repositories therefore
-#   removes the hot-redeploy images while saving $0. Only deleting the
-#   registry itself stops the charge. az-teardown.sh also stops Postgres and
-#   deletes Container Apps / App Insights, none of which were costing anything.
-#
-# Two latent costs this does NOT address (nothing bills today, but watch):
-#   1. Postgres free-tier window. Both flexible servers (Standard_B1ms, 32 GB)
-#      were created 2026-04-12; the 12-month free allowance lapses ~2026-04-12,
-#      after which two servers begin billing. Delete them before then if the
-#      project is still dormant.
-#   2. Cost-data lag. The dev stack (eadevacreadev1, ea-dev-cae, dev Container
-#      Apps) was created 2026-08-15 ~10:30 UTC. Cost Management lags 24-48h, so
-#      dev's steady-state cost was not yet observable when this was written.
-#      Re-check a few days out to confirm dev Container Apps stay at $0.
-#
-# Resource groups are retained. They contain the CIAM directories
-# (eacustomerdev/eacustomerprod), so `az group delete` must NEVER be used here
-# — it would destroy the customer identity tenants. Likewise a plain
-# `terraform destroy` would drop module.entra_external_id.* (app registrations
-# and service principals) and the resource groups themselves.
+# This is a destructive, narrowly scoped maintenance helper, not a declaration
+# of current account cost. Confirm the live Cost Management inventory before
+# use. Resource groups are retained because they may contain customer identity
+# resources and other state that a blanket group delete would destroy.
 #
 # Terraform: both registries exist in state as module.acr.azurerm_container_registry.this.
 # No `terraform state rm` is performed — a later `terraform apply` will refresh,
 # observe the registry is gone, and plan to recreate it. That is the desired
 # relaunch behavior. Relaunch also requires rebuilding and pushing images,
 # since the stored image tags are deleted with the registry.
+#
+# Required configuration (load from an ignored operator config):
+#   AZURE_SUBSCRIPTION_ID
+#   AZURE_ACR_TARGETS="<registry>:<resource-group> [<registry>:<resource-group> ...]"
 #
 # Usage:
 #   ./az-delete-acr.sh              # delete
@@ -75,13 +35,16 @@ log_error()   { echo -e "${RED}[ERROR]${RESET} $*"; }
 log_success() { echo -e "${GREEN}[OK]${RESET}    $*"; }
 log_step()    { echo -e "\n${BOLD}==> $*${RESET}"; }
 
-SUBSCRIPTION_ID="5eeebca2-f232-415b-a8cf-6b6688ca5e8f"
-
-# registry:resource-group
-TARGETS=(
-  "eadevacreadev1:ea-dev-rg"
-  "eaprodacreaprd1:ea-prod-rg"
-)
+: "${AZURE_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID from the approved operator configuration.}"
+: "${AZURE_ACR_TARGETS:?Set AZURE_ACR_TARGETS as space-separated registry:resource-group pairs.}"
+SUBSCRIPTION_ID="$AZURE_SUBSCRIPTION_ID"
+read -r -a TARGETS <<<"$AZURE_ACR_TARGETS"
+for target in "${TARGETS[@]}"; do
+  [[ "$target" =~ ^[^:[:space:]]+:[^:[:space:]]+$ ]] || {
+    log_error "Invalid AZURE_ACR_TARGETS entry: $target"
+    exit 2
+  }
+done
 
 DRY_RUN=0
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
@@ -139,16 +102,14 @@ else
   log_warn "Registries still present: ${REMAINING}"
 fi
 
-log_step "Retained (unchanged, \$0 today)"
+log_step "Retained (unchanged; current cost not asserted)"
 log_info "Resource groups, CIAM directories, Entra app registrations/SPs,"
 log_info "Key Vaults, Postgres, Container Apps, Log Analytics, App Insights,"
 log_info "Static Web Apps, managed identities, tfstate storage account."
 
 log_step "Expected outcome"
-log_info "Azure run-rate should now be ~\$0/mo — the registries were the only"
-log_info "billing line. Watch two latent items: the Postgres free-tier window"
-log_info "lapses ~2026-04-12, and dev (created 2026-08-15) is still inside the"
-log_info "24-48h cost-reporting lag. Re-check with the Cost Management API."
+log_info "Configured registries are absent. Re-query Cost Management and the"
+log_info "remaining resource inventory before making any run-rate claim."
 
 log_success "Done. Log: ${LOGFILE}"
 exit 0

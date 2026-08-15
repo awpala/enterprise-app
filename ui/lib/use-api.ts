@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { ApiClient } from './api';
 import { useAuth } from '@/components/AuthProvider';
 
+/** Returns an authenticated API client after runtime configuration is available. */
 export function useApi(): ApiClient | null {
   const { config, getAccessToken } = useAuth();
   return useMemo(

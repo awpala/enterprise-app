@@ -72,9 +72,8 @@ public class RunsController(
 
         var runs = await facade.RequestBatchRunAsync(request.ModelIds, cancellationToken);
 
-        // Load model names for the response — runs from RequestModelRunAsync
-        // do not have the Model navigation loaded, so we do a follow-up query
-        // to get the model names in bulk.
+        // Runs returned from RequestModelRunAsync do not have the Model navigation
+        // loaded, so resolve each distinct model name before building the response.
         var modelIds = runs.Select(r => r.ModelId).Distinct().ToHashSet();
         var modelNames = new Dictionary<Guid, string>();
         foreach (var modelId in modelIds)

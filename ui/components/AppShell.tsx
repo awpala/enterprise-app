@@ -8,6 +8,7 @@ import { useAuth } from './AuthProvider';
 import { Spinner } from './Spinner';
 import { useTheme } from './ThemeProvider';
 
+/** Guards authenticated routes and renders the shared application chrome. */
 export function AppShell({ children }: { readonly children: ReactNode }) {
   const auth = useAuth();
   const { theme, toggleTheme } = useTheme();

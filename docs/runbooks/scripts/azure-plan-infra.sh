@@ -28,6 +28,8 @@
 #   - `az login` completed against the workforce tenant, so the AzureRM and
 #     AzureAD providers can initialize and `az account show` can resolve the
 #     active subscription.
+#   - TFSTATE_RESOURCE_GROUP, TFSTATE_STORAGE_ACCOUNT, and TFSTATE_CONTAINER
+#     loaded from the Azure bootstrap outputs.
 #
 # Refresh policy:
 #   This script passes `-refresh=false` to `terraform plan` by default. The
@@ -41,7 +43,8 @@
 #
 # What to check in the plan output (clean first-run expectations):
 #   - `module.entra_external_id.*` resources all appear as additions
-#     (app registrations, user flow, Google/Microsoft/Email IDP wiring).
+#     (API/SPA app registrations, service principals, scope, and preauthorization).
+#     The tenant, user flow, and identity providers are portal-managed.
 #   - `module.container_apps.*` updates where the API container app gains
 #     new `Authentication__*` environment variables wired from the External ID
 #     module outputs.
@@ -122,6 +125,10 @@ if [[ ! -f "$SECRETS" ]]; then
   exit 1
 fi
 
+: "${TFSTATE_RESOURCE_GROUP:?Set TFSTATE_RESOURCE_GROUP from the Azure bootstrap output.}"
+: "${TFSTATE_STORAGE_ACCOUNT:?Set TFSTATE_STORAGE_ACCOUNT from the Azure bootstrap output.}"
+: "${TFSTATE_CONTAINER:?Set TFSTATE_CONTAINER from the Azure bootstrap output.}"
+
 # ---- export TF_VAR_* via the single-source helper --------------------------
 
 echo "Exporting TF_VAR_* for env=$ENV via azure-source-sso-env.sh..." >&2
@@ -162,9 +169,9 @@ echo "Running 'terraform init -upgrade -reconfigure' against backend key=$BACKEN
 # Without this flag, flipping this script between envs fails with
 # "Backend configuration changed" on every env switch.
 if ! terraform init -upgrade -reconfigure \
-  -backend-config=resource_group_name=ea-tfstate-rg \
-  -backend-config=storage_account_name=eatfstateeaboot \
-  -backend-config=container_name=tfstate \
+  -backend-config="resource_group_name=$TFSTATE_RESOURCE_GROUP" \
+  -backend-config="storage_account_name=$TFSTATE_STORAGE_ACCOUNT" \
+  -backend-config="container_name=$TFSTATE_CONTAINER" \
   -backend-config="key=$BACKEND_KEY"; then
   echo "Error: 'terraform init' failed — inspect output above." >&2
   exit 1

@@ -2,6 +2,8 @@
 
 Everything needed to run the full system on a developer workstation: UI, API, data engine, PostgreSQL, and RabbitMQ. The layout mirrors the shared application topology used by both cloud targets.
 
+This workflow is for a Docker-capable host. The `ea-dev-env` devcontainer intentionally has no Docker daemon; use `run-api`, `run-data-engine`, and `run-ui` there instead.
+
 ## Files
 
 | File | Role |
@@ -9,7 +11,7 @@ Everything needed to run the full system on a developer workstation: UI, API, da
 | `compose.yaml` | Production-parity baseline using each service's real Dockerfile. |
 | `compose.override.yaml` | Dev conveniences, including the Next.js development server and source mount. |
 
-The split lets CI smoke-test the same image recipe used in production (`compose.yaml` alone), while day-to-day dev enjoys hot reload (both files merged).
+The split lets the baseline use the same image recipes as production (`compose.yaml` alone), while the merged development configuration runs the UI with hot reload.
 
 ## Local Topology
 
@@ -21,8 +23,8 @@ flowchart LR
     dev -->|5432| pg[(ea-db<br/>postgres:16)]
     ui -->|Bearer HTTP| api
     api -->|EF Core| pg
-    api -->|AMQP 5672| mq[[ea-rabbitmq<br/>rabbitmq:4-management]]
-    de[ea-data-engine<br/>Python] -->|AMQP 5672| mq
+    api <-->|publish requests<br/>consume lifecycle events| mq[[ea-rabbitmq<br/>rabbitmq:4-management]]
+    mq <-->|consume requests<br/>publish lifecycle events| de[ea-data-engine<br/>Python]
     mq -.admin.-> mqui
 ```
 
@@ -42,23 +44,26 @@ Health checks gate startup: the API waits for `ea-db` and `ea-rabbitmq` to repor
 ## Common Commands
 
 ```bash
-# Build and start everything (foreground, logs streamed)
+# Baseline images only (foreground, logs streamed)
 docker compose -f deploy/compose.yaml up --build
 
-# Detached
-docker compose -f deploy/compose.yaml up --build -d
+# Development override, including UI hot reload
+docker compose -f deploy/compose.yaml -f deploy/compose.override.yaml up --build
+
+# From deploy/, Compose discovers compose.yaml and compose.override.yaml
+(cd deploy && docker compose up --build)
 
 # Tail logs for one service
-docker compose -f deploy/compose.yaml logs -f ea-api
+docker compose -f deploy/compose.yaml -f deploy/compose.override.yaml logs -f ea-api
 
 # Reset DB and broker state (destroys volumes)
-docker compose -f deploy/compose.yaml down -v
+docker compose -f deploy/compose.yaml -f deploy/compose.override.yaml down -v
 
 # Rebuild one service only
-docker compose -f deploy/compose.yaml up --build ea-data-engine
+docker compose -f deploy/compose.yaml -f deploy/compose.override.yaml up --build ea-data-engine
 ```
 
-Compose v2 picks up `compose.override.yaml` automatically when running from the repo root or `deploy/`.
+Compose discovers `compose.override.yaml` automatically when invoked from `deploy/` without `-f`. From the repository root, pass both files explicitly as shown above.
 
 ## Volumes
 
