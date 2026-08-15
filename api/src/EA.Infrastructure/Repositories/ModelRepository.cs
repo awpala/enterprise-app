@@ -107,10 +107,67 @@ public class ModelRepository(AppDbContext dbContext) : IModelRepository
     }
 
     /// <inheritdoc />
-    public Task UpdateModelRunAsync(ModelRun run, CancellationToken cancellationToken = default)
+    public async Task<bool> MarkModelRunStartedAsync(
+        Guid runId,
+        DateTime startedAtUtc,
+        CancellationToken cancellationToken = default)
     {
-        dbContext.ModelRuns.Update(run);
-        return Task.CompletedTask;
+        var affected = await dbContext.ModelRuns
+            .Where(run => run.Id == runId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(
+                    run => run.StartedAtUtc,
+                    run => run.StartedAtUtc == null || startedAtUtc < run.StartedAtUtc
+                        ? startedAtUtc
+                        : run.StartedAtUtc)
+                .SetProperty(
+                    run => run.Status,
+                    run => run.Status == ModelRunStatus.Pending
+                        ? ModelRunStatus.Running
+                        : run.Status),
+                cancellationToken);
+
+        return affected > 0;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> MarkModelRunCompletedAsync(
+        Guid runId,
+        DateTime completedAtUtc,
+        System.Text.Json.JsonDocument? resultSummary,
+        System.Text.Json.JsonDocument? sampleData,
+        CancellationToken cancellationToken = default)
+    {
+        var affected = await dbContext.ModelRuns
+            .Where(run => run.Id == runId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(run => run.Status, ModelRunStatus.Completed)
+                .SetProperty(run => run.StartedAtUtc, run => run.StartedAtUtc ?? completedAtUtc)
+                .SetProperty(run => run.CompletedAtUtc, completedAtUtc)
+                .SetProperty(run => run.ResultSummary, resultSummary)
+                .SetProperty(run => run.SampleData, sampleData),
+                cancellationToken);
+
+        return affected > 0;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> MarkModelRunFailedAsync(
+        Guid runId,
+        DateTime completedAtUtc,
+        string errorMessage,
+        CancellationToken cancellationToken = default)
+    {
+        var affected = await dbContext.ModelRuns
+            .Where(run => run.Id == runId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(run => run.Status, ModelRunStatus.Failed)
+                .SetProperty(run => run.StartedAtUtc, run => run.StartedAtUtc ?? completedAtUtc)
+                .SetProperty(run => run.CompletedAtUtc, completedAtUtc)
+                .SetProperty(run => run.ErrorMessage, errorMessage),
+                cancellationToken);
+
+        return affected > 0;
     }
 
     /// <inheritdoc />

@@ -23,24 +23,22 @@ public class ModelRunCompletedConsumer(
             "Received ModelRunCompleted for run {ModelRunId}, model {ModelId} (MessageId: {MessageId}, CorrelationId: {CorrelationId})",
             message.ModelRunId, message.ModelId, message.MessageId, message.CorrelationId);
 
-        var run = await repository.GetModelRunByIdAsync(message.ModelRunId, context.CancellationToken);
-        if (run is null)
+        var updated = await repository.MarkModelRunCompletedAsync(
+            message.ModelRunId,
+            message.OccurredAtUtc,
+            message.ResultSummary,
+            message.HistogramData,
+            context.CancellationToken);
+        if (!updated)
         {
             logger.LogWarning("Model run {ModelRunId} not found, skipping", message.ModelRunId);
             return;
         }
 
-        run.Status = ModelRunStatus.Completed;
-        run.CompletedAtUtc = message.OccurredAtUtc;
-        run.ResultSummary = message.ResultSummary;
-        run.SampleData = message.HistogramData;
-
-        await repository.UpdateModelRunAsync(run, context.CancellationToken);
-
         var metrics = message.Metrics.Select(m => new ModelMetric
         {
             Id = Guid.NewGuid(),
-            ModelRunId = run.Id,
+            ModelRunId = message.ModelRunId,
             MetricName = m.Name,
             MetricValue = m.Value,
             CalculatedAtUtc = message.OccurredAtUtc

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/components/auth-provider';
+import { useAuth } from '@/components/AuthProvider';
+import { ErrorNotice } from '@/components/ErrorNotice';
+import { Spinner } from '@/components/Spinner';
 
 export default function AuthCallbackPage() {
   const { loading, completeLogin } = useAuth();
@@ -17,8 +19,8 @@ export default function AuthCallbackPage() {
   }, [loading, completeLogin, router]);
 
   return (
-    <main className="centered-page">
-      {error ? <div className="notice error">{error}</div> : <div className="spinner" aria-label="Completing sign-in" />}
+    <main className="grid min-h-screen place-items-center bg-background bg-[image:var(--app-backdrop)] p-6">
+      {error ? <ErrorNotice message={error} /> : <Spinner label="Completing sign-in" />}
     </main>
   );
 }

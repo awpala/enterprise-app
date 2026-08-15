@@ -1,12 +1,16 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, Edit3, Play } from 'lucide-react';
-import { ErrorNotice, Loading } from '@/components/loading';
-import { StatusBadge } from '@/components/status-badge';
-import { errorMessage, formatDate } from '@/lib/format';
+import { ErrorNotice } from '@/components/ErrorNotice';
+import { Loading } from '@/components/Loading';
+import { ModelSummary } from '@/components/models/ModelSummary';
+import { RunsTable } from '@/components/runs/RunsTable';
+import { Button, ButtonLink } from '@/components/ui/Button';
+import { Card, CardBody, CardHeader } from '@/components/ui/Card';
+import { Page, PageHeader } from '@/components/ui/Page';
+import { errorMessage } from '@/lib/format';
 import { useApi } from '@/lib/use-api';
 import type { Model, ModelRun } from '@/lib/types';
 
@@ -52,29 +56,37 @@ export default function ModelDetailPage() {
   if (!model) return <ErrorNotice message={error || 'Model not found.'} />;
 
   return (
-    <div className="page">
-      <div className="page-header"><h1>{model.name}</h1><div className="header-actions">
-        <Link className="button secondary" href="/models"><ArrowLeft size={17} /> Back</Link>
-        <Link className="button secondary" href={`/models/${id}/edit`}><Edit3 size={17} /> Edit</Link>
-        <button className="button primary" disabled={model.status === 'Archived' || requesting} onClick={() => void requestRun()}><Play size={17} /> {requesting ? 'Requesting…' : 'Run Model'}</button>
-      </div></div>
+    <Page>
+      <PageHeader>
+        <h1>{model.name}</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <ButtonLink variant="secondary" href="/models"><ArrowLeft size={17} /> Back</ButtonLink>
+          <ButtonLink variant="secondary" href={`/models/${id}/edit`}><Edit3 size={17} /> Edit</ButtonLink>
+          <Button disabled={model.status === 'Archived' || requesting} onClick={() => void requestRun()}><Play size={17} /> {requesting ? 'Requesting…' : 'Run Model'}</Button>
+        </div>
+      </PageHeader>
       {error && <ErrorNotice message={error} />}
-      <div className="card-grid">
-        <section className="card"><div className="card-header"><h2>Details</h2></div><div className="card-body"><dl className="detail-list">
-          <div className="detail-row"><dt>Status</dt><dd><StatusBadge status={model.status} /></dd></div>
-          <div className="detail-row"><dt>Version</dt><dd>v{model.version}</dd></div>
-          <div className="detail-row"><dt>Created</dt><dd>{formatDate(model.createdAtUtc)}</dd></div>
-          <div className="detail-row"><dt>Updated</dt><dd>{formatDate(model.updatedAtUtc)}</dd></div>
-          <div className="detail-row"><dt>Created By</dt><dd>{model.createdBy}</dd></div>
-        </dl></div></section>
-        <section className="card"><div className="card-header"><h2>Description</h2></div><div className="card-body"><p>{model.description || 'No description provided.'}</p></div></section>
-      </div>
-      {model.parameters && <section className="card"><div className="card-header"><h2>Parameters</h2></div><div className="card-body"><pre className="json-display">{JSON.stringify(model.parameters, null, 2)}</pre></div></section>}
-      <section className="card"><div className="card-header"><h2>Recent Runs</h2><span className="spacer" /><Link className="button ghost" href={`/models/${id}/runs`}>View All</Link></div>
-        {runs.length === 0 ? <div className="empty-state"><p>No runs yet.</p></div> : <div className="table-wrap"><table><thead><tr><th>Status</th><th>Requested</th><th>Completed</th></tr></thead><tbody>
-          {runs.map(run => <tr className="clickable-row" key={run.id} onClick={() => router.push(`/models/${id}/runs/${run.id}`)}><td><StatusBadge status={run.status} /></td><td>{formatDate(run.requestedAtUtc, 'short')}</td><td>{formatDate(run.completedAtUtc, 'short')}</td></tr>)}
-        </tbody></table></div>}
-      </section>
-    </div>
+      <ModelSummary model={model} />
+      {model.parameters && (
+        <Card className="mb-[18px]">
+          <CardHeader><h2>Parameters</h2></CardHeader>
+          <CardBody>
+            <pre className="m-0 overflow-auto rounded-[9px] bg-surface-muted p-[15px] text-xs text-foreground">{JSON.stringify(model.parameters, null, 2)}</pre>
+          </CardBody>
+        </Card>
+      )}
+      <Card>
+        <CardHeader>
+          <h2>Recent Runs</h2>
+          <span className="flex-1" />
+          <ButtonLink variant="ghost" href={`/models/${id}/runs`}>View All</ButtonLink>
+        </CardHeader>
+        {runs.length === 0 ? (
+          <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 text-muted"><p>No runs yet.</p></div>
+        ) : (
+          <RunsTable runs={runs} variant="recent" onOpen={run => router.push(`/models/${id}/runs/${run.id}`)} />
+        )}
+      </Card>
+    </Page>
   );
 }

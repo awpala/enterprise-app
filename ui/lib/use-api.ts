@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { ApiClient } from './api';
-import { useAuth } from '@/components/auth-provider';
+import { useAuth } from '@/components/AuthProvider';
 
 export function useApi(): ApiClient | null {
   const { config, getAccessToken } = useAuth();

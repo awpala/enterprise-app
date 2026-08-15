@@ -51,11 +51,17 @@ fi
 if ! grep -q '^export api=' "$BASH_ALIASES" 2>/dev/null; then
   echo 'export api="/workspace/api/src/EA.Api"' >> "$BASH_ALIASES"
 fi
+if ! grep -q '^export data_engine=' "$BASH_ALIASES" 2>/dev/null; then
+  echo 'export data_engine="/workspace/data-engine"' >> "$BASH_ALIASES"
+fi
 if ! grep -q '^alias run-ui=' "$BASH_ALIASES" 2>/dev/null; then
   echo "alias run-ui='cd \"\$ui\" && npm run dev'" >> "$BASH_ALIASES"
 fi
 if ! grep -q '^alias run-api=' "$BASH_ALIASES" 2>/dev/null; then
   echo "alias run-api='cd \"\$api\" && dotnet run'" >> "$BASH_ALIASES"
+fi
+if ! grep -q '^alias run-data-engine=' "$BASH_ALIASES" 2>/dev/null; then
+  echo "alias run-data-engine='cd \"\$data_engine\" && .venv/bin/python -m data_engine.main'" >> "$BASH_ALIASES"
 fi
 
 on_error() {

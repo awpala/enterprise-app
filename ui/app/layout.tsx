@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { AuthProvider } from '@/components/auth-provider';
-import { ThemeProvider } from '@/components/theme-provider';
+import { AuthProvider } from '@/components/AuthProvider';
+import { ThemeProvider } from '@/components/ThemeProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
+    <html className="min-h-full" lang="en" suppressHydrationWarning>
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <ThemeProvider>
           <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>

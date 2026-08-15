@@ -17,6 +17,7 @@ pgpassfile
 **/*.egg-info
 .next/
 ui/next-env.d.ts
+*.tsbuildinfo
 .claude/*.lock
 
 # Terraform bootstrap (local state + per-user config, never committed)

@@ -1,14 +1,20 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Activity, TestTube2 } from 'lucide-react';
-import { ErrorNotice, Loading } from '@/components/loading';
-import { StatusBadge } from '@/components/status-badge';
+import { ErrorNotice } from '@/components/ErrorNotice';
+import { Loading } from '@/components/Loading';
+import { ButtonLink } from '@/components/ui/Button';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { DataTable } from '@/components/ui/DataTable';
+import { Page, PageHeader } from '@/components/ui/Page';
 import { useApi } from '@/lib/use-api';
-import { errorMessage, formatDate } from '@/lib/format';
+import { errorMessage } from '@/lib/format';
 import type { Model } from '@/lib/types';
+import { createModelTableColumns } from '@/utils/modelTableColumns';
+
+const modelColumns = createModelTableColumns({ compact: true });
 
 export default function DashboardPage() {
   const api = useApi();
@@ -33,27 +39,51 @@ export default function DashboardPage() {
   }, [api]);
 
   return (
-    <div className="page">
-      <div className="page-header"><h1>Dashboard</h1></div>
+    <Page fillAvailableHeight>
+      <PageHeader><h1>Dashboard</h1></PageHeader>
       {error && <ErrorNotice message={error} />}
       {loading ? <Loading label="Loading dashboard" /> : (
         <>
-          <div className="stat-grid">
-            <div className="card stat-card"><span className="stat-icon"><TestTube2 /></span><div><span className="stat-value">{total}</span><span className="stat-label">Total Models</span></div></div>
-            <div className="card stat-card"><span className="stat-icon"><Activity /></span><div><span className="stat-value">{active}</span><span className="stat-label">Active Models</span></div></div>
+          <div className="mb-[18px] grid auto-rows-fr grid-cols-1 items-stretch gap-4 sm:grid-cols-2">
+            <Card className="flex h-full items-center gap-4 p-[22px]">
+              <span className="grid size-12 place-items-center rounded-[14px] bg-primary-soft text-primary"><TestTube2 /></span>
+              <div className="flex flex-col">
+                <span className="text-3xl leading-none font-extrabold">{total}</span>
+                <span className="text-[13px] text-muted">Total Models</span>
+              </div>
+            </Card>
+            <Card className="flex h-full items-center gap-4 p-[22px]">
+              <span className="grid size-12 place-items-center rounded-[14px] bg-primary-soft text-primary"><Activity /></span>
+              <div className="flex flex-col">
+                <span className="text-3xl leading-none font-extrabold">{active}</span>
+                <span className="text-[13px] text-muted">Active Models</span>
+              </div>
+            </Card>
           </div>
-          <section className="card">
-            <div className="card-header"><h2>Recent Models</h2><span className="spacer" /><Link className="button ghost" href="/models">View All</Link></div>
+          <Card className="flex min-h-0 shrink flex-col">
+            <CardHeader>
+              <h2>Recent Models</h2>
+              <span className="flex-1" />
+              <ButtonLink variant="ghost" href="/models">View All</ButtonLink>
+            </CardHeader>
             {models.length === 0 ? (
-              <div className="empty-state"><p>No models yet.</p><Link className="button primary" href="/models/new">Create Model</Link></div>
+              <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 text-muted">
+                <p>No models yet.</p>
+                <ButtonLink href="/models/new">Create Model</ButtonLink>
+              </div>
             ) : (
-              <div className="table-wrap"><table><thead><tr><th>Name</th><th>Status</th><th>Version</th><th>Updated</th></tr></thead><tbody>
-                {models.map(model => <tr className="clickable-row" key={model.id} onClick={() => router.push(`/models/${model.id}`)}><td>{model.name}</td><td><StatusBadge status={model.status} /></td><td>v{model.version}</td><td>{formatDate(model.updatedAtUtc, 'short')}</td></tr>)}
-              </tbody></table></div>
+              <DataTable
+                ariaLabel="Recent models"
+                bottomSpacing={false}
+                columns={modelColumns}
+                onRowActivate={model => router.push(`/models/${model.id}`)}
+                rowKey={model => model.id}
+                rows={models}
+              />
             )}
-          </section>
+          </Card>
         </>
       )}
-    </div>
+    </Page>
   );
 }

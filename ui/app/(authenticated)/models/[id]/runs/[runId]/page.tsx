@@ -1,15 +1,25 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { Histogram } from '@/components/histogram';
-import { ErrorNotice, Loading } from '@/components/loading';
-import { StatusBadge } from '@/components/status-badge';
+import { ErrorNotice } from '@/components/ErrorNotice';
+import { Histogram } from '@/components/Histogram';
+import { Loading } from '@/components/Loading';
+import { StatusBadge } from '@/components/StatusBadge';
+import { ButtonLink } from '@/components/ui/Button';
+import { Card, CardBody, CardHeader } from '@/components/ui/Card';
+import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
+import { Page, PageHeader } from '@/components/ui/Page';
 import { errorMessage, formatDate } from '@/lib/format';
 import { useApi } from '@/lib/use-api';
-import type { ModelRunDetail } from '@/lib/types';
+import type { ModelMetric, ModelRunDetail } from '@/lib/types';
+
+const metricColumns: readonly DataTableColumn<ModelMetric>[] = [
+  { id: 'metric', header: 'Metric', cell: metric => metric.metricName },
+  { id: 'value', header: 'Value', cell: metric => metric.metricValue.toLocaleString('en-US', { maximumFractionDigits: 6 }) },
+  { id: 'calculated', header: 'Calculated', cell: metric => formatDate(metric.calculatedAtUtc) },
+];
 
 export default function RunDetailPage() {
   const { id, runId } = useParams<{ id: string; runId: string }>();
@@ -29,13 +39,45 @@ export default function RunDetailPage() {
   if (loading) return <Loading label="Loading run" />;
   if (!run) return <ErrorNotice message={error || 'Run not found.'} />;
 
-  return <div className="page"><div className="page-header"><h1>Run Detail</h1><Link className="button secondary" href={`/models/${id}/runs`}><ArrowLeft size={17} /> Back to Runs</Link></div>
-    {error && <ErrorNotice message={error} />}
-    <section className="card"><div className="card-header"><h2>Run Information</h2></div><div className="card-body"><dl className="detail-list">
-      <div className="detail-row"><dt>Status</dt><dd><StatusBadge status={run.status} /></dd></div><div className="detail-row"><dt>Requested</dt><dd>{formatDate(run.requestedAtUtc)}</dd></div><div className="detail-row"><dt>Started</dt><dd>{formatDate(run.startedAtUtc)}</dd></div><div className="detail-row"><dt>Completed</dt><dd>{formatDate(run.completedAtUtc)}</dd></div>{run.errorMessage && <div className="detail-row"><dt>Error</dt><dd className="notice error">{run.errorMessage}</dd></div>}
-    </dl></div></section>
-    {run.metrics.length > 0 && <section className="card"><div className="card-header"><h2>Computed Metrics</h2></div><div className="table-wrap"><table><thead><tr><th>Metric</th><th>Value</th><th>Calculated</th></tr></thead><tbody>{run.metrics.map(metric => <tr key={metric.id}><td>{metric.metricName}</td><td>{metric.metricValue.toLocaleString('en-US', { maximumFractionDigits: 6 })}</td><td>{formatDate(metric.calculatedAtUtc)}</td></tr>)}</tbody></table></div></section>}
-    {run.sampleData && <section className="card"><div className="card-header"><h2>Distribution</h2><span className="spacer" /><span className="muted">{run.sampleData.sampleSize.toLocaleString()} samples</span></div><div className="card-body"><Histogram data={run.sampleData} /></div></section>}
-    {run.resultSummary && <section className="card"><div className="card-header"><h2>Result Summary</h2></div><div className="card-body"><pre className="json-display">{JSON.stringify(run.resultSummary, null, 2)}</pre></div></section>}
-  </div>;
+  return (
+    <Page>
+      <PageHeader>
+        <h1>Run Detail</h1>
+        <ButtonLink variant="secondary" href={`/models/${id}/runs`}><ArrowLeft size={17} /> Back to Runs</ButtonLink>
+      </PageHeader>
+      {error && <ErrorNotice message={error} />}
+      <div className="grid gap-[18px]">
+        <Card>
+          <CardHeader><h2>Run Information</h2></CardHeader>
+          <CardBody>
+            <dl className="grid gap-3">
+              <div className="grid grid-cols-[130px_1fr] items-center gap-4"><dt className="font-bold text-muted">Status</dt><dd className="m-0"><StatusBadge status={run.status} /></dd></div>
+              <div className="grid grid-cols-[130px_1fr] items-center gap-4"><dt className="font-bold text-muted">Requested</dt><dd className="m-0">{formatDate(run.requestedAtUtc)}</dd></div>
+              <div className="grid grid-cols-[130px_1fr] items-center gap-4"><dt className="font-bold text-muted">Started</dt><dd className="m-0">{formatDate(run.startedAtUtc)}</dd></div>
+              <div className="grid grid-cols-[130px_1fr] items-center gap-4"><dt className="font-bold text-muted">Completed</dt><dd className="m-0">{formatDate(run.completedAtUtc)}</dd></div>
+              {run.errorMessage && <div className="grid grid-cols-[130px_1fr] items-center gap-4"><dt className="font-bold text-muted">Error</dt><dd className="m-0 rounded-[9px] border border-danger/30 bg-danger/10 px-[14px] py-3 text-danger">{run.errorMessage}</dd></div>}
+            </dl>
+          </CardBody>
+        </Card>
+        {run.metrics.length > 0 && (
+          <Card>
+            <CardHeader><h2>Computed Metrics</h2></CardHeader>
+            <DataTable ariaLabel="Computed metrics" columns={metricColumns} rowKey={metric => metric.id} rows={run.metrics} />
+          </Card>
+        )}
+        {run.sampleData && (
+          <Card>
+            <CardHeader><h2>Distribution</h2><span className="flex-1" /><span className="text-muted">{run.sampleData.sampleSize.toLocaleString()} samples</span></CardHeader>
+            <CardBody><Histogram data={run.sampleData} /></CardBody>
+          </Card>
+        )}
+        {run.resultSummary && (
+          <Card>
+            <CardHeader><h2>Result Summary</h2></CardHeader>
+            <CardBody><pre className="m-0 overflow-auto rounded-[9px] bg-surface-muted p-[15px] text-xs text-foreground">{JSON.stringify(run.resultSummary, null, 2)}</pre></CardBody>
+          </Card>
+        )}
+      </div>
+    </Page>
+  );
 }

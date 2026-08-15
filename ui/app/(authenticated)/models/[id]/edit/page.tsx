@@ -1,4 +1,4 @@
-import { ModelForm } from '@/components/model-form';
+import { ModelForm } from '@/components/ModelForm';
 
 export default async function EditModelPage({ params }: { readonly params: Promise<{ id: string }> }) {
   const { id } = await params;

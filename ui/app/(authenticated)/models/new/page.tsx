@@ -1,4 +1,4 @@
-import { ModelForm } from '@/components/model-form';
+import { ModelForm } from '@/components/ModelForm';
 
 export default function NewModelPage() {
   return <ModelForm />;

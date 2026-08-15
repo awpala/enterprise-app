@@ -1,5 +1,6 @@
 using EA.Domain.Entities;
 using EA.Domain.Enums;
+using System.Text.Json;
 
 namespace EA.Domain.Interfaces;
 
@@ -80,11 +81,46 @@ public interface IModelRepository
     Task AddModelRunAsync(ModelRun run, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Updates an existing model run entity.
+    /// Atomically records that a model run started without downgrading a terminal status.
     /// </summary>
-    /// <param name="run">The model run to update.</param>
+    /// <param name="runId">The run identifier.</param>
+    /// <param name="startedAtUtc">The worker-reported start timestamp.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task UpdateModelRunAsync(ModelRun run, CancellationToken cancellationToken = default);
+    /// <returns>True when the run exists.</returns>
+    Task<bool> MarkModelRunStartedAsync(
+        Guid runId,
+        DateTime startedAtUtc,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically records successful completion while preserving the earliest start timestamp.
+    /// </summary>
+    /// <param name="runId">The run identifier.</param>
+    /// <param name="completedAtUtc">The worker-reported completion timestamp.</param>
+    /// <param name="resultSummary">The computed result summary.</param>
+    /// <param name="sampleData">The computed histogram data.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>True when the run exists.</returns>
+    Task<bool> MarkModelRunCompletedAsync(
+        Guid runId,
+        DateTime completedAtUtc,
+        JsonDocument? resultSummary,
+        JsonDocument? sampleData,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically records failed completion while preserving the earliest start timestamp.
+    /// </summary>
+    /// <param name="runId">The run identifier.</param>
+    /// <param name="completedAtUtc">The worker-reported failure timestamp.</param>
+    /// <param name="errorMessage">The worker-reported error.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>True when the run exists.</returns>
+    Task<bool> MarkModelRunFailedAsync(
+        Guid runId,
+        DateTime completedAtUtc,
+        string errorMessage,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Adds a collection of model metric entities to the data store.

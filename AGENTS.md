@@ -114,7 +114,21 @@ Deeper structure (individual components, feature folders, migration files, etc.)
 
 ## Development Workflow
 
+### Devcontainer Runtime
+
+The `ea-dev-env` devcontainer does not contain Docker and must never use Docker-in-Docker. PostgreSQL and RabbitMQ are supplied by the enclosing development environment. Run the three application processes in separate terminals with aliases installed by `.devcontainer/scripts/setup-env.sh`:
+
+```bash
+run-api
+run-ui
+run-data-engine
+```
+
+All three processes are required for the model-run lifecycle; without `run-data-engine`, requested runs remain pending because no worker consumes the RabbitMQ command.
+
 ### Local Development (Docker-first)
+
+The Compose workflow below is for host environments with Docker, not for use inside `ea-dev-env`.
 
 ```bash
 # Start full stack
@@ -182,6 +196,8 @@ The generated `.sql` pairs with the C# migration of the same stem (e.g. `2026041
 ### Next.js / TypeScript
 
 - Use App Router and Server Components by default; add `'use client'` only for browser state/effects.
+- Component filenames must use PascalCase and match the file's primary exported component (for example, `StatusBadge.tsx` exports `StatusBadge`). Split unrelated exported components into their own matching files.
+- Keep non-component helpers out of `components/`; place reusable frontend helpers in `ui/utils/` using camelCase filenames.
 - HTTP calls go through `lib/api.ts`, not directly from feature pages.
 - Public deployment configuration comes from `/api/runtime-config`; never expose secrets there.
 - Authentication uses the cloud-neutral OIDC adapter and Authorization Code + PKCE.

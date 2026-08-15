@@ -22,18 +22,15 @@ public class ModelRunStartedConsumer(
             "Received ModelRunStarted for run {ModelRunId}, model {ModelId} (MessageId: {MessageId}, CorrelationId: {CorrelationId})",
             message.ModelRunId, message.ModelId, message.MessageId, message.CorrelationId);
 
-        var run = await repository.GetModelRunByIdAsync(message.ModelRunId, context.CancellationToken);
-        if (run is null)
+        var updated = await repository.MarkModelRunStartedAsync(
+            message.ModelRunId,
+            message.OccurredAtUtc,
+            context.CancellationToken);
+        if (!updated)
         {
             logger.LogWarning("Model run {ModelRunId} not found, skipping", message.ModelRunId);
             return;
         }
-
-        run.Status = ModelRunStatus.Running;
-        run.StartedAtUtc = message.OccurredAtUtc;
-
-        await repository.UpdateModelRunAsync(run, context.CancellationToken);
-        await repository.SaveChangesAsync(context.CancellationToken);
 
         logger.LogInformation("Model run {ModelRunId} marked as Running", message.ModelRunId);
     }
