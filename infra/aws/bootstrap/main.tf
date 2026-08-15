@@ -143,6 +143,7 @@ resource "aws_iam_role_policy" "github_deployer" {
           "iam:DeleteRolePolicy",
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies",
+          "iam:ListInstanceProfilesForRole",
           "iam:UpdateAssumeRolePolicy"
         ]
         Resource = "*"
@@ -152,14 +153,6 @@ resource "aws_iam_role_policy" "github_deployer" {
         Effect   = "Allow"
         Action   = "route53:CreateHostedZone"
         Resource = "*"
-        Condition = {
-          Null = {
-            "route53:VPCs" = "false"
-          }
-          "ForAllValues:StringLike" = {
-            "route53:VPCs" = "VPCId=vpc-*,VPCRegion=${var.aws_region}"
-          }
-        }
       },
       {
         Sid    = "ReadPrivateServiceDiscoveryDns"
@@ -168,6 +161,12 @@ resource "aws_iam_role_policy" "github_deployer" {
           "route53:GetHostedZone",
           "route53:ListHostedZonesByName"
         ]
+        Resource = "*"
+      },
+      {
+        Sid      = "DenyPublicServiceDiscoveryDns"
+        Effect   = "Deny"
+        Action   = "servicediscovery:CreatePublicDnsNamespace"
         Resource = "*"
       }
     ]
