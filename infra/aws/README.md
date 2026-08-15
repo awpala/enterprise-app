@@ -138,7 +138,7 @@ The logical GitHub Environment is `production`, while its committed Terraform fi
 | Secrets deletion recovery | Immediate | 30 days |
 | CloudWatch log retention | 14 days | 90 days |
 | Synthetic developer auth | Enabled | Disabled |
-| Synthetic guest auth | Disabled | Disabled |
+| Synthetic guest auth | Disabled | Enabled as the explicit production guest hatch |
 | Continuous service count | Minimum 1, maximum 3 | Minimum 1, maximum 3 |
 
 `image_tag = "latest"` in the tfvars files is only a local default. GitHub Actions overrides it with an immutable branch-and-commit tag for development and an immutable commit tag for production.
