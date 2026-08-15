@@ -99,6 +99,12 @@ jobs:
           terraform -chdir="infra/${{ matrix.target }}" init -backend=false
           terraform -chdir="infra/${{ matrix.target }}" validate
 
+      - name: Test AWS secret readiness contract
+        if: matrix.target == 'aws'
+        run: |
+          terraform -chdir="infra/aws/modules/secrets-manager" init -backend=false
+          terraform -chdir="infra/aws/modules/secrets-manager" test
+
       - name: Validate bootstrap root
         run: |
           terraform -chdir="infra/${{ matrix.target }}/bootstrap" init -backend=false
@@ -138,4 +144,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Validate shell adapters
-        run: bash -n .github/scripts/*.sh infra/scripts/*.sh docs/runbooks/scripts/*.sh
+        run: |
+          bash -n .github/scripts/*.sh .github/scripts/tests/*.sh infra/scripts/*.sh docs/runbooks/scripts/*.sh
+          bash .github/scripts/tests/aws-image-retention.test.sh

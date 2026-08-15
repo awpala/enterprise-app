@@ -122,6 +122,7 @@ Every taggable application resource receives `project`, `environment`, `managed-
 - RabbitMQ is a single ECS task backed by EFS. EFS protects broker data across task replacement, but this is not a highly available broker design. Production approval requires accepting that limitation or replacing it with a managed/HA design.
 - API, UI, and data-engine ECS services use deployment circuit breakers with rollback and wait for steady state. Each scales on average CPU; RabbitMQ remains fixed at one task.
 - Terraform generates the database and broker passwords. The deployed values live in Secrets Manager, but they also exist in encrypted Terraform state. Access to the state bucket is therefore secret-bearing access.
+- Secret-consuming ECS task definitions receive explicit `AWSCURRENT` references whose Terraform outputs depend on the corresponding secret-version resources. The execution-role output likewise waits for its image, log, and secret-read policies, preventing fresh-environment tasks from starting against an empty secret container or an incomplete execution role.
 - The bootstrap deployment policy is intentionally broad for initial account provisioning. Derive a least-privilege replacement from development CloudTrail evidence before production.
 
 ## Environment profiles
@@ -229,7 +230,7 @@ The AWS adapter performs these gates in order:
 7. Apply the complete stack with the computed image tag and wait for ECS services to stabilize.
 8. Run the migration task in the private subnets and require its container exit code to be zero.
 9. Smoke-test API readiness, UI health, runtime OIDC configuration, managed login, both required federated providers, Cognito client configuration, and logout redirect behavior.
-10. Remove stale ECR tags, retaining the newest deployed tag and an optional `latest` tag. Terraform's ECR policy independently expires untagged images after seven days and caps tagged-image history at 20.
+10. Discover every image used by current or draining ECS service deployments and by the migration task definition, then remove only stale ECR tags whose digests are unprotected. Cleanup always retains every tag on the newest pushed digest, the current deployment tag, `latest`, and all active tag- or digest-pinned references. A post-cleanup verifier fails the workflow if any protected reference no longer resolves; Terraform's ECR policy independently expires untagged images after seven days and caps tagged-image history at 20.
 
 Documentation-only changes do not match the deployment workflow paths.
 

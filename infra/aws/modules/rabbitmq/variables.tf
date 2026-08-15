@@ -59,8 +59,13 @@ variable "username" {
 }
 
 variable "password_secret_arn" {
-  description = "Secrets Manager ARN containing the RabbitMQ password."
+  description = "AWSCURRENT-qualified Secrets Manager reference containing the RabbitMQ password."
   type        = string
+
+  validation {
+    condition     = can(regex("::AWSCURRENT:$", var.password_secret_arn))
+    error_message = "password_secret_arn must explicitly select the AWSCURRENT secret version."
+  }
 }
 
 variable "log_group_name" {

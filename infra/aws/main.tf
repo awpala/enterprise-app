@@ -148,7 +148,7 @@ module "rabbitmq" {
   task_role_arn          = module.ecs_iam.task_role_arn
   image                  = "rabbitmq:4-management"
   username               = var.rabbitmq_username
-  password_secret_arn    = module.secrets_manager.rabbitmq_password_arn
+  password_secret_arn    = module.secrets_manager.rabbitmq_password_current_reference
   log_group_name         = module.observability.log_group_names["rabbitmq"]
   tags                   = local.common_tags
 }
@@ -171,8 +171,8 @@ module "container_services" {
   ui_target_group_arn    = module.load_balancer.ui_target_group_arn
   rabbitmq_host          = module.rabbitmq.host
   rabbitmq_username      = var.rabbitmq_username
-  rabbitmq_password_arn  = module.secrets_manager.rabbitmq_password_arn
-  postgres_secret_arn    = module.secrets_manager.postgres_connection_string_arn
+  rabbitmq_password_arn  = module.secrets_manager.rabbitmq_password_current_reference
+  postgres_secret_arn    = module.secrets_manager.postgres_connection_string_current_reference
   application_url        = module.cloudfront.application_url
   auth_authority         = module.cognito.authority
   auth_audience          = module.cognito.api_audience

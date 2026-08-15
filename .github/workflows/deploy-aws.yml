@@ -125,3 +125,6 @@ jobs:
 
       - name: Enforce image retention
         run: .github/scripts/aws-clean-images.sh
+
+      - name: Verify active image retention
+        run: .github/scripts/aws-verify-active-images.sh

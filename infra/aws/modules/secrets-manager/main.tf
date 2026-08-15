@@ -5,7 +5,8 @@ resource "aws_secretsmanager_secret" "postgres_connection_string" {
 }
 
 resource "aws_secretsmanager_secret_version" "postgres_connection_string" {
-  secret_id = aws_secretsmanager_secret.postgres_connection_string.id
+  secret_id      = aws_secretsmanager_secret.postgres_connection_string.id
+  version_stages = ["AWSCURRENT"]
   secret_string = join(";", [
     "Host=${var.postgres_host}",
     "Port=${var.postgres_port}",
@@ -24,6 +25,7 @@ resource "aws_secretsmanager_secret" "rabbitmq_password" {
 }
 
 resource "aws_secretsmanager_secret_version" "rabbitmq_password" {
-  secret_id     = aws_secretsmanager_secret.rabbitmq_password.id
-  secret_string = var.rabbitmq_password
+  secret_id      = aws_secretsmanager_secret.rabbitmq_password.id
+  secret_string  = var.rabbitmq_password
+  version_stages = ["AWSCURRENT"]
 }

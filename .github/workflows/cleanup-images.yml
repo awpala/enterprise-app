@@ -28,7 +28,7 @@ jobs:
   azure:
     if: inputs.target == 'azure' || inputs.target == 'both'
     runs-on: ubuntu-latest
-    environment: azure-${{ inputs.environment }}
+    environment: ${{ inputs.environment }}
     env:
       ARM_USE_OIDC: "true"
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -58,7 +58,7 @@ jobs:
   aws:
     if: inputs.target == 'aws' || inputs.target == 'both'
     runs-on: ubuntu-latest
-    environment: aws-${{ inputs.environment }}
+    environment: ${{ inputs.environment }}
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       AWS_TFSTATE_BUCKET: ${{ vars.AWS_TFSTATE_BUCKET }}
@@ -81,3 +81,5 @@ jobs:
             -backend-config="use_lockfile=true"
       - name: Clean AWS registry
         run: .github/scripts/aws-clean-images.sh
+      - name: Verify active AWS images
+        run: .github/scripts/aws-verify-active-images.sh

@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${MOCK_AWS_STATE:?MOCK_AWS_STATE is required}"
+: "${MOCK_DELETE_LOG:?MOCK_DELETE_LOG is required}"
+
+service=${1:?AWS service is required}
+operation=${2:?AWS operation is required}
+shift 2
+
+argument_value() {
+  local expected=$1
+  shift
+  while (( $# > 0 )); do
+    if [[ "$1" == "$expected" ]]; then
+      printf '%s\n' "${2:-}"
+      return
+    fi
+    shift
+  done
+}
+
+has_argument() {
+  local expected=$1
+  shift
+  while (( $# > 0 )); do
+    [[ "$1" == "$expected" ]] && return 0
+    shift
+  done
+  return 1
+}
+
+case "${service}/${operation}" in
+  ecs/list-services)
+    jq '{serviceArns: [.services[].serviceArn]}' "$MOCK_AWS_STATE"
+    ;;
+  ecs/describe-services)
+    jq '{services: [.services[] | {deployments}], failures: []}' "$MOCK_AWS_STATE"
+    ;;
+  ecs/describe-task-definition)
+    task_definition=$(argument_value --task-definition "$@")
+    jq --arg task_definition "$task_definition" \
+      '{taskDefinition: {containerDefinitions: [.taskDefinitions[$task_definition][] | {image: .}]}}' \
+      "$MOCK_AWS_STATE"
+    ;;
+  ecr/describe-images)
+    repository=$(argument_value --repository-name "$@")
+    image_id=$(argument_value --image-ids "$@")
+
+    if [[ -z "$image_id" ]]; then
+      jq --arg repository "$repository" \
+        '{imageDetails: .repositories[$repository].images}' "$MOCK_AWS_STATE"
+      exit 0
+    fi
+
+    reference=${image_id#*=}
+    if [[ "${MOCK_MISSING_REFERENCE:-}" == "${repository}|${reference}" ]]; then
+      exit 254
+    fi
+    if [[ "$image_id" == imageTag=* ]]; then
+      match_count=$(jq --arg repository "$repository" --arg reference "$reference" \
+        '[.repositories[$repository].images[] | select((.imageTags // []) | index($reference))] | length' \
+        "$MOCK_AWS_STATE")
+    else
+      match_count=$(jq --arg repository "$repository" --arg reference "$reference" \
+        '[.repositories[$repository].images[] | select(.imageDigest == $reference)] | length' \
+        "$MOCK_AWS_STATE")
+    fi
+    (( match_count > 0 )) || exit 254
+    printf '{"imageDetails":[]}\n'
+    ;;
+  ecr/batch-delete-image)
+    repository=$(argument_value --repository-name "$@")
+    image_id=$(argument_value --image-ids "$@")
+    printf '%s\t%s\n' "$repository" "${image_id#imageTag=}" >> "$MOCK_DELETE_LOG"
+    printf '{"imageIds":[],"failures":[]}\n'
+    ;;
+  *)
+    echo "Unexpected mock AWS command: ${service} ${operation} $*" >&2
+    exit 64
+    ;;
+esac
