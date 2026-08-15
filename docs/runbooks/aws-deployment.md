@@ -102,6 +102,20 @@ gh run watch <run-id> \
 
 The workflow requires the migration task to exit zero and `/health/ready` to return HTTP 200. After it succeeds, complete the browser and observability checks in the [AWS deployment workbook](../workbooks/aws-deployment-workbook.md#9-verification-evidence).
 
+After the first successful infrastructure deployment, provision the sole real
+application user from the existing IAM Identity Center `admin` identity:
+
+```bash
+infra/scripts/aws-provision-cognito-admin.sh dev \
+  --config infra/aws/envs/dev.deploy.env
+```
+
+The script resolves the administrator's primary email without printing or
+persisting it, confirms the AWS account, and sends one Cognito temporary-password
+invitation. Complete the required password change through the generated managed
+login page. Real sign-in, callback, authenticated API access, refresh, and logout
+are mandatory dev acceptance gates; `Log in as Dev` is not a substitute.
+
 The onboarding script sets the repository variable `DEPLOYMENT_TARGETS` from
 the deployment config. With `DEPLOYMENT_TARGETS=aws`, every non-`main` push
 deploys to `aws-dev`, while every `main` push deploys to `aws-production`.

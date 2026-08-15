@@ -165,3 +165,9 @@ resource "aws_cognito_user_pool_domain" "this" {
   user_pool_id          = aws_cognito_user_pool.this.id
   managed_login_version = 2
 }
+
+resource "aws_cognito_managed_login_branding" "this" {
+  user_pool_id                = aws_cognito_user_pool.this.id
+  client_id                   = aws_cognito_user_pool_client.ui.id
+  use_cognito_provided_values = true
+}

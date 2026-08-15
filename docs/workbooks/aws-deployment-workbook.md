@@ -134,6 +134,12 @@ aws rds describe-db-instances --query 'DBInstances[].{id:DBInstanceIdentifier,pu
 
 Complete a real browser journey: native sign-in, optional federated sign-ins, token inspection (`iss`, `client_id`, `scope`, `token_use`), create a model, request a run, observe completion, refresh, logout, and revoked/expired-token rejection. Confirm the audit actor and message headers contain normalized subject/tenant/provider values.
 
+Provision the sole native Cognito user from the existing IAM Identity Center
+`admin` identity with `infra/scripts/aws-provision-cognito-admin.sh`; do not copy
+the administrator's email or temporary credential into Git, Terraform variables,
+GitHub configuration, or command output. Synthetic dev access does not satisfy
+the native sign-in gate.
+
 In CloudWatch/X-Ray, capture a correlated trace spanning ALB/API, RabbitMQ publish/consume, and data engine. Confirm alarms are `OK`, log retention matches tfvars, and no secret appears in logs.
 
 ## 10. Failure, rollback, and teardown
