@@ -175,7 +175,6 @@ module "entra_external_id" {
   application_url    = local.ui_url
   external_tenant_id = var.external_tenant_id
   tenant_subdomain   = var.tenant_subdomain
-  tags               = local.common_tags
 }
 
 #-------------------------------------------------------------------------

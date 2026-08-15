@@ -3,8 +3,13 @@ set -euo pipefail
 
 # predefined and derived constants
 BASH_RC="/root/.bashrc"
+BASH_ALIASES="/root/.bash_aliases"
 WORKSPACE_DIR="/workspace"
 LOGFILE="/tmp/setup-env-debug.log"
+GOOGLE_CLOUD_APT_KEY_URL="https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+GOOGLE_CLOUD_APT_KEYRING="/usr/share/keyrings/cloud.google.gpg"
+GOOGLE_CLOUD_APT_SOURCE_FILE="/etc/apt/sources.list.d/google-cloud-sdk.list"
+GOOGLE_CLOUD_APT_SOURCE="deb [signed-by=${GOOGLE_CLOUD_APT_KEYRING}] https://packages.cloud.google.com/apt cloud-sdk main"
 
 # redirect all output to logfile (and still echo to stdout for visibility)
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -19,8 +24,9 @@ echo "--- Environment (sorted) ---"
 printenv | sort
 echo
 
-# ensure /root/.bashrc file exists
+# ensure /root/.bashrc and /root/.bash_aliases files exist
 touch "$BASH_RC"
+touch "$BASH_ALIASES"
 
 # post-process /root/.bashrc
 if [ -f "$BASH_RC" ]; then
@@ -28,6 +34,28 @@ if [ -f "$BASH_RC" ]; then
   sed -i -E 's/^#\s*export\s+/export /' "$BASH_RC" || true
   sed -i -E 's/^#\s*eval\s+/eval /' "$BASH_RC" || true
   sed -i -E 's/^#\s*alias\s+l/alias l/' "$BASH_RC" || true
+
+  if ! grep -q 'bash_aliases' "$BASH_RC" 2>/dev/null; then
+    cat >> "$BASH_RC" <<'EOF'
+if [ -f ~/.bash_aliases ]; then
+  . ~/.bash_aliases
+fi
+EOF
+  fi
+fi
+
+# write dedicated /root/.bash_aliases entries
+if ! grep -q '^export ui=' "$BASH_ALIASES" 2>/dev/null; then
+  echo 'export ui="/workspace/ui"' >> "$BASH_ALIASES"
+fi
+if ! grep -q '^export api=' "$BASH_ALIASES" 2>/dev/null; then
+  echo 'export api="/workspace/api/src/EA.Api"' >> "$BASH_ALIASES"
+fi
+if ! grep -q '^alias run-ui=' "$BASH_ALIASES" 2>/dev/null; then
+  echo "alias run-ui='cd \"\$ui\" && npm run dev'" >> "$BASH_ALIASES"
+fi
+if ! grep -q '^alias run-api=' "$BASH_ALIASES" 2>/dev/null; then
+  echo "alias run-api='cd \"\$api\" && dotnet run'" >> "$BASH_ALIASES"
 fi
 
 on_error() {
@@ -48,6 +76,32 @@ elif command -v apt-get >/dev/null 2>&1; then
   echo "Installed: $(rg --version | head -n 1)"
 else
   echo "ERROR: ripgrep is missing and apt-get is unavailable." >&2
+  exit 1
+fi
+
+# ---- Google Cloud CLI ----
+if command -v gcloud >/dev/null 2>&1; then
+  echo "Google Cloud CLI is already installed: $(gcloud version 2>/dev/null | sed -n '1p')"
+elif command -v apt-get >/dev/null 2>&1; then
+  echo "--- Installing Google Cloud CLI ---"
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
+    ca-certificates \
+    curl \
+    gnupg
+  curl --fail --silent --show-error --location "$GOOGLE_CLOUD_APT_KEY_URL" \
+    | gpg --dearmor --yes --output "$GOOGLE_CLOUD_APT_KEYRING"
+  printf '%s\n' "$GOOGLE_CLOUD_APT_SOURCE" > "$GOOGLE_CLOUD_APT_SOURCE_FILE"
+  apt-get update
+  CLOUDSDK_SKIP_PY_COMPILATION=1 DEBIAN_FRONTEND=noninteractive \
+    apt-get install --yes --no-install-recommends google-cloud-cli
+  command -v gcloud >/dev/null 2>&1 || {
+    echo "ERROR: Google Cloud CLI installation completed without a gcloud executable." >&2
+    exit 1
+  }
+  echo "Installed Google Cloud CLI: $(gcloud version | sed -n '1p')"
+else
+  echo "ERROR: Google Cloud CLI is missing and apt-get is unavailable." >&2
   exit 1
 fi
 

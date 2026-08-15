@@ -17,9 +17,3 @@ variable "tenant_subdomain" {
   description = "Subdomain of the Entra External ID tenant (the prefix in <subdomain>.ciamlogin.com). Used to compute the OIDC authority URL."
   type        = string
 }
-
-variable "tags" {
-  description = "Tags to apply to taggable resources in this module (most Graph-level resources do not accept tags)."
-  type        = map(string)
-  default     = {}
-}
