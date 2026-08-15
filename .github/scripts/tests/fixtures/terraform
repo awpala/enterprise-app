@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+command_line=" $* "
+if [[ "$command_line" == *" output -json ecr_repository_urls "* ]]; then
+  jq -n '{
+    "ea-api": "registry.example.test/ea-api",
+    "ea-ui": "registry.example.test/ea-ui",
+    "ea-data-engine": "registry.example.test/ea-data-engine",
+    "ea-migrations": "registry.example.test/ea-migrations"
+  }'
+elif [[ "$command_line" == *" output -raw ecs_cluster_name "* ]]; then
+  printf 'test-cluster\n'
+elif [[ "$command_line" == *" output -raw migration_task_definition_arn "* ]]; then
+  printf 'task/migrations\n'
+else
+  echo "Unexpected mock Terraform command: $*" >&2
+  exit 64
+fi

@@ -1,0 +1,134 @@
+{
+  "repositories": {
+    "ea-api": {
+      "images": [
+        {
+          "imageDigest": "sha256:api-newest",
+          "imagePushedAt": "2026-08-15T04:00:00Z",
+          "imageTags": ["z-newest-api", "a-newest-api"]
+        },
+        {
+          "imageDigest": "sha256:api-latest",
+          "imagePushedAt": "2026-08-15T03:00:00Z",
+          "imageTags": ["latest"]
+        },
+        {
+          "imageDigest": "sha256:api-deployment",
+          "imagePushedAt": "2026-08-15T02:00:00Z",
+          "imageTags": ["release-under-test"]
+        },
+        {
+          "imageDigest": "sha256:api-active",
+          "imagePushedAt": "2026-08-15T01:00:00Z",
+          "imageTags": ["active-api"]
+        },
+        {
+          "imageDigest": "sha256:api-stale",
+          "imagePushedAt": "2026-08-14T01:00:00Z",
+          "imageTags": ["stale-api-b", "stale-api-a"]
+        }
+      ]
+    },
+    "ea-ui": {
+      "images": [
+        {
+          "imageDigest": "sha256:ui-newest",
+          "imagePushedAt": "2026-08-15T04:00:00Z",
+          "imageTags": ["ui-newest"]
+        },
+        {
+          "imageDigest": "sha256:ui-current",
+          "imagePushedAt": "2026-08-15T02:00:00Z",
+          "imageTags": ["active-ui-current"]
+        },
+        {
+          "imageDigest": "sha256:ui-draining",
+          "imagePushedAt": "2026-08-15T01:00:00Z",
+          "imageTags": ["active-ui-draining"]
+        },
+        {
+          "imageDigest": "sha256:ui-stale",
+          "imagePushedAt": "2026-08-14T01:00:00Z",
+          "imageTags": ["stale-ui"]
+        }
+      ]
+    },
+    "ea-data-engine": {
+      "images": [
+        {
+          "imageDigest": "sha256:data-newest",
+          "imagePushedAt": "2026-08-15T04:00:00Z",
+          "imageTags": ["z-newest-data", "a-newest-data"]
+        },
+        {
+          "imageDigest": "sha256:data-active",
+          "imagePushedAt": "2026-08-15T02:00:00Z",
+          "imageTags": ["active-digest-alias-b", "active-digest-alias-a"]
+        },
+        {
+          "imageDigest": "sha256:data-stale",
+          "imagePushedAt": "2026-08-14T01:00:00Z",
+          "imageTags": ["stale-data"]
+        }
+      ]
+    },
+    "ea-migrations": {
+      "images": [
+        {
+          "imageDigest": "sha256:migrations-newest",
+          "imagePushedAt": "2026-08-15T04:00:00Z",
+          "imageTags": ["migrations-newest"]
+        },
+        {
+          "imageDigest": "sha256:migrations-active",
+          "imagePushedAt": "2026-08-15T02:00:00Z",
+          "imageTags": ["active-migrations"]
+        },
+        {
+          "imageDigest": "sha256:migrations-stale",
+          "imagePushedAt": "2026-08-14T01:00:00Z",
+          "imageTags": ["stale-migrations"]
+        }
+      ]
+    }
+  },
+  "services": [
+    {
+      "serviceArn": "service/api",
+      "deployments": [
+        {"taskDefinition": "task/api-current"}
+      ]
+    },
+    {
+      "serviceArn": "service/ui",
+      "deployments": [
+        {"taskDefinition": "task/ui-current"},
+        {"taskDefinition": "task/ui-draining"}
+      ]
+    },
+    {
+      "serviceArn": "service/data-engine",
+      "deployments": [
+        {"taskDefinition": "task/data-current"}
+      ]
+    }
+  ],
+  "taskDefinitions": {
+    "task/api-current": [
+      "registry.example.test/ea-api:active-api",
+      "public.example.test/telemetry:stable"
+    ],
+    "task/ui-current": [
+      "registry.example.test/ea-ui:active-ui-current"
+    ],
+    "task/ui-draining": [
+      "registry.example.test/ea-ui:active-ui-draining"
+    ],
+    "task/data-current": [
+      "registry.example.test/ea-data-engine@sha256:data-active"
+    ],
+    "task/migrations": [
+      "registry.example.test/ea-migrations:active-migrations"
+    ]
+  }
+}
