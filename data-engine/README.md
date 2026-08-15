@@ -10,7 +10,7 @@ Companion service to the API. Consumes `model.run.*` commands from RabbitMQ, exe
 | `pydantic` 2 | Message models | Validates inbound payloads against the shared JSON Schema contracts. Rejects malformed messages at the edge. |
 | `pydantic-settings` | Config | `RABBITMQ_*` / app env vars parsed and typed on startup — fails fast on misconfiguration. |
 | `numpy` 2 + `scipy` 1.14+ | Numerical core | Workflow computations (histograms, metrics) live in `workflows/`. |
-| `azure-monitor-opentelemetry` | Telemetry | Same App Insights sink as the .NET API — preserves correlation across the MQ boundary. |
+| OpenTelemetry SDK/exporters | Telemetry | Runtime-selected Azure Monitor or OTLP export while instrumentation and trace propagation stay provider-neutral. |
 | `opentelemetry-instrumentation-pika` | Trace propagation | Extracts the `traceparent` header from AMQP properties so a single run shows up as one distributed trace spanning API → broker → engine → broker → API. |
 
 Dev-only: `pytest` + `pytest-cov` for tests, `ruff` for lint, `pyright` (standard mode) for types.
@@ -61,4 +61,4 @@ Tests under `tests/` target the `workflows/` layer directly without a broker. Co
 
 - **Prefetch matters.** pika consumers set a bounded prefetch so a single slow run doesn't starve the other queues. Don't raise it without thinking about DLQ behavior.
 - **At-least-once, not exactly-once.** Workflows must be idempotent with respect to `messageId` / `correlationId`. The API side reconciles by run ID.
-- **Azure Monitor exporter needs `APPLICATIONINSIGHTS_CONNECTION_STRING`.** Absent in local dev — the engine falls back to stdout logging.
+- **Telemetry export is explicit.** Set `OBSERVABILITY_EXPORTER=azuremonitor` with `APPLICATIONINSIGHTS_CONNECTION_STRING`, or `OBSERVABILITY_EXPORTER=otlp` with the standard OTLP endpoint. Local development defaults to `none` and retains stdout logging.

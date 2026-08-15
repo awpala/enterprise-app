@@ -3,7 +3,7 @@ namespace EA.Domain.Interfaces;
 /// <summary>
 /// Abstraction over the authenticated principal for the current request.
 /// Resolved from the JWT (via <c>IHttpContextAccessor</c>) in production,
-/// or a fixed dev principal when <c>AzureAd:Enabled = false</c>.
+/// or a fixed dev principal when <c>Authentication:Enabled = false</c>.
 /// </summary>
 /// <remarks>
 /// Lives in <c>EA.Domain</c> so infrastructure components (EF Core interceptors,
@@ -14,21 +14,23 @@ namespace EA.Domain.Interfaces;
 public interface ICurrentUser
 {
     /// <summary>
-    /// The Entra object identifier (<c>oid</c> claim), stable within the tenant.
+    /// Stable application identifier derived from the provider subject claim.
+    /// Native UUID/GUID subjects are preserved; other OIDC subjects are mapped
+    /// deterministically so the domain does not depend on a provider claim shape.
     /// </summary>
-    Guid? Oid { get; }
+    Guid? SubjectId { get; }
 
     /// <summary>
-    /// The Entra tenant identifier (<c>tid</c> claim).
+    /// Stable tenant/issuer identifier. Entra <c>tid</c> values are preserved;
+    /// providers without tenant GUIDs are mapped deterministically from issuer.
     /// </summary>
-    Guid? Tid { get; }
+    Guid? TenantId { get; }
 
     /// <summary>
-    /// The upstream identity provider. One of <c>"google.com"</c>, <c>"live.com"</c>,
-    /// <c>"entra"</c>, <c>"email"</c> (local OTP in External ID where <c>idp</c> is
-    /// absent), or <c>"dev"</c> when the dev short-circuit is active.
+    /// The upstream identity provider, normalized from Entra <c>idp</c>, Cognito
+    /// federation metadata, or the configured OIDC issuer.
     /// </summary>
-    string? Idp { get; }
+    string? IdentityProvider { get; }
 
     /// <summary>
     /// The display name of the authenticated user (<c>name</c> claim).
@@ -36,9 +38,8 @@ public interface ICurrentUser
     string? Name { get; }
 
     /// <summary>
-    /// The email address of the authenticated user. External ID ID tokens may
-    /// surface this as the <c>emails</c> array, <c>preferred_username</c>,
-    /// or <see cref="System.Security.Claims.ClaimTypes.Email"/>.
+    /// The email address of the authenticated user, normalized from common OIDC
+    /// and Entra claim shapes.
     /// </summary>
     string? Email { get; }
 

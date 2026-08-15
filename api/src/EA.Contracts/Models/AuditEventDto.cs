@@ -6,10 +6,10 @@ namespace EA.Contracts.Models;
 public record AuditEventDto(
     Guid Id,
     DateTime OccurredAtUtc,
-    Guid? ActorOid,
+    Guid? ActorSubjectId,
     string? ActorName,
     string? ActorEmail,
-    string ActorIdp,
+    string ActorIdentityProvider,
     string ActorType,
     string Action,
     string EntityType,

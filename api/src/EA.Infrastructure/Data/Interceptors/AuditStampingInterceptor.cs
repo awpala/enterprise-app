@@ -88,7 +88,7 @@ public sealed class AuditStampingInterceptor(ICurrentUser currentUser) : SaveCha
         if (context is null || !currentUser.IsAuthenticated)
             return;
 
-        var actorOid = currentUser.Oid ?? Guid.Empty;
+        var actorSubjectId = currentUser.SubjectId ?? Guid.Empty;
         var actorName = currentUser.Name;
 
         foreach (var entry in context.ChangeTracker.Entries())
@@ -96,9 +96,9 @@ public sealed class AuditStampingInterceptor(ICurrentUser currentUser) : SaveCha
             if (entry.State is not (EntityState.Added or EntityState.Modified))
                 continue;
 
-            StampCreated(entry, actorOid, actorName);
-            StampUpdated(entry, actorOid, actorName);
-            StampModelRunRequested(entry, actorOid, actorName);
+            StampCreated(entry, actorSubjectId, actorName);
+            StampUpdated(entry, actorSubjectId, actorName);
+            StampModelRunRequested(entry, actorSubjectId, actorName);
         }
     }
 
@@ -115,7 +115,7 @@ public sealed class AuditStampingInterceptor(ICurrentUser currentUser) : SaveCha
         var now = DateTime.UtcNow;
 
         // Derive correlation ID from the current OpenTelemetry distributed trace,
-        // tying each audit row to the trace visible in Application Insights.
+        // tying each audit row to the trace visible in the selected telemetry backend.
         Guid? correlationId = Activity.Current is { } activity
             ? new Guid(activity.TraceId.ToHexString())
             : null;
@@ -181,10 +181,10 @@ public sealed class AuditStampingInterceptor(ICurrentUser currentUser) : SaveCha
             occurredAtUtc: now,
             action: action,
             entityType: nameof(Model),
-            actorIdp: currentUser.Idp ?? "unknown",
+            actorIdentityProvider: currentUser.IdentityProvider ?? "unknown",
             actorType: "user",
-            actorOid: currentUser.Oid,
-            actorTid: currentUser.Tid,
+            actorSubjectId: currentUser.SubjectId,
+            actorTenantId: currentUser.TenantId,
             actorName: currentUser.Name,
             actorEmail: currentUser.Email,
             entityId: model.Id,
@@ -207,10 +207,10 @@ public sealed class AuditStampingInterceptor(ICurrentUser currentUser) : SaveCha
             occurredAtUtc: now,
             action: "modelrun.requested",
             entityType: nameof(ModelRun),
-            actorIdp: currentUser.Idp ?? "unknown",
+            actorIdentityProvider: currentUser.IdentityProvider ?? "unknown",
             actorType: "user",
-            actorOid: currentUser.Oid,
-            actorTid: currentUser.Tid,
+            actorSubjectId: currentUser.SubjectId,
+            actorTenantId: currentUser.TenantId,
             actorName: currentUser.Name,
             actorEmail: currentUser.Email,
             entityId: run.Id,
@@ -218,45 +218,45 @@ public sealed class AuditStampingInterceptor(ICurrentUser currentUser) : SaveCha
             correlationId: correlationId);
     }
 
-    private static void StampCreated(EntityEntry entry, Guid actorOid, string? actorName)
+    private static void StampCreated(EntityEntry entry, Guid actorSubjectId, string? actorName)
     {
         if (entry.State != EntityState.Added || entry.Entity is not ICreatedAuditable created)
             return;
 
         if (created.CreatedBy == Guid.Empty)
-            created.CreatedBy = actorOid;
+            created.CreatedBy = actorSubjectId;
 
         if (string.IsNullOrWhiteSpace(created.CreatedByName))
             created.CreatedByName = actorName;
     }
 
-    private static void StampUpdated(EntityEntry entry, Guid actorOid, string? actorName)
+    private static void StampUpdated(EntityEntry entry, Guid actorSubjectId, string? actorName)
     {
         if (entry.Entity is not IUpdatedAuditable updated)
             return;
 
         if (entry.State == EntityState.Modified)
         {
-            updated.UpdatedBy = actorOid;
+            updated.UpdatedBy = actorSubjectId;
             updated.UpdatedByName = actorName;
             return;
         }
 
         // Added: only fill if the caller didn't set anything explicitly.
         if (!updated.UpdatedBy.HasValue)
-            updated.UpdatedBy = actorOid;
+            updated.UpdatedBy = actorSubjectId;
 
         if (string.IsNullOrWhiteSpace(updated.UpdatedByName))
             updated.UpdatedByName = actorName;
     }
 
-    private static void StampModelRunRequested(EntityEntry entry, Guid actorOid, string? actorName)
+    private static void StampModelRunRequested(EntityEntry entry, Guid actorSubjectId, string? actorName)
     {
         if (entry.State != EntityState.Added || entry.Entity is not ModelRun run)
             return;
 
         if (!run.RequestedBy.HasValue)
-            run.RequestedBy = actorOid;
+            run.RequestedBy = actorSubjectId;
 
         if (string.IsNullOrWhiteSpace(run.RequestedByName))
             run.RequestedByName = actorName;

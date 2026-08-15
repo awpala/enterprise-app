@@ -15,8 +15,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Identity.Web;
 using OpenTelemetry;
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 
@@ -42,42 +42,61 @@ if (args.Contains("--seed-generate"))
 var builder = WebApplication.CreateBuilder(args);
 
 // ---------------------------------------------------------------------------
-// Observability — Azure Monitor OpenTelemetry distro
+// Observability — cloud-neutral OpenTelemetry with deployment adapters
 // ---------------------------------------------------------------------------
-// When a connection string is configured (Terraform injects
-// APPLICATIONINSIGHTS_CONNECTION_STRING as a secret env var in deployed
-// envs; AzureMonitor:ConnectionString also works via IConfiguration), the
-// distro:
-//   - exports ASP.NET Core / HttpClient / SqlClient / EF Core / MassTransit
-//     v8 traces automatically (no per-span code needed);
-//   - bridges ILogger to App Insights `traces` table;
-//   - exports runtime metrics.
-// Local (docker compose, `dotnet run`, tests) does not set the connection
-// string. The distro does NOT silently no-op in that case — it throws
-// InvalidOperationException at host start — so we gate `UseAzureMonitor`
-// on connection-string presence and fall back to stdout logging only.
-// The `EA.Api.Facade` ActivitySource is registered unconditionally so call
-// sites can create custom spans uniformly; spans are simply not exported
-// when the distro is skipped.
-//
-// Sampling: 100% in Development, 20% in non-Dev to control ingestion cost.
-// Any outbound MassTransit/HTTP spans respect parent sampling so the
-// data-engine traces stay correlated with what the API sampled.
+// Instrumentation stays cloud-neutral. The deployment selects one exporter:
+// Azure Monitor, OTLP (for ADOT or any collector), or none for local/tests.
+// Azure's connection string remains an adapter input, not an application-wide
+// configuration contract.
 // ---------------------------------------------------------------------------
 var azureMonitorConnectionString =
     builder.Configuration["AzureMonitor:ConnectionString"]
     ?? Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
 
-var otelBuilder = builder.Services.AddOpenTelemetry()
-    .WithTracing(tracing => tracing.AddSource("EA.Api.Facade"));
+var observabilityExporter = builder.Configuration["Observability:Exporter"]?.Trim().ToLowerInvariant()
+    ?? "none";
 
-if (!string.IsNullOrWhiteSpace(azureMonitorConnectionString))
+var otelBuilder = builder.Services.AddOpenTelemetry();
+
+if (observabilityExporter == "azuremonitor")
 {
+    if (string.IsNullOrWhiteSpace(azureMonitorConnectionString))
+        throw new InvalidOperationException(
+            "Observability:Exporter is 'azuremonitor' but no Application Insights connection string is configured.");
+
     otelBuilder.UseAzureMonitor(options =>
     {
         options.SamplingRatio = builder.Environment.IsDevelopment() ? 1.0f : 0.2f;
     });
 }
+else
+{
+    otelBuilder
+        .WithTracing(tracing =>
+        {
+            tracing
+                .AddSource("EA.Api.Facade")
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation();
+
+            if (observabilityExporter == "otlp")
+                tracing.AddOtlpExporter();
+        })
+        .WithMetrics(metrics =>
+        {
+            metrics
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddRuntimeInstrumentation();
+
+            if (observabilityExporter == "otlp")
+                metrics.AddOtlpExporter();
+        });
+}
+
+if (observabilityExporter is not ("azuremonitor" or "otlp" or "none"))
+    throw new InvalidOperationException(
+        $"Unsupported Observability:Exporter '{observabilityExporter}'. Expected azuremonitor, otlp, or none.");
 
 // ---------------------------------------------------------------------------
 // Database
@@ -130,7 +149,7 @@ builder.Services.AddMassTransit(x =>
         // ---------------------------------------------------------------------
         // The open-generic UserContextPublishFilter<T> stamps the current
         // HTTP request's principal onto every Send and Publish as transport
-        // headers (x-user-oid, x-user-tid, x-user-idp, x-user-name,
+        // headers (x-user-subject, x-user-tenant, x-user-identity-provider, x-user-name,
         // x-user-email). MassTransit resolves the filter per message from
         // the container, which picks up the request-scoped ICurrentUser.
         // Non-HTTP publish paths (seeder, background services) short-circuit
@@ -159,11 +178,10 @@ builder.Services.AddOpenApi();
 // ---------------------------------------------------------------------------
 // Authentication / Authorization
 // ---------------------------------------------------------------------------
-// The AzureAd:Enabled flag toggles between real JWT validation against
-// Entra External ID (prod + dev containers with envvars) and a fixed
-// dev principal (local docker compose + curl workflows + unit tests).
+// Authentication uses one deployment-neutral OIDC contract. Terraform selects
+// Entra External ID for Azure or Cognito for AWS and supplies normalized values.
 //
-// When AzureAd:Enabled=true AND AzureAd:AllowGuest=true (prod-only sales
+// When Authentication:Enabled=true AND Authentication:AllowGuest=true (the
 // demo failsafe), a policy scheme "JwtOrGuest" is registered as the default
 // and forwards per-request: requests with an Authorization: Bearer ... header
 // go to JwtBearer for real token validation; everything else is handled by
@@ -173,15 +191,21 @@ builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 
-var azureAdEnabled = builder.Configuration.GetValue("AzureAd:Enabled", defaultValue: false);
-var allowGuest = builder.Configuration.GetValue("AzureAd:AllowGuest", defaultValue: false);
+var authentication = builder.Configuration.GetSection("Authentication");
+var authenticationEnabled = authentication.GetValue("Enabled", defaultValue: false);
+var authenticationProvider = authentication["Provider"]?.Trim().ToLowerInvariant() ?? string.Empty;
+var allowGuest = authentication.GetValue("AllowGuest", defaultValue: false);
 // allowDev enables the same JwtOrDev policy-scheme trick as allowGuest but
-// routes to DevAuthHandler instead. Set AzureAd:AllowDev=true in deployed
-// dev so engineers can use the "Log in as Dev" button without a real Entra
-// External ID account. Must be false in prod.
-var allowDev = builder.Configuration.GetValue("AzureAd:AllowDev", defaultValue: false);
+// routes to DevAuthHandler instead. Set Authentication:AllowDev=true in deployed
+// dev so engineers can use the "Log in as Dev" button without a real external
+// identity account. Must be false in production.
+var allowDev = authentication.GetValue("AllowDev", defaultValue: false);
 
-if (azureAdEnabled)
+if (allowDev && allowGuest)
+    throw new InvalidOperationException(
+        "Authentication:AllowDev and Authentication:AllowGuest cannot both be enabled.");
+
+if (authenticationEnabled)
 {
     const string jwtOrGuestScheme = "JwtOrGuest";
     const string jwtOrDevScheme = "JwtOrDev";
@@ -197,17 +221,57 @@ if (azureAdEnabled)
         options.DefaultChallengeScheme = defaultScheme;
     });
 
-    authBuilder.AddMicrosoftIdentityWebApi(
-        jwtBearerOptions =>
+    var authority = authentication["Authority"]
+        ?? throw new InvalidOperationException("Authentication:Authority is required when authentication is enabled.");
+    var audience = authentication["Audience"]
+        ?? throw new InvalidOperationException("Authentication:Audience is required when authentication is enabled.");
+    var clientId = authentication["ClientId"] ?? audience;
+    var requiredScope = authentication["RequiredScope"];
+    var isCognito = authenticationProvider == "cognito";
+
+    if (authenticationProvider is not ("entra" or "cognito"))
+        throw new InvalidOperationException(
+            $"Unsupported Authentication:Provider '{authenticationProvider}'. Expected entra or cognito.");
+
+    authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+    {
+        options.Authority = authority;
+        options.Audience = audience;
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters.ValidateIssuer = true;
+        options.TokenValidationParameters.ValidateLifetime = true;
+        options.TokenValidationParameters.ValidateAudience = !isCognito;
+        options.TokenValidationParameters.NameClaimType = "name";
+        options.Events = new JwtBearerEvents
         {
-            builder.Configuration.Bind("AzureAd", jwtBearerOptions);
-            jwtBearerOptions.TokenValidationParameters.ValidateIssuer = true;
-            jwtBearerOptions.TokenValidationParameters.NameClaimType = "name";
-        },
-        identityOptions =>
-        {
-            builder.Configuration.Bind("AzureAd", identityOptions);
-        });
+            OnTokenValidated = context =>
+            {
+                var principal = context.Principal;
+                if (isCognito)
+                {
+                    var tokenUse = principal?.FindFirst("token_use")?.Value;
+                    var tokenClientId = principal?.FindFirst("client_id")?.Value;
+                    if (tokenUse != "access" || !string.Equals(tokenClientId, clientId, StringComparison.Ordinal))
+                    {
+                        context.Fail("The Cognito token is not an access token for this application client.");
+                        return Task.CompletedTask;
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(requiredScope))
+                {
+                    var scopes = (principal?.FindFirst("scp")?.Value
+                                  ?? principal?.FindFirst("scope")?.Value
+                                  ?? string.Empty)
+                        .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    if (!scopes.Contains(requiredScope, StringComparer.Ordinal))
+                        context.Fail("The access token does not contain the required API scope.");
+                }
+
+                return Task.CompletedTask;
+            }
+        };
+    });
 
     if (allowDev)
     {
@@ -267,8 +331,8 @@ builder.Services.AddAuthorization(options =>
 // ---------------------------------------------------------------------------
 // CORS
 // ---------------------------------------------------------------------------
-// In Development, allow any http://localhost:* origin so the Angular dev
-// server can land on whichever port it picks (4200, 4201, ...).
+// In Development, allow any http://localhost:* origin so the Next.js dev
+// server can land on whichever port it picks (3000).
 // In non-Development, only the origins listed under Cors:AllowedOrigins are
 // allowed — no wildcard fallback.
 // ---------------------------------------------------------------------------
@@ -330,7 +394,7 @@ if (app.Environment.IsDevelopment())
     // flow so Scalar's "Try It" can acquire a real Bearer token. Plan
     // budgeted ~half a day for this; leaving a minimal default here so the
     // rest of Phase 2A ships. Config values are already available under
-    // AzureAd:Authority / AzureAd:ClientId / AzureAd:Scopes.
+    // Authentication:Authority / Authentication:ClientId / RequiredScope.
     app.MapScalarApiReference(options =>
     {
         options.AddPreferredSecuritySchemes("OAuth2");

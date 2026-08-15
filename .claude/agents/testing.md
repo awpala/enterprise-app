@@ -26,11 +26,11 @@ You are the testing specialist. You write, maintain, and improve tests across th
 - Use **FluentAssertions** for readable assertions.
 - Name tests: `MethodName_Scenario_ExpectedResult`.
 
-### Angular Testing
+### Next.js Testing
 
-- Component tests with Angular TestBed.
-- Service tests mock HttpClient via `HttpClientTestingModule`.
-- Use Vitest. Do NOT use Jasmine/Karma.
+- Use Vitest and Testing Library for route handlers, hooks, and client components.
+- Mock `fetch` and OIDC boundaries; do not contact identity providers in unit tests.
+- Build the production Next.js application as a CI type/route validation step.
 
 ### Contract Testing
 

@@ -1,6 +1,6 @@
 # EA.Api — ASP.NET Core .NET 10 REST API
 
-System-of-record for the model domain. Owns the PostgreSQL schema via EF Core, authenticates callers against Entra ID, and drives async workflows by publishing versioned messages to RabbitMQ through MassTransit's transactional outbox.
+System-of-record for the model domain. Owns the PostgreSQL schema via EF Core, authenticates callers through the deployment-selected OIDC provider, and drives async workflows by publishing versioned messages to RabbitMQ through MassTransit's transactional outbox.
 
 ## Solution Layout
 
@@ -17,9 +17,9 @@ System-of-record for the model domain. Owns the PostgreSQL schema via EF Core, a
 |---|---|---|
 | `MassTransit.RabbitMQ` + `MassTransit.EntityFrameworkCore` | Messaging + outbox | Transactional consistency between `SaveChanges` and message publish. Avoids dual-write bugs when a DB commit succeeds but the broker publish fails. |
 | `Npgsql.EntityFrameworkCore.PostgreSQL` | EF Core provider | First-class Postgres support including `JsonDocument` columns (used for `audit_events.details`). |
-| `Microsoft.Identity.Web` | Entra ID auth | JWT bearer validation with minimal ceremony; integrates with `ClaimsPrincipal` used by `AuditStampingInterceptor`. |
+| `Microsoft.AspNetCore.Authentication.JwtBearer` | OIDC access-token validation | Validates Entra or Cognito tokens through one normalized configuration contract. |
 | `Scalar.AspNetCore` | OpenAPI UI | Modern replacement for Swagger UI; renders the spec produced by `Microsoft.AspNetCore.OpenApi`. |
-| `Azure.Monitor.OpenTelemetry.AspNetCore` | Telemetry | Single-line OTel distro wiring for traces, metrics, logs straight to App Insights / Log Analytics. |
+| OpenTelemetry exporters | Telemetry | Selects Azure Monitor, standard OTLP, or no exporter at deployment time. |
 | `AspNetCore.HealthChecks.NpgSql` | Readiness | Backs `/health/ready` with a real DB probe — Container Apps uses this to gate traffic. |
 
 ## Architectural Patterns
@@ -44,13 +44,15 @@ dotnet ef migrations add <Name> -s ../EA.Api
 dotnet ef migrations script --idempotent -s ../EA.Api -o Migrations/Scripts/{timestamp}_{Name}.sql
 ```
 
-The `.sql` artifact is committed alongside the `.cs` migration for PR review. In production the migration bundle image (`Dockerfile.migrations`) is executed as a Container Apps Job during `deploy.yml`.
+The `.sql` artifact is committed alongside the `.cs` migration for PR review. The migration bundle runs as an Azure Container Apps Job or AWS ECS one-off task.
 
-## Observability
+## Authentication and observability
 
-- OpenTelemetry → Azure Monitor distro; structured logs via `ILogger<T>` message templates.
+- `Authentication:Provider` selects `entra` or `cognito`; authority, audience/client ID, and required scope use the same keys for both.
+- `CurrentUser` normalizes `oid`/`sub`, tenant/issuer, and provider claims before domain code sees them.
+- `Observability:Exporter` selects `azuremonitor`, `otlp`, or `none`; structured logs use `ILogger<T>` message templates.
 - Correlation IDs flow across HTTP and RabbitMQ via OTel context propagation.
-- Health endpoints: `/health/live`, `/health/ready`, `/health/startup` — wired to Container Apps probes.
+- Health endpoints: `/health/live`, `/health/ready`, `/health/startup` — wired to Container Apps or ECS/ALB probes.
 
 ## Running Locally
 

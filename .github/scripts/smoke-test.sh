@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Smoke tests the deployed API by polling /health/ready with retries.
-# Expects terraform state available under infra/.
+# Expects Terraform state available under the selected provider root.
 set -euo pipefail
 
-API_URL=$(terraform -chdir=infra output -raw api_url)
+: "${TF_ROOT:?TF_ROOT must explicitly select a provider root, for example infra/azure or infra/aws.}"
+API_URL=$(terraform -chdir="$TF_ROOT" output -raw api_url)
 echo "::add-mask::$API_URL"
 for i in 1 2 3 4 5 6; do
   if curl -fsS "$API_URL/health/ready"; then

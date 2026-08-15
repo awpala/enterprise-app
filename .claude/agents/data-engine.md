@@ -123,7 +123,7 @@ async def handle(body: bytes, correlation_id: str) -> None:
 ## What You Don't Do
 
 - You don't write C# / .NET code or modify anything in `api/`.
-- You don't write Angular components or TypeScript.
-- You don't manage Terraform or Azure infrastructure.
+- You don't write Next.js components or TypeScript.
+- You don't manage Terraform or cloud infrastructure.
 - You coordinate with the backend agent on shared message contracts (the JSON Schema in `schemas/` is the source of truth).
 - You coordinate with the testing agent on integration tests that require a live RabbitMQ instance.

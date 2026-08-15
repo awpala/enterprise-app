@@ -47,7 +47,11 @@ jobs:
 
       - name: Run UI tests
         working-directory: ui
-        run: npm test -- --watch=false --passWithNoTests
+        run: npm test
+
+      - name: Lint and build UI
+        working-directory: ui
+        run: npm run lint && npm run build
 
   integration-tests:
     name: Integration tests
@@ -69,3 +73,69 @@ jobs:
 
       - name: Run API integration tests
         run: dotnet test api/tests/EA.Api.IntegrationTests/ --configuration Release --no-restore
+
+  infrastructure-validation:
+    name: Terraform (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [azure, aws]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.8
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive "infra/${{ matrix.target }}"
+
+      - name: Validate application root
+        run: |
+          terraform -chdir="infra/${{ matrix.target }}" init -backend=false
+          terraform -chdir="infra/${{ matrix.target }}" validate
+
+      - name: Validate bootstrap root
+        run: |
+          terraform -chdir="infra/${{ matrix.target }}/bootstrap" init -backend=false
+          terraform -chdir="infra/${{ matrix.target }}/bootstrap" validate
+
+  container-builds:
+    name: Container (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: api
+            context: api
+            dockerfile: api/Dockerfile
+          - image: migrations
+            context: api
+            dockerfile: api/Dockerfile.migrations
+          - image: data-engine
+            context: data-engine
+            dockerfile: data-engine/Dockerfile
+          - image: ui
+            context: ui
+            dockerfile: ui/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build cloud-portable image
+        run: docker build --file "${{ matrix.dockerfile }}" --tag "ea-${{ matrix.image }}:ci" "${{ matrix.context }}"
+
+  delivery-script-validation:
+    name: Delivery script syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate shell adapters
+        run: bash -n .github/scripts/*.sh infra/scripts/*.sh docs/runbooks/scripts/*.sh

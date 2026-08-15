@@ -27,9 +27,9 @@ public class UserContextPublishFilterTests
         var currentUser = new StubCurrentUser
         {
             IsAuthenticated = true,
-            Oid = oid,
-            Tid = tid,
-            Idp = "google.com",
+            SubjectId = oid,
+            TenantId = tid,
+            IdentityProvider = "google.com",
             Name = "Alice Example",
             Email = "alice@example.com",
         };
@@ -45,11 +45,11 @@ public class UserContextPublishFilterTests
         published.Should().BeTrue();
 
         var context = harness.Published.Select<ModelRunRequested>().First().Context;
-        context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserOidHeader)
+        context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserSubjectHeader)
             .Should().Be(oid.ToString());
-        context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserTidHeader)
+        context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserTenantHeader)
             .Should().Be(tid.ToString());
-        context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserIdpHeader)
+        context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserIdentityProviderHeader)
             .Should().Be("google.com");
         context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserNameHeader)
             .Should().Be("Alice Example");
@@ -71,11 +71,11 @@ public class UserContextPublishFilterTests
         (await harness.Published.Any<ModelRunRequested>()).Should().BeTrue();
 
         var context = harness.Published.Select<ModelRunRequested>().First().Context;
-        context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserOidHeader)
+        context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserSubjectHeader)
             .Should().BeNull();
-        context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserTidHeader)
+        context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserTenantHeader)
             .Should().BeNull();
-        context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserIdpHeader)
+        context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserIdentityProviderHeader)
             .Should().BeNull();
         context.Headers.Get<string>(UserContextPublishFilter<ModelRunRequested>.UserNameHeader)
             .Should().BeNull();
@@ -112,9 +112,9 @@ public class UserContextPublishFilterTests
 
     private sealed class StubCurrentUser : ICurrentUser
     {
-        public Guid? Oid { get; set; }
-        public Guid? Tid { get; set; }
-        public string? Idp { get; set; }
+        public Guid? SubjectId { get; set; }
+        public Guid? TenantId { get; set; }
+        public string? IdentityProvider { get; set; }
         public string? Name { get; set; }
         public string? Email { get; set; }
         public bool IsAuthenticated { get; set; }

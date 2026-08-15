@@ -24,11 +24,11 @@ public class AuditEvent
     /// <summary>Gets the UTC timestamp at which the action occurred.</summary>
     public DateTime OccurredAtUtc { get; private set; }
 
-    /// <summary>Gets the Entra object identifier of the actor, if known.</summary>
-    public Guid? ActorOid { get; private set; }
+    /// <summary>Gets the normalized OIDC subject identifier of the actor, if known.</summary>
+    public Guid? ActorSubjectId { get; private set; }
 
-    /// <summary>Gets the Entra tenant identifier of the actor, if known.</summary>
-    public Guid? ActorTid { get; private set; }
+    /// <summary>Gets the normalized tenant or issuer identifier of the actor, if known.</summary>
+    public Guid? ActorTenantId { get; private set; }
 
     /// <summary>Gets the display name of the actor. PII — handle per retention policy.</summary>
     public string? ActorName { get; private set; }
@@ -41,7 +41,7 @@ public class AuditEvent
     /// Examples: <c>"google.com"</c>, <c>"live.com"</c>, <c>"entra"</c>,
     /// <c>"email"</c>, <c>"dev"</c>, <c>"system"</c>.
     /// </summary>
-    public string ActorIdp { get; private set; } = string.Empty;
+    public string ActorIdentityProvider { get; private set; } = string.Empty;
 
     /// <summary>
     /// Gets the class of actor. One of <c>"user"</c>, <c>"service_principal"</c>,
@@ -77,10 +77,10 @@ public class AuditEvent
     /// <param name="occurredAtUtc">When the action happened.</param>
     /// <param name="action">Action identifier (e.g. <c>"model.created"</c>).</param>
     /// <param name="entityType">Affected entity type name.</param>
-    /// <param name="actorIdp">Upstream identity provider identifier.</param>
+    /// <param name="actorIdentityProvider">Upstream identity provider identifier.</param>
     /// <param name="actorType">Actor class (<c>"user"</c>, <c>"service_principal"</c>, <c>"system"</c>).</param>
-    /// <param name="actorOid">Actor object identifier, if known.</param>
-    /// <param name="actorTid">Actor tenant identifier, if known.</param>
+    /// <param name="actorSubjectId">Normalized actor subject identifier, if known.</param>
+    /// <param name="actorTenantId">Normalized actor tenant or issuer identifier, if known.</param>
     /// <param name="actorName">Actor display name.</param>
     /// <param name="actorEmail">Actor email.</param>
     /// <param name="entityId">Affected entity identifier.</param>
@@ -90,10 +90,10 @@ public class AuditEvent
         DateTime occurredAtUtc,
         string action,
         string entityType,
-        string actorIdp,
+        string actorIdentityProvider,
         string actorType,
-        Guid? actorOid = null,
-        Guid? actorTid = null,
+        Guid? actorSubjectId = null,
+        Guid? actorTenantId = null,
         string? actorName = null,
         string? actorEmail = null,
         Guid? entityId = null,
@@ -102,7 +102,7 @@ public class AuditEvent
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(action);
         ArgumentException.ThrowIfNullOrWhiteSpace(entityType);
-        ArgumentException.ThrowIfNullOrWhiteSpace(actorIdp);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actorIdentityProvider);
         ArgumentException.ThrowIfNullOrWhiteSpace(actorType);
 
         return new AuditEvent
@@ -111,10 +111,10 @@ public class AuditEvent
             OccurredAtUtc = occurredAtUtc,
             Action = action,
             EntityType = entityType,
-            ActorIdp = actorIdp,
+            ActorIdentityProvider = actorIdentityProvider,
             ActorType = actorType,
-            ActorOid = actorOid,
-            ActorTid = actorTid,
+            ActorSubjectId = actorSubjectId,
+            ActorTenantId = actorTenantId,
             ActorName = actorName,
             ActorEmail = actorEmail,
             EntityId = entityId,

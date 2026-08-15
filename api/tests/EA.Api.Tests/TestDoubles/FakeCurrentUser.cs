@@ -10,9 +10,9 @@ namespace EA.Api.Tests.TestDoubles;
 /// </summary>
 internal sealed class FakeCurrentUser : ICurrentUser
 {
-    public Guid? Oid { get; set; } = new("00000000-0000-0000-0000-000000000001");
-    public Guid? Tid { get; set; } = new("00000000-0000-0000-0000-000000000002");
-    public string? Idp { get; set; } = "dev";
+    public Guid? SubjectId { get; set; } = new("00000000-0000-0000-0000-000000000001");
+    public Guid? TenantId { get; set; } = new("00000000-0000-0000-0000-000000000002");
+    public string? IdentityProvider { get; set; } = "dev";
     public string? Name { get; set; } = "Dev User";
     public string? Email { get; set; } = "dev@localhost";
     public bool IsAuthenticated { get; set; } = true;

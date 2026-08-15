@@ -7,7 +7,7 @@ namespace EA.Domain.Interfaces;
 /// </summary>
 public interface IUpdatedAuditable
 {
-    /// <summary>The Entra object identifier of the actor that last updated the row.</summary>
+    /// <summary>The normalized subject identifier of the actor that last updated the row.</summary>
     Guid? UpdatedBy { get; set; }
 
     /// <summary>The display name captured at last update.</summary>

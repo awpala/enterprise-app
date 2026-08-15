@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace EA.Api.Auth;
 
 /// <summary>
-/// Authentication handler used when <c>AzureAd:Enabled = false</c>.
+/// Authentication handler used when <c>Authentication:Enabled = false</c>.
 /// Synthesizes a fixed dev principal so curl, docker-compose, and integration
 /// tests can keep exercising guarded endpoints without a real token.
 /// </summary>

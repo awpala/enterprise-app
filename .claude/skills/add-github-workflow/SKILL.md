@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 ## Inputs
 
-- **Workflow purpose** (e.g., `ci`, `deploy`, `swa-deploy`, `pr-validation`)
+- **Workflow purpose** (e.g., `ci`, `deploy-azure`, `deploy-aws`, `pr-validation`)
 - **Triggers** (e.g., `push to main`, `pull_request`, `tag v*.*.*`)
 - **Jobs needed** (e.g., `build-api`, `build-ui`, `terraform-plan`, `terraform-apply`)
 
@@ -14,7 +14,7 @@ disable-model-invocation: true
 
 1. **Workflow file** at `.github/workflows/{name}.yml`
 2. **OIDC permissions** block (`id-token: write`, `contents: read`)
-3. **Azure login step** using `azure/login@v2` with OIDC (client-id, tenant-id, subscription-id from secrets)
+3. **Provider login step** using Azure workload identity or an AWS role assumed through GitHub OIDC
 4. **Job definitions** with proper `needs` dependencies and matrix strategies where applicable
 
 ## Conventions Applied
@@ -24,7 +24,7 @@ disable-model-invocation: true
 - Use `docker/metadata-action@v6` for tag/label generation
 - Push images only on `main` or tag events (`push: ${{ github.event_name != 'pull_request' }}`)
 - Terraform: separate `plan` and `apply` jobs; `apply` requires manual approval via GitHub Environments
-- SWA deploy uses `Azure/static-web-apps-deploy` with deployment token
+- Build the Next.js standalone image with the other application containers
 - Add Trivy scan step for container images before push
 - Include `terraform fmt -check` and `terraform validate` in PR validation
-- Secrets referenced: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `ACR_NAME`, `ACR_LOGIN_SERVER`
+- Keep provider credentials and state coordinates in environment-scoped variables/secrets

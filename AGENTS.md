@@ -4,26 +4,26 @@
 
 ## Project Overview
 
-A Docker-first, event-driven enterprise demo application focused around a generic "model," deployed to Azure via Terraform (and respective CLIs). The system demonstrates enterprise patterns: SSO, async job processing, observability, and repeatable IaC deployments.
+A Docker-first, event-driven enterprise demo application focused around a generic "model," deployable to Azure or AWS through peer Terraform roots and provider CLIs. The system demonstrates SSO, async job processing, observability, and repeatable infrastructure-as-code deployments.
 
 The development occurs within a VS Code-based Devcontainer, as defined in `.devcontainer`. Any missing CLIs, dependencies, should be updated accordingly in setup script `.devcontainer/scripts/setup-env.sh`.
 
 ### Architecture
 
-- **Angular 20 SPA** (`ui/`) — client UI, hosted on Azure Static Web Apps
+- **Next.js 16** (`ui/`) — App Router UI, deployed as the same standalone container on both clouds
 - **ASP.NET Core .NET 10 REST API** (`api/`) — system-of-record, EF Core + Postgres, publishes commands to RabbitMQ
 - **Python 3 Data Engine** (`data-engine`) - companion service for numerical computations and data-related workflows, jobs, etc.; transmits data via RabbitMQ
 - **RabbitMQ** — message broker for async job workflows
 - **PostgreSQL** — relational data store, managed via EF Core migrations
-- **Azure Container Apps** — runtime for API and RabbitMQ containers
-- **Terraform** (`infra/`) — all Azure infrastructure as code
+- **Azure Container Apps or AWS ECS/Fargate** — deployment-selected application runtime
+- **Terraform** (`infra/azure`, `infra/aws`) — peer provider implementations behind common orchestration
 
 ### Interaction Flow
 
 ```mermaid
 flowchart LR
     user([User])
-    ui[Angular 20 SPA]
+    ui[Next.js 16]
     api[ASP.NET Core API]
     db[(PostgreSQL)]
     mq{{RabbitMQ}}
@@ -59,16 +59,11 @@ High-level layout only — a single level of expansion per service, intentionall
 │   ├── seed/                           # Seed data applied by the migration job
 │   ├── Dockerfile                      # Multi-stage: SDK build → aspnet runtime
 │   └── Dockerfile.migrations           # EF Core migration bundle image
-├── ui/                                 # Angular 20 SPA
-│   ├── src/app/
-│   │   ├── auth/                       # MSAL config, AuthService, BearerAuthInterceptor, guards
-│   │   ├── core/                       # App-wide services (UiStateService, theme, App Insights, HTTP)
-│   │   ├── features/                   # Feature routes (dashboard, landing, models, runs)
-│   │   ├── shared/                     # Reusable components/ and shared model interfaces
-│   │   └── environments/               # Build-time environment shims
-│   ├── e2e/                            # Playwright end-to-end tests
-│   ├── scripts/                        # generate-environment.mjs (runtime env injection)
-│   └── nginx.conf                      # Local prod-parity container only; SWA in cloud
+├── ui/                                 # Next.js 16 App Router application
+│   ├── app/                            # Routes, layouts, callback, runtime-config and health handlers
+│   ├── components/                     # Client components and cloud-neutral OIDC adapter
+│   ├── lib/                            # API client, hooks, types, formatting
+│   └── Dockerfile                      # Standalone server image on canonical port 3000
 ├── data-engine/                        # Python 3 worker service
 │   └── src/data_engine/
 │       ├── consumers/                  # pika consumers keyed to routing keys
@@ -79,25 +74,18 @@ High-level layout only — a single level of expansion per service, intentionall
 │       └── config.py                   # Settings loader
 ├── schemas/                            # JSON Schema message contracts (source of truth)
 ├── deploy/                             # Docker Compose local stack (compose.yaml + overrides)
-├── infra/                              # Terraform
-│   ├── bootstrap/                      # One-time bootstrap stack (remote state backend, root RG, ACR)
-│   ├── envs/                           # Per-environment tfvars (dev.tfvars, production.tfvars)
-│   ├── modules/                        # container-apps, postgres, static-web-app, container-registry,
-│   │                                   #   key-vault, observability, diagnostics, entra-external-id
-│   ├── main.tf                         # Root stack (top-level *.tf files)
-│   ├── variables.tf
-│   ├── outputs.tf
-│   ├── locals.tf
-│   └── versions.tf
+├── infra/                              # Common deployment contract
+│   ├── scripts/                        # Cloud-selected Terraform entry point
+│   ├── azure/                          # Azure root, bootstrap, envs, and modules
+│   └── aws/                            # AWS root, bootstrap, envs, and modules
 ├── docs/
 │   ├── adrs/                           # Architecture Decision Records (numbered, immutable)
 │   ├── runbooks/                       # Operational runbooks + SSO/bootstrap helper scripts
 │   ├── summaries/                      # Cross-cutting architecture summaries (observability, etc.)
 │   └── diagrams/                       # Exported architecture diagrams (png/svg/drawio)
 ├── .github/
-│   ├── workflows/                      # ci.yml, deploy.yml, cleanup-acr.yml
-│   └── scripts/                        # CI helpers (build-and-push-images.sh, build-ui.sh,
-│                                       #   run-migrations-job.sh, smoke-test.sh, clean-acr-images.sh, ...)
+│   ├── workflows/                      # CI and provider deployment workflows
+│   └── scripts/                        # Build, migration, smoke-test, and registry helpers
 ├── .claude/                            # Claude Code tooling (agents/, skills/, hooks/) — see CLAUDE.md
 ├── .devcontainer/                      # VS Code devcontainer (setup-env.sh installs CLIs and deps)
 ├── AGENTS.md                           # This file — canonical agent-facing project guide
@@ -115,14 +103,14 @@ Deeper structure (individual components, feature folders, migration files, etc.)
 | API framework | ASP.NET Core | 10 | Minimal APIs preferred; controllers acceptable |
 | ORM | EF Core + Npgsql | latest stable | Npgsql.EntityFrameworkCore.PostgreSQL |
 | Messaging (.NET) | MassTransit | latest stable | RabbitMQ transport, outbox, sagas |
-| Frontend | Angular | 20 | Standalone components, signals preferred |
-| Frontend auth | MSAL Angular | latest | Auth code flow + PKCE via Entra ID |
-| Database | PostgreSQL | 16 | Azure Flexible Server in cloud; `postgres:16` locally |
+| Frontend | Next.js / React | 16 / 19 | App Router, standalone server output |
+| Frontend auth | oidc-client-ts | latest stable | Auth code flow + PKCE via Entra or Cognito |
+| Database | PostgreSQL | 16 | Azure Flexible Server, AWS RDS, or `postgres:16` locally |
 | Message broker | RabbitMQ | 4 | `rabbitmq:4-management` image |
-| IaC | Terraform | ≥1.9 | AzureRM provider, azurerm backend |
+| IaC | Terraform | ≥1.9 | AzureRM/AzureAD or AWS providers; Blob/S3 state |
 | Containers | Docker | Compose v2 | Multi-stage builds, BuildKit |
-| CI/CD | GitHub Actions | — | OIDC to Azure, selective image builds, ACR cleanup |
-| Observability | OpenTelemetry | — | Azure Monitor distro for .NET |
+| CI/CD | GitHub Actions | — | Workload identity/OIDC; immutable container tags |
+| Observability | OpenTelemetry | — | Azure Monitor or OTLP/ADOT selected at runtime |
 
 ## Development Workflow
 
@@ -133,8 +121,8 @@ Deeper structure (individual components, feature folders, migration files, etc.)
 docker compose -f deploy/compose.yaml up --build
 
 # API:         http://localhost:8000
-# UI:          http://localhost:4200
-# Data Engine: http://localhost:5000
+# UI:          http://localhost:3000
+# Data Engine: no inbound port
 # RabbitMQ:    http://localhost:15672 (guest/guest)
 # Postgres:    localhost:5432 (ea-db/postgres/password)
 ```
@@ -176,7 +164,7 @@ The generated `.sql` pairs with the C# migration of the same stem (e.g. `2026041
 - **No `// TODO` without a linked issue.** Use `// HACK:` only with justification.
 - **All public APIs must have XML doc comments** (API project) or JSDoc (UI project).
 - **Fail fast.** Validate inputs at boundaries; use guard clauses.
-- **Prefer immutability.** Use `record` types in C#, `readonly` signals in Angular.
+- **Prefer immutability.** Use `record` types in C# and readonly TypeScript contracts.
 
 ### C# / .NET
 
@@ -189,25 +177,25 @@ The generated `.sql` pairs with the C# migration of the same stem (e.g. `2026041
 - EF Core: no lazy loading. Use explicit `.Include()` or projection queries.
 - MassTransit consumers go in `EA.Infrastructure/Consumers/`.
 - Migrations go in `EA.Infrastructure/Migrations/`.
-- Connection strings and secrets come from configuration (environment variables in containers, Key Vault in Azure). **Never hardcode secrets.**
+- Connection strings and secrets come from configuration (environment variables in containers, Key Vault on Azure, or Secrets Manager on AWS). **Never hardcode secrets.**
 
-### Angular / TypeScript
+### Next.js / TypeScript
 
-- Use standalone components (no NgModules for feature components).
-- Use Angular signals for local state; NgRx SignalStore for shared state.
-- Use `inject()` function over constructor injection.
-- HTTP calls go through dedicated service classes in `core/services/`.
-- Use `environment.ts` for configuration; MSAL config in `auth/`.
+- Use App Router and Server Components by default; add `'use client'` only for browser state/effects.
+- HTTP calls go through `lib/api.ts`, not directly from feature pages.
+- Public deployment configuration comes from `/api/runtime-config`; never expose secrets there.
+- Authentication uses the cloud-neutral OIDC adapter and Authorization Code + PKCE.
+- The canonical UI port is 3000 in development, containers, health checks, and documentation.
 - Strict TypeScript (`strict: true`). No `any` types without justification.
 
 ### Terraform
 
-- Use modules for logical resource groups (see `infra/modules/`).
+- Use focused modules for logical service concerns under the selected provider root (see `infra/azure/modules/` and `infra/aws/modules/`). Keep provider roots composition-only.
 - All resources must be tagged: `environment`, `project`, `managed-by = "terraform"`.
 - Use `terraform fmt` and `terraform validate` before committing.
 - Variables must have `description` and `type`. Use `sensitive = true` for secrets.
-- Remote state in Azure Blob Storage with locking.
-- Prefer managed identities over passwords/keys everywhere.
+- Keep Azure and AWS state separate in Blob Storage and S3 respectively.
+- Prefer managed/workload identities and IAM roles over passwords/keys everywhere.
 
 ### Docker
 
@@ -234,47 +222,45 @@ The generated `.sql` pairs with the C# migration of the same stem (e.g. `2026041
 
 ## Observability
 
-- OpenTelemetry SDK with Azure Monitor distro (`Azure.Monitor.OpenTelemetry.AspNetCore`).
-- Structured logs to stdout/stderr (Container Apps routes to Log Analytics).
+- OpenTelemetry instrumentation with runtime-selected `azuremonitor`, `otlp`, or `none` exporters.
+- Structured logs to stdout/stderr; the deployment routes them to Log Analytics or CloudWatch.
 - Correlation IDs propagated across HTTP and RabbitMQ boundaries.
-- Health probes wired to Container Apps liveness/readiness/startup checks.
-- Audit logging via `AuditStampingInterceptor` on every `SaveChanges` call. Emits rows to the `audit_events` table for domain mutations (`model.created`, `model.updated`, `model.archived`, `modelrun.requested`) with actor identity from the authenticated user's Entra ID claims.
+- Health probes wired to Container Apps or ECS/ALB health checks.
+- Audit logging via `AuditStampingInterceptor` uses normalized OIDC subject, tenant/issuer, and identity-provider values.
 
 ## Deployment Pipeline
 
 ### CI (`ci.yml`)
-- **Every push** → unit tests (API + UI) run on all branches.
-- **Merge to `main`** → integration tests (Testcontainers) run after unit tests pass.
+- **Every push/PR** → API/UI tests, both Terraform roots and bootstraps, shell adapters, and all four portable container builds.
+- **Pull requests and `main`** → integration tests (Testcontainers) after unit tests pass.
 
 ### Deploy (`deploy.yml`)
-1. **Detect changes** → `git diff` identifies which sub-apps changed (`api/`, `data-engine/`).
-2. **Terraform apply — phase 1** → ensures resource group + ACR exist.
-3. **Selective image builds** → only changed images are rebuilt via `az acr build`; unchanged images are re-tagged to the new `IMAGE_TAG` via `az acr import`.
-4. **Terraform apply — phase 2** → full infrastructure apply with the new image tag.
-5. **Migration job** → Container Apps Job runs EF Core migration bundle.
-6. **SWA deploy** → Angular build deployed to Static Web Apps.
-7. **Smoke test** → `GET /health/ready` with retries.
+1. **Require an explicit target** → manual runs select `azure`, `aws`, or `both`; push runs require the repository variable `DEPLOYMENT_TARGETS` with one of those values. There is no default provider.
+2. **Detect changes once** → `git diff` identifies changes under `api/`, `data-engine/`, and `ui/`.
+3. **Call provider adapters** → reusable `deploy-azure.yml` and `deploy-aws.yml` workflows run only for selected targets and use protected `azure-{environment}` / `aws-{environment}` GitHub Environments.
+4. **Apply registry phase** → create the selected provider registry before image publication.
+5. **Build or copy immutable images** → publish the same four images to ACR or ECR.
+6. **Apply full stack, migrate, and smoke test** → use the provider-native one-off migration workload, then poll the normalized `api_url` output.
 
 ### Image tagging
 - `main` → `sha-<sha7>`
 - Non-main → `<branch-slug>-<sha7>`
 
-### ACR cleanup (`cleanup-acr.yml`)
-- **On merge to `main`** → prunes stale image tags from both dev and production ACRs, keeping only the most recent tag per repository.
+### Image retention (`cleanup-images.yml`)
+- Manual maintenance explicitly selects Azure, AWS, or both. Provider adapters enforce the same keep-newest policy; ECR also has Terraform-managed lifecycle policies.
 
-## Azure Resource Mapping
+## Cloud Resource Mapping
 
-| Component | Azure Service | Terraform Resource |
+| Component | Azure | AWS |
 |---|---|---|
-| API | Container Apps | `azurerm_container_app` |
-| RabbitMQ | Container Apps | `azurerm_container_app` |
-| Migrations | Container Apps Jobs | `azurerm_container_app_job` |
-| UI | Static Web Apps | `azurerm_static_web_app` |
-| Database | PostgreSQL Flexible Server | `azurerm_postgresql_flexible_server` |
-| Images | Container Registry | `azurerm_container_registry` |
-| Secrets | Key Vault | `azurerm_key_vault` |
-| Logs | Log Analytics | `azurerm_log_analytics_workspace` |
-| APM | Application Insights | `azurerm_application_insights` |
+| API/UI/worker | Container Apps | ECS/Fargate |
+| RabbitMQ | Container App | ECS/Fargate + EFS |
+| Migrations | Container Apps Job | ECS one-off task |
+| Database | PostgreSQL Flexible Server | RDS PostgreSQL |
+| Images | ACR | ECR |
+| Secrets | Key Vault | Secrets Manager |
+| Customer SSO | Entra External ID | Cognito |
+| Logs/APM | Log Analytics + Application Insights | CloudWatch + X-Ray/ADOT |
 
 ## Assistant-Specific Tooling
 

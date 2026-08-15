@@ -17,26 +17,37 @@ Architectural decisions, operational runbooks, and cross-cutting references for 
 
 | ADR | Subject |
 |---|---|
-| `0001-azure-native-observability.md` | Why Azure Monitor + App Insights (OTel distro) over a vendor-neutral collector stack. |
+| `0001-azure-native-observability.md` | Historical Azure Monitor observability decision, superseded in application scope by ADR 0003. |
+| `0002-aws-peer-architecture.md` | AWS service mapping and account-backed production gates. |
+| `0003-multicloud-application-generalization.md` | Peer infrastructure layout, Next.js runtime, normalized auth, and telemetry contracts. |
 
 ### Runbooks (`runbooks/`)
 
 | File | Type | Purpose |
 |---|---|---|
-| `sso-manual-bootstrap.md` | Markdown | Step-by-step Entra External ID bootstrap procedure (click-by-click portal steps plus CLI). |
-| `observability.md` | Markdown | How to read App Insights / Log Analytics for this app; common KQL queries. |
-| `plan-infra.sh` | Script | Wraps `terraform plan` with the right backend and var-file conventions. |
-| `push-sso-secrets.sh` | Script | Pushes bootstrapped SSO client secrets into Key Vault. |
-| `sample.push-sso-secrets.sh` | Script | Example values — copy, edit, do not commit the real one. |
-| `source-sso-env.sh` | Script | Sourceable helper that exports SSO env vars for the current shell. |
-| `validate-sso-snapshot.sh` | Script | Verifies the SSO configuration matches a captured snapshot (Graph query, not portal eyeballing). |
-| `verify-deployer-sp.sh` | Script | Confirms the CI deployer service principal has the expected role assignments. |
+| `sso-bootstrap.md` | Markdown | Provider-selection entry point for customer SSO bootstrap. |
+| `observability.md` | Markdown | Provider-neutral signals and adapter selection. |
+| `teardown-redeploy.md` | Markdown | Provider-selection entry point for teardown and recovery. |
+| `azure-sso-manual-bootstrap.md` | Markdown | Step-by-step Entra External ID bootstrap procedure (click-by-click portal steps plus CLI). |
+| `azure-observability.md` | Markdown | Azure Monitor/App Insights adapter operations and KQL queries. |
+| `aws-deployment.md` | Markdown | Short AWS operational sequence and rollback entry point. |
+| `scripts/azure-plan-infra.sh` | Script | Wraps an Azure Terraform plan with its backend and var-file conventions. |
+| `scripts/sample.azure-push-sso-secrets.sh` | Script | Example Azure environment values—copy to the ignored provider-named file and populate locally. |
+| `scripts/azure-source-sso-env.sh` | Script | Sourceable Azure helper that exports External ID Terraform values. |
+| `scripts/azure-validate-sso-snapshot.sh` | Script | Verifies an Azure SSO configuration against a captured snapshot. |
+| `scripts/azure-verify-deployer-sp.sh` | Script | Confirms the Azure deployer service principal permissions. |
 
 ### Summaries (`summaries/`)
 
 | File | Purpose |
 |---|---|
 | `observability-logging-summary.md` | Summary of log sinks, correlation strategy, and retention choices. |
+
+### Workbooks (`workbooks/`)
+
+| File | Purpose |
+|---|---|
+| `aws-deployment-workbook.md` | Comprehensive AWS prerequisites, service parity, CLI deployment, evidence, recovery, and production-readiness gates. |
 
 ## Where to Add New Docs
 

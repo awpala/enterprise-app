@@ -90,7 +90,7 @@ public class ModelsController(
         // Pass Guid.Empty / null; the AuditStampingInterceptor fills the audit
         // columns from ICurrentUser before SaveChanges. Seeder call sites pass
         // explicit non-default values so the interceptor leaves them alone.
-        var createdBy = currentUser.Oid ?? Guid.Empty;
+        var createdBy = currentUser.SubjectId ?? Guid.Empty;
         var createdByName = currentUser.Name;
 
         var model = await facade.CreateModelAsync(
@@ -237,8 +237,8 @@ public class ModelsController(
 
     /// <summary>
     /// Renders the Phase 2A/2B audit columns as a single string for the wire
-    /// format. Prefers the captured display name; falls back to the Entra
-    /// object identifier for rows created by principals with no name claim.
+    /// format. Prefers the captured display name; falls back to the normalized
+    /// subject identifier for rows created by principals with no name claim.
     /// </summary>
     private static string FormatCreatedBy(string? createdByName, Guid createdBy) =>
         !string.IsNullOrWhiteSpace(createdByName)

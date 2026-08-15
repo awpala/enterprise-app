@@ -3,7 +3,7 @@
 import pytest
 
 from data_engine.models.messages import HistogramData
-from data_engine.workflows.model_metrics import compute_metrics, UnsupportedDistributionError
+from data_engine.workflows.model_metrics import UnsupportedDistributionError, compute_metrics
 
 
 class TestComputeMetrics:

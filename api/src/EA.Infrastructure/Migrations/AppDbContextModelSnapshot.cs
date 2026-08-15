@@ -18,7 +18,7 @@ namespace EA.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.5")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -40,24 +40,24 @@ namespace EA.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("actor_email");
 
-                    b.Property<string>("ActorIdp")
+                    b.Property<string>("ActorIdentityProvider")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("actor_idp");
+                        .HasColumnName("actor_identity_provider");
 
                     b.Property<string>("ActorName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("actor_name");
 
-                    b.Property<Guid?>("ActorOid")
+                    b.Property<Guid?>("ActorSubjectId")
                         .HasColumnType("uuid")
-                        .HasColumnName("actor_oid");
+                        .HasColumnName("actor_subject_id");
 
-                    b.Property<Guid?>("ActorTid")
+                    b.Property<Guid?>("ActorTenantId")
                         .HasColumnType("uuid")
-                        .HasColumnName("actor_tid");
+                        .HasColumnName("actor_tenant_id");
 
                     b.Property<string>("ActorType")
                         .IsRequired()
@@ -89,9 +89,9 @@ namespace EA.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ActorOid", "OccurredAtUtc")
+                    b.HasIndex("ActorSubjectId", "OccurredAtUtc")
                         .IsDescending(false, true)
-                        .HasDatabaseName("ix_audit_events_actor_oid_occurred_at_utc");
+                        .HasDatabaseName("ix_audit_events_actor_subject_id_occurred_at_utc");
 
                     b.HasIndex("EntityType", "EntityId")
                         .HasDatabaseName("ix_audit_events_entity");

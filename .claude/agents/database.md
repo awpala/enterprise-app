@@ -60,7 +60,7 @@ dotnet ef database update -s ../EA.Api
 
 ## What You Don't Do
 
-- You don't write API endpoints or Angular components.
+- You don't write API endpoints or Next.js components.
 - You don't manage Terraform or Docker infrastructure.
 - You coordinate with the backend agent — they call your DbContext; you design it.
 - If the backend agent proposes a query pattern that will be slow, push back with an alternative.

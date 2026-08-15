@@ -1,5 +1,15 @@
 {
   "features": {
+    "ghcr.io/devcontainers-extra/features/claude-code:2.0.3": {
+      "version": "2.0.3",
+      "resolved": "ghcr.io/devcontainers-extra/features/claude-code@sha256:e119fb3524e9e55d47b84ee32b20085dbeae66f08d8e298e59c57a94f02d5b35",
+      "integrity": "sha256:e119fb3524e9e55d47b84ee32b20085dbeae66f08d8e298e59c57a94f02d5b35"
+    },
+    "ghcr.io/devcontainers-extra/features/typescript:2": {
+      "version": "2.0.16",
+      "resolved": "ghcr.io/devcontainers-extra/features/typescript@sha256:a6bb60b4e02edb858f22e18b691ac7223dd7dfb52708e84d887488e326bd48f5",
+      "integrity": "sha256:a6bb60b4e02edb858f22e18b691ac7223dd7dfb52708e84d887488e326bd48f5"
+    },
     "ghcr.io/devcontainers/features/aws-cli:1": {
       "version": "1.1.4",
       "resolved": "ghcr.io/devcontainers/features/aws-cli@sha256:1f93c8315b7a6d76982ebb2269f8b0d50413fc0f965c032edf4aee0caceb73ef",
@@ -42,6 +52,11 @@
       "dependsOn": [
         "ghcr.io/devcontainers/features/github-cli:1"
       ]
+    },
+    "ghcr.io/jsburckhardt/devcontainer-features/codex:1": {
+      "version": "1.0.0",
+      "resolved": "ghcr.io/jsburckhardt/devcontainer-features/codex@sha256:e6ec5fabc4c804ddda9e0aee677d13e989decc7fbbdcf27f70551f986bb9b28a",
+      "integrity": "sha256:e6ec5fabc4c804ddda9e0aee677d13e989decc7fbbdcf27f70551f986bb9b28a"
     }
   }
 }

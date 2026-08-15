@@ -38,7 +38,7 @@ public interface IModelFacade
     /// <param name="description">Optional description.</param>
     /// <param name="parameters">Optional JSON parameters.</param>
     /// <param name="createdBy">
-    /// The creator's Entra object identifier. Pass <see cref="Guid.Empty"/>
+    /// The creator's normalized subject identifier. Pass <see cref="Guid.Empty"/>
     /// from HTTP paths to let the <c>AuditStampingInterceptor</c> fill it
     /// from <see cref="ICurrentUser"/>; seeders pass explicit fake Guids.
     /// </param>

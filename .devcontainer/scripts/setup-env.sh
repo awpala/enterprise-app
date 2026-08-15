@@ -38,73 +38,30 @@ on_error() {
 }
 trap on_error ERR
 
-# ---- Angular CLI: install globally ----
-echo "--- Installing Angular CLI globally ---"
-npm install -g @angular/cli 2>&1 || echo "Angular CLI global install failed (will retry manually)"
-echo "Angular CLI version: $(ng --version 2>/dev/null | head -1 || echo 'not available')"
-
-# ---- TypeScript CLI: install globally ----
-echo "--- Installing TypeScript globally ---"
-if command -v tsc >/dev/null 2>&1; then
-  echo "TypeScript already available: $(tsc --version 2>/dev/null || echo 'version unknown')"
+# ---- Search tooling ----
+if command -v rg >/dev/null 2>&1; then
+  echo "ripgrep is already installed: $(rg --version | head -n 1)"
+elif command -v apt-get >/dev/null 2>&1; then
+  echo "--- Installing ripgrep ---"
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends ripgrep
+  echo "Installed: $(rg --version | head -n 1)"
 else
-  npm install -g typescript@latest 2>&1 || echo "TypeScript global install failed (will retry manually)"
-  echo "TypeScript version: $(tsc --version 2>/dev/null || echo 'not available')"
+  echo "ERROR: ripgrep is missing and apt-get is unavailable." >&2
+  exit 1
 fi
 
-# ---- Claude Code CLI: install globally via native install ----
-echo "--- Installing Claude CLI globally ---"
-if command -v claude >/dev/null 2>&1; then
-  echo "claude CLI already available: $(claude --version 2>/dev/null || echo 'version unknown')"
-else
-  echo "Attempting native Claude installer (non-fatal on failure)..."
-  # run installer but don't let a non-zero exit stop the whole script
-  set +e
-  curl -fsSL https://claude.ai/install.sh | bash -s -- || true
-  INSTALL_RC=$?
-  set -e
-
-  # If installer placed binary in ~/.local/bin, add it to PATH for this run
-  if [ -x "$HOME/.local/bin/claude" ]; then
-    export PATH="$HOME/.local/bin:$PATH"
-    if [ -f "$BASH_RC" ] && ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "$BASH_RC" 2>/dev/null; then
-      echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_RC"
-      echo "Added ~/.local/bin to $BASH_RC"
-    fi
-  fi
-
-  # Resolve the binary and report version without causing script failure
-  CLAUDE_BIN=$(command -v claude || echo "$HOME/.local/bin/claude")
-  if [ -x "$CLAUDE_BIN" ]; then
-    CLAUDE_VER=$("$CLAUDE_BIN" --version 2>/dev/null || true)
-    echo "claude CLI version: ${CLAUDE_VER:-available but version not reported}"
-  else
-    echo "claude CLI version: not available"
-    echo "If the installer reported '~/.local/bin' is not in PATH, run:"
-    echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> $BASH_RC && source $BASH_RC"
-  fi
-fi
-
-# ---- OpenAI Codex CLI: install globally via npm ----
-echo "--- Installing OpenAI Codex CLI globally ---"
-if command -v codex >/dev/null 2>&1; then
-  echo "Codex CLI already available"
-else
-  npm install -g @openai/codex 2>&1 || echo "Codex CLI global install failed (will retry manually)"
-fi
-echo "Codex CLI version:"
-codex --version 2>/dev/null || echo "not available"
-
-# ---- Angular frontend: install npm dependencies ----
+# ---- Next.js frontend: install npm dependencies ----
 UI_DIR="${WORKSPACE_DIR}/ui"
 if [ -f "${UI_DIR}/package.json" ]; then
-  echo "--- Installing Angular frontend dependencies ---"
+  echo "--- Installing Next.js frontend dependencies ---"
   cd "${UI_DIR}"
   npm ci --prefer-offline 2>&1 || npm install 2>&1 || echo "npm install failed (will retry manually)"
-  echo "Angular frontend dependencies installed."
+  echo "Next.js version: $(npm exec -- next --version 2>/dev/null || echo 'not available')"
+  echo "Next.js frontend dependencies installed."
   cd "${WORKSPACE_DIR}"
 else
-  echo "No Angular frontend found at ${UI_DIR}/package.json — skipping npm install."
+  echo "No Next.js frontend found at ${UI_DIR}/package.json — skipping npm install."
 fi
 
 # ---- Data Engine: create Python virtual environment and install dependencies ----

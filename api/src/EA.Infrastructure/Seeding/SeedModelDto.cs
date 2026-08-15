@@ -39,7 +39,7 @@ public sealed record SeedModelDto
     public required DateTime UpdatedAtUtc { get; init; }
 
     /// <summary>
-    /// Gets the deterministic fake Entra object identifier of the seed creator.
+    /// Gets the deterministic synthetic subject identifier of the seed creator.
     /// Derived from <see cref="CreatedByName"/> so regenerating the seed produces
     /// the same Guid.
     /// </summary>

@@ -4,7 +4,6 @@ Starts the RabbitMQ consumer and blocks until a shutdown signal is received.
 """
 
 import logging
-import os
 import signal
 import sys
 import time
@@ -24,26 +23,46 @@ def _configure_logging(settings: Settings) -> None:
     )
 
 
-def main() -> None:
-    """Bootstrap and run the data engine consumer."""
-    # Ordered at the top of main() -- must run BEFORE any logger is used so the
-    # AzureMonitor handler is attached to the root logger ahead of log records.
-    # Conditional on the env var being set: local docker-compose does not set
-    # APPLICATIONINSIGHTS_CONNECTION_STRING, and configure_azure_monitor() would
-    # raise without one. Imports are lazy so local dev + unit tests don't need
-    # these packages installed.
-    if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
+def _configure_telemetry(settings: Settings) -> None:
+    """Configure the deployment-selected OpenTelemetry exporter adapter."""
+    if settings.observability_exporter == "none":
+        return
+
+    from opentelemetry.instrumentation.pika import PikaInstrumentor
+
+    if settings.observability_exporter == "azuremonitor":
         from azure.monitor.opentelemetry import configure_azure_monitor
-        from opentelemetry.instrumentation.pika import PikaInstrumentor
 
         configure_azure_monitor(
             logger_name="data_engine",
             enable_live_metrics=False,
         )
-        PikaInstrumentor().instrument()
+    else:
+        from opentelemetry import metrics, trace
+        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+        from opentelemetry.sdk.metrics import MeterProvider
+        from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+        resource = Resource.create({"service.name": "ea-data-engine"})
+        tracer_provider = TracerProvider(resource=resource)
+        tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+        trace.set_tracer_provider(tracer_provider)
+
+        metric_reader = PeriodicExportingMetricReader(OTLPMetricExporter())
+        metrics.set_meter_provider(MeterProvider(resource=resource, metric_readers=[metric_reader]))
+
+    PikaInstrumentor().instrument()
+
+
+def main() -> None:
+    """Bootstrap and run the data engine consumer."""
     settings = load_settings()
     _configure_logging(settings)
+    _configure_telemetry(settings)
 
     logger.info("Starting EA Data Engine")
     logger.info("RabbitMQ host: %s:%d", settings.rabbitmq_host, settings.rabbitmq_port)

@@ -26,11 +26,11 @@ public class AuditEventConfiguration : IEntityTypeConfiguration<AuditEvent>
             .HasColumnName("occurred_at_utc")
             .IsRequired();
 
-        builder.Property(e => e.ActorOid)
-            .HasColumnName("actor_oid");
+        builder.Property(e => e.ActorSubjectId)
+            .HasColumnName("actor_subject_id");
 
-        builder.Property(e => e.ActorTid)
-            .HasColumnName("actor_tid");
+        builder.Property(e => e.ActorTenantId)
+            .HasColumnName("actor_tenant_id");
 
         builder.Property(e => e.ActorName)
             .HasColumnName("actor_name")
@@ -40,8 +40,8 @@ public class AuditEventConfiguration : IEntityTypeConfiguration<AuditEvent>
             .HasColumnName("actor_email")
             .HasMaxLength(200);
 
-        builder.Property(e => e.ActorIdp)
-            .HasColumnName("actor_idp")
+        builder.Property(e => e.ActorIdentityProvider)
+            .HasColumnName("actor_identity_provider")
             .IsRequired()
             .HasMaxLength(100);
 
@@ -73,8 +73,8 @@ public class AuditEventConfiguration : IEntityTypeConfiguration<AuditEvent>
         builder.HasIndex(e => new { e.EntityType, e.EntityId })
             .HasDatabaseName("ix_audit_events_entity");
 
-        builder.HasIndex(e => new { e.ActorOid, e.OccurredAtUtc })
+        builder.HasIndex(e => new { e.ActorSubjectId, e.OccurredAtUtc })
             .IsDescending(false, true)
-            .HasDatabaseName("ix_audit_events_actor_oid_occurred_at_utc");
+            .HasDatabaseName("ix_audit_events_actor_subject_id_occurred_at_utc");
     }
 }

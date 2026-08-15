@@ -1,0 +1,12 @@
+project                 = "ea"
+environment             = "dev"
+aws_region              = "us-east-1"
+image_tag               = "latest"
+single_nat_gateway      = true
+postgres_instance_class = "db.t4g.micro"
+postgres_multi_az       = false
+desired_count           = 1
+maximum_desired_count   = 3
+allow_dev_auth          = true
+allow_guest_auth        = false
+log_retention_days      = 14

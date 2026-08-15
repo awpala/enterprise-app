@@ -7,8 +7,8 @@ using Microsoft.Extensions.Options;
 namespace EA.Api.Auth;
 
 /// <summary>
-/// Authentication handler used when <c>AzureAd:Enabled = true</c> and
-/// <c>AzureAd:AllowGuest = true</c> (prod-only "Log in as Guest" failsafe for
+/// Authentication handler used when <c>Authentication:Enabled = true</c> and
+/// <c>Authentication:AllowGuest = true</c> (demo "Log in as Guest" failsafe for
 /// sales/prospecting demos). Synthesizes a fixed guest principal when no
 /// Bearer token is present so prospects can exercise the app without signing
 /// in. Guests receive the same read/write access as real users.

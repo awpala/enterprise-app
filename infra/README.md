@@ -1,366 +1,54 @@
-# Infrastructure — Azure via Terraform (MVP)
+# Multi-cloud infrastructure
 
-This folder contains the Terraform configuration for deploying the Enterprise App to Azure. Two operating modes are supported:
+The infrastructure tree has two peer Terraform implementations behind one
+deployment contract:
 
-1. **Local CLI** — run `terraform apply` from the devcontainer, targeting the `dev` environment. Used for bootstrapping and break-glass ops.
-2. **GitHub Actions CI/CD** — push to `main` deploys to `production`; pushes to any other branch deploy to `dev`. See [CI/CD via GitHub Actions](#cicd-via-github-actions) below.
+- `azure/` provisions the Azure implementation.
+- `aws/` provisions the AWS implementation.
+- `scripts/deploy.sh` is the cloud-neutral CLI entry point.
 
-No custom domains, no MSAL auth yet (anonymous access).
+Choose the cloud at deployment time; application code does not expose a cloud
+selector to end users.
 
-## What gets deployed
+```bash
+# Validate without credentials
+./infra/scripts/deploy.sh validate azure
+./infra/scripts/deploy.sh validate aws
 
-| Resource | Module | Notes |
+# Plan/apply after the provider-specific bootstrap and login
+./infra/scripts/deploy.sh plan aws dev
+./infra/scripts/deploy.sh apply azure production
+```
+
+Both roots publish a normalized output surface consumed by deployment tooling:
+`application_url`, `api_url`, `container_registry`, `migration_workload`,
+`auth_authority`, `auth_client_id`, and `auth_api_scope`. Provider-specific
+outputs remain available for operational commands.
+
+The Terraform states are intentionally separate. A cloud switch creates a peer
+deployment; it never attempts to reinterpret Azure resource addresses as AWS
+resource addresses or vice versa.
+
+## Provider mapping
+
+| Capability | Azure implementation | AWS implementation |
 |---|---|---|
-| Resource Group | root | Holds everything else |
-| Container Registry (Basic) | `modules/container-registry` | Managed-identity pull only, no admin creds |
-| Log Analytics + Application Insights | `modules/observability` | Workspace-based App Insights |
-| Key Vault | `modules/key-vault` | RBAC-auth mode, holds DB + RabbitMQ passwords |
-| Postgres Flexible Server (B1ms) | `modules/postgres` | Public, firewall allows Azure services only |
-| Container Apps Environment | `modules/container-apps` | Shared by all apps |
-| Container App: `ea-rabbitmq` | `modules/container-apps` | Public `rabbitmq:4-management` image, internal ingress |
-| Container App: `ea-api` | `modules/container-apps` | ACR image, external ingress on `var.api_target_port` |
-| Container App: `ea-data-engine` | `modules/container-apps` | ACR image, no ingress |
-| Container App Job: `ea-migrations` | `modules/container-apps` | Runs EF Core bundle, manual trigger |
-| Static Web App (Free) | `modules/static-web-app` | Angular UI host |
-
-All resources are tagged with `project`, `environment`, `managed-by = terraform`.
-
-### Regional constraints
-
-Most resources deploy to `var.location` (default `eastus`), but two are pinned to `eastus2` regardless — not all regions offer every service on every subscription (basic/personal subs especially), and these two reliably hit offer restrictions elsewhere:
-
-- **Static Web App** — SWA Free is GA only in a handful of regions; `eastus2` is the safe default.
-- **Postgres Flexible Server** — basic subs get `LocationIsOfferRestricted` in `eastus`; pinning to `eastus2` avoids the quota gap.
-
-Azure permits resources in a region different from their containing RG, so this needs no other changes. Cross-US latency between the eastus Container Apps and the eastus2 Postgres is negligible for an MVP.
-
-## State
-
-State lives in an Azure Blob backend (`azurerm` with `use_oidc = true` + `use_azuread_auth = true`). The storage account is provisioned by the bootstrap module (`infra/bootstrap/`) and the concrete backend coordinates are supplied at init time via `-backend-config=...` so the same root config works for both environments and both local + CI.
-
-- `dev` uses the `dev.tfstate` blob key.
-- `production` uses the `production.tfstate` blob key.
-
-See [CI/CD via GitHub Actions](#cicd-via-github-actions) for bootstrap and migration steps.
-
-## Credentials — what you need to bring
-
-| Thing | How to get it | Frequency |
-|---|---|---|
-| **Azure subscription** | `az account show --query id -o tsv` — you need one | One-time |
-| **RBAC on subscription** | **Owner** (simplest) or **Contributor + User Access Administrator** — UAA is required because Terraform creates role assignments (AcrPull, Key Vault Secrets Officer/User) | One-time |
-| **Entra ID tenant** | Auto-picked up from `az login`. No app registrations needed for this pass — MSAL is out of scope | — |
-| **Auth to Azure from Terraform** | `az login` (device code is fine). The AzureRM provider auto-detects the CLI credential. **No service principal needed**; that's for CI/CD later | Per session |
-| **Resource provider registration** | One-time `az provider register` for each namespace (see step 2 below) | One-time per subscription |
-| **Postgres admin password** | Generated by Terraform `random_password.postgres`, stored in Key Vault as `postgres-admin-password` | Auto |
-| **RabbitMQ password** | Generated by Terraform `random_password.rabbitmq`, stored in Key Vault as `rabbitmq-password` | Auto |
-| **ACR credentials** | None needed — Container Apps pull via **user-assigned managed identity** with `AcrPull` role | Auto |
-| **SWA deployment token** | `terraform output -raw swa_deployment_token` or `az staticwebapp secrets list --name <swa-name> --query properties.apiKey -o tsv` | Per deploy |
-
-## Runbook
-
-### 0. Prereqs check
-
-```bash
-az --version         # 2.85.0+
-terraform version    # 1.9+
-```
-
-Install SWA CLI (used in step 7 to upload the UI bundle):
-
-```bash
-npm install -g @azure/static-web-apps-cli
-```
-
-### 1. Azure login
-
-```bash
-az login                                                 # device-code flow works in the devcontainer
-az account show                                          # confirm the right tenant
-az account set --subscription "<your-subscription-id>"   # if you have more than one
-az account show --query id -o tsv                        # copy this for terraform.tfvars
-```
-
-### 2. Register resource providers (one-time per subscription)
-
-```bash
-az provider register --namespace Microsoft.App
-az provider register --namespace Microsoft.ContainerRegistry
-az provider register --namespace Microsoft.DBforPostgreSQL
-az provider register --namespace Microsoft.OperationalInsights
-az provider register --namespace Microsoft.Insights
-az provider register --namespace Microsoft.KeyVault
-az provider register --namespace Microsoft.Web
-az provider register --namespace Microsoft.ManagedIdentity
-
-# Wait until all show "Registered" (takes 1-3 min)
-for ns in Microsoft.App Microsoft.ContainerRegistry Microsoft.DBforPostgreSQL \
-          Microsoft.OperationalInsights Microsoft.Insights Microsoft.KeyVault \
-          Microsoft.Web Microsoft.ManagedIdentity; do
-  echo -n "$ns: "; az provider show --namespace $ns --query registrationState -o tsv
-done
-```
-
-### 3. Configure Terraform vars
-
-```bash
-cd /workspace/infra
-cp terraform.tfvars.example terraform.tfvars
-# edit terraform.tfvars:
-#   - set subscription_id
-#   - set name_suffix to 4-6 lowercase alphanumerics unique to you (controls ACR/KV/SWA names)
-#   - leave image_tag = "latest" for the first run
-```
-
-Then initialize. The root now uses a **partial backend**, so `terraform init` needs backend coordinates. For a brand-new dev deploy (no bootstrap yet), you can still run locally with explicit flags once the bootstrap module has created the storage account (see [CI/CD via GitHub Actions](#cicd-via-github-actions)); or keep using a local backend short-term by commenting the `backend "azurerm"` block out. For the standard path:
-
-```bash
-terraform init \
-  -backend-config=resource_group_name=<tfstate_rg> \
-  -backend-config=storage_account_name=<tfstate_account> \
-  -backend-config=container_name=tfstate \
-  -backend-config=key=dev.tfstate
-terraform validate
-terraform fmt -recursive
-```
-
-(The bootstrap outputs `backend_config_dev` and `backend_config_production` pre-composed for you — `terraform output -raw backend_config_dev`.)
-
-### 4. Phase 1 — `-target` apply for ACR + RG
-
-Container Apps validate the referenced image exists at creation time. So we need ACR + images before the full apply. The simplest MVP approach is a targeted two-phase apply.
-
-> **Caveat:** `-target` is officially "for exceptional circumstances." Using it here is a pragmatic shortcut. Once images exist in ACR, all subsequent applies are single-phase and normal.
-
-```bash
-terraform apply \
-  -target=azurerm_resource_group.this \
-  -target=module.acr
-```
-
-Capture outputs you'll need:
-
-```bash
-ACR_NAME=$(terraform output -raw acr_name)
-echo "ACR: $ACR_NAME"
-```
-
-### 5. Build + push images via ACR Tasks
-
-No Docker daemon in the devcontainer — `az acr build` runs the build remotely in an ACR agent pool from your local source context.
-
-```bash
-cd /workspace
-
-# API
-az acr build \
-  --registry "$ACR_NAME" \
-  --image ea-api:latest \
-  --file api/Dockerfile \
-  api/
-
-# Migrations bundle
-az acr build \
-  --registry "$ACR_NAME" \
-  --image ea-migrations:latest \
-  --file api/Dockerfile.migrations \
-  api/
-
-# Data engine
-az acr build \
-  --registry "$ACR_NAME" \
-  --image ea-data-engine:latest \
-  --file data-engine/Dockerfile \
-  data-engine/
-
-# UI — skipped: goes to Static Web Apps, not Container Apps.
-```
-
-Confirm:
-
-```bash
-az acr repository list --name "$ACR_NAME" -o table
-# expect: ea-api, ea-migrations, ea-data-engine
-```
-
-### 6. Phase 2 — full `terraform apply`
-
-```bash
-cd /workspace/infra
-terraform apply
-```
-
-This creates Log Analytics, App Insights, Key Vault, Postgres, the CAE, all three Container Apps, the migrations Job, and the Static Web App. Expect ~8-12 minutes (Postgres Flexible Server dominates).
-
-Capture the important outputs:
-
-```bash
-API_URL=$(terraform output -raw api_url)
-MIG_JOB=$(terraform output -raw migrations_job_name)
-RG=$(terraform output -raw resource_group_name)
-SWA_NAME=$(terraform output -raw swa_name)
-
-echo "API:  $API_URL"
-echo "Job:  $MIG_JOB (in $RG)"
-echo "SWA:  $(terraform output -raw swa_url)"
-```
-
-### 7. Run the EF Core migrations job
-
-```bash
-az containerapp job start \
-  --name "$MIG_JOB" \
-  --resource-group "$RG"
-
-# Tail the latest execution
-EXEC=$(az containerapp job execution list \
-  --name "$MIG_JOB" --resource-group "$RG" \
-  --query '[0].name' -o tsv)
-
-az containerapp job execution show \
-  --name "$MIG_JOB" --resource-group "$RG" \
-  --job-execution-name "$EXEC" \
-  --query 'properties.status'
-```
-
-Status should go `Running` → `Succeeded`. If it fails, pull logs from Log Analytics (the CAE is wired to the workspace).
-
-### 8. Build and deploy the Angular UI to SWA
-
-The production `environment.ts` is auto-generated from the `API_URL` env var (see `ui/scripts/generate-environment.mjs`); no manual editing of environment files. Export `API_URL` to the deployed API FQDN and run `build:prod`:
-
-```bash
-cd /workspace/ui
-npm ci
-export API_URL="$(cd /workspace/infra && terraform output -raw api_url)"
-npm run build:prod
-
-SWA_TOKEN=$(cd /workspace/infra && terraform output -raw swa_deployment_token)
-
-swa deploy ./dist/ui/browser \
-  --deployment-token "$SWA_TOKEN" \
-  --env production
-```
-
-`build:prod` fails fast if `API_URL` is unset. Alternatively, set `API_URL=` in the repo-root `.env` and the generator will pick it up.
-
-### 9. Smoke test
-
-```bash
-# API health
-curl -fsS "$API_URL/health/ready" && echo
-curl -fsS "$API_URL/health/live"  && echo
-
-# UI
-echo "Open: $(cd /workspace/infra && terraform output -raw swa_url)"
-```
-
-If `/health/ready` returns 200 and the SWA URL loads, the end-to-end loop is validated.
-
-## Day-2 operations
-
-**Deploy a new image:**
-
-```bash
-SHA=$(git rev-parse --short HEAD)
-
-az acr build --registry "$ACR_NAME" --image "ea-api:sha-$SHA"       --file api/Dockerfile          api/
-az acr build --registry "$ACR_NAME" --image "ea-migrations:sha-$SHA" --file api/Dockerfile.migrations api/
-az acr build --registry "$ACR_NAME" --image "ea-data-engine:sha-$SHA" --file data-engine/Dockerfile data-engine/
-
-cd /workspace/infra
-terraform apply -var "image_tag=sha-$SHA"
-
-az containerapp job start --name "$MIG_JOB" --resource-group "$RG"
-```
-
-**Tear it all down:**
-
-```bash
-cd /workspace/infra
-terraform destroy
-```
-
-(Key Vault and Postgres soft-delete may linger a few days — if you recreate with the same `name_suffix` quickly, you may hit name-reservation conflicts. Pick a new suffix if so.)
-
-## CI/CD via GitHub Actions
-
-GitHub Actions handles everything the local runbook above covers, per environment, on every push.
-
-**Branch → environment mapping:**
-
-| Trigger | GitHub Environment | tfstate key | `environment` var | `name_suffix` | Image tag |
-|---|---|---|---|---|---|
-| push to `main` | `production` | `production.tfstate` | `prod` | `eaprd1` | `sha-<sha7>` |
-| push to any other branch | `dev` | `dev.tfstate` | `dev` | `entapp` | `<branch-slug>-<sha7>` |
-
-> The GitHub Environment is `production` while the Terraform `environment` variable is `prod` (kept short so generated resource names stay under Azure length limits). The OIDC federated credential is pinned to the GitHub Environment name — that's what matters.
-
-Auth is **OIDC federated credentials** — no client secret, no password. The Entra ID app + SP are created by `infra/bootstrap/`.
-
-### One-time bootstrap
-
-See [`infra/bootstrap/README.md`](bootstrap/README.md) for the full walkthrough. Short version:
-
-```bash
-cd /workspace/infra/bootstrap
-cp terraform.tfvars.example terraform.tfvars
-# edit terraform.tfvars: set subscription_id and a unique 4-6 char name_suffix
-
-terraform init
-terraform apply
-
-# Populate repo secrets, variables, and Environments via gh CLI:
-terraform output -raw gh_setup_commands | bash
-```
-
-The bootstrap outputs contain tenant/subscription/client IDs (treated as secrets for this project). They live **only** in the local `bootstrap/terraform.tfstate` (gitignored). If you need a value in your shell, `terraform output -raw <name>`; if you want it persisted locally, add it to `/workspace/.env` (gitignored). **Never** commit these values to any file.
-
-### Migrate existing local `dev` state to the blob backend
-
-Existing `dev` was deployed from local CLI — its state lives at `/workspace/infra/terraform.tfstate`. Before CI's first run for `dev`, migrate that state to the blob backend; otherwise CI will try to create duplicate globally-unique resources (ACR, KV, SWA, Postgres) and name-conflict.
-
-```bash
-cd /workspace/infra
-
-# Get the pre-composed backend config snippet from bootstrap.
-BACKEND=$(cd bootstrap && terraform output -raw backend_config_dev)
-
-# Migrate. You'll be prompted to confirm copying existing state to the new backend.
-terraform init -migrate-state $BACKEND
-```
-
-After migration, `terraform plan -var-file=envs/dev.tfvars` should be a no-op (modulo any drift).
-
-### Trigger a deploy
-
-Just push. The `deploy` workflow:
-
-1. Logs into Azure via OIDC (`azure/login@v2`) using repo secrets `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID`.
-2. `terraform init` with `-backend-config` populated from repo variables `TFSTATE_RESOURCE_GROUP` / `TFSTATE_STORAGE_ACCOUNT` / `TFSTATE_CONTAINER` and the computed tfstate key.
-3. `terraform apply` phase 1 (RG + ACR), then `az acr build` for each of the three images, then `terraform apply` phase 2 (full).
-4. Starts the migrations Container Apps Job and polls until `Succeeded` (600s timeout).
-5. Builds the Angular UI with `API_URL` set from `terraform output -raw api_url`, then `swa deploy` using the token from `terraform output -raw swa_deployment_token` (never written to an artifact, always masked).
-6. Smoke-tests `/health/ready` with retries.
-
-Concurrency:
-
-- `dev`: `cancel-in-progress: true` — latest push wins, older runs are canceled.
-- `production`: `cancel-in-progress: false` — runs serialize, no cancellation.
-
-### Tear-down notes
-
-- Tearing down an environment means `terraform destroy` with the right `-var-file` and backend config — easier to do locally than via CI.
-- Tearing down `infra/bootstrap/` kills CI entirely. Only do it if you're retiring the project. After destroy, clean up repo secrets (`gh secret delete`), variables (`gh variable delete`), and Environments (Settings UI).
-
-## Troubleshooting
-
-- **`terraform apply` fails creating a Container App with "image not found"** — you skipped phase 1 / phase 5. Build the images first.
-- **`AcrPull` role assignment errors** — your user lacks User Access Administrator or Owner. Ask for one of those on the subscription.
-- **Postgres name conflict** — the server name is globally DNS-scoped. Change `name_suffix`.
-- **Postgres create fails with `LocationIsOfferRestricted`** — your subscription doesn't have Postgres Flexible Server offered in the target region. The module already pins `eastus2`; don't override unless you've confirmed your sub has quota there.
-- **Static Web App create fails with "region not supported"** — SWA Free is GA only in a handful of regions; the module pins `eastus2`. Don't override unless you know it's supported.
-- **Migrations job `Failed`** — check Log Analytics for the `ContainerAppConsoleLogs_CL` table, filter by `ContainerAppName_s == "<migrations-job-name>"`.
-- **CI fails on `terraform init` with AAD auth error** — the OIDC SP is missing `Storage Blob Data Contributor` on the tfstate account. Re-run `infra/bootstrap/` apply.
-- **CI fails on `terraform apply` with "AuthorizationFailed" creating role assignments** — the OIDC SP is missing `User Access Administrator` at subscription scope. Re-run bootstrap apply.
-- **CI picks the wrong federated credential / OIDC fails in Actions** — confirm the `environment:` on the deploy job matches a federated-credential subject in the Entra ID app (`repo:<owner>/<repo>:environment:<name>`).
+| Container runtime | Container Apps / Jobs | ECS on Fargate / one-off tasks |
+| Registry | Azure Container Registry | Elastic Container Registry |
+| PostgreSQL | Flexible Server | RDS for PostgreSQL |
+| Messaging | RabbitMQ Container App | RabbitMQ ECS service with EFS |
+| Secrets | Key Vault | Secrets Manager |
+| Customer identity | Entra External ID | Cognito user pools |
+| UI runtime / entry point | Next.js on Container Apps | Next.js on ECS behind an Application Load Balancer |
+| Logs/dashboard | Log Analytics + Application Insights workbooks | CloudWatch Logs + dashboard |
+| CI federation | Entra workload identity | IAM GitHub OIDC role |
+| State | Azure Blob | S3 native state locking |
+
+See the provider READMEs and the [AWS deployment workbook](../docs/workbooks/aws-deployment-workbook.md)
+for prerequisites, phase gates, and operational verification.
+
+## CI/CD selection
+
+`.github/workflows/deploy.yml` is the common delivery entry point. It never assumes a provider: dispatches require a target input, and push deployments require `DEPLOYMENT_TARGETS=azure`, `aws`, or `both`. The entry workflow calls the reusable `deploy-azure.yml` and `deploy-aws.yml` adapters and passes one normalized change set to each selected target.
+
+Provider credentials, state coordinates, and approval rules belong to the explicitly named `azure-{environment}` and `aws-{environment}` GitHub Environments. Common scripts require `TF_ROOT`; they do not default to either provider.

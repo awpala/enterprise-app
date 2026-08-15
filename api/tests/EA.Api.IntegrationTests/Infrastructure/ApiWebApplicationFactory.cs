@@ -49,15 +49,15 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>
         // Seeding is disabled because the integration tests assert against an
         // empty starting database; the repo seed JSON also targets the
         // /workspace/api/seed path that the Testcontainer doesn't need.
-        // AzureAd:Enabled is left false so Program.cs skips the real
-        // JwtBearer/Microsoft.Identity.Web wiring; ConfigureServices below
+        // Authentication:Enabled is left false so Program.cs skips real OIDC
+        // JWT validation; ConfigureServices below
         // replaces the dev short-circuit with a Test scheme that reads the
         // per-request X-Test-User-* headers.
         builder.ConfigureAppConfiguration((_, config) =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["AzureAd:Enabled"] = "false",
+                ["Authentication:Enabled"] = "false",
                 ["Seeding:Enabled"] = "false",
             });
         });

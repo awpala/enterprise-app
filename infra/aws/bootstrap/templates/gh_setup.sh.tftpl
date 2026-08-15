@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+%{ for environment in environments ~}
+gh api --method PUT "repos/${repo}/environments/${environment}" >/dev/null
+gh variable set AWS_REGION --env "${environment}" --repo "${repo}" --body "${region}"
+gh variable set AWS_DEPLOY_ROLE_ARN --env "${environment}" --repo "${repo}" --body "${role_arn}"
+gh variable set AWS_TFSTATE_BUCKET --env "${environment}" --repo "${repo}" --body "${bucket}"
+%{ endfor ~}

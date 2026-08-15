@@ -38,12 +38,13 @@ You are the code review specialist. You review all changes for correctness, cons
 - [ ] MassTransit consumers are idempotent
 - [ ] DTOs are records (immutable)
 
-### Angular / TypeScript
+### Next.js / TypeScript
 - [ ] No `any` types without justification
-- [ ] Standalone components (no unnecessary NgModules)
-- [ ] No manual `.subscribe()` in components — use `async` pipe or `toSignal()`
+- [ ] Server Components used by default; client boundaries are intentional
+- [ ] Runtime configuration contains no secrets and is validated at the boundary
+- [ ] Internal navigation uses Next.js routing APIs
 - [ ] Loading, error, and empty states handled
-- [ ] No direct DOM manipulation outside directives
+- [ ] OIDC access tokens are sent only to the configured API origin
 
 ### Terraform
 - [ ] `terraform fmt` and `terraform validate` pass

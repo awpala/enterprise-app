@@ -1,0 +1,4 @@
+aws_region  = "us-east-1"
+name_suffix = "replace1"
+github_owner = "your-github-owner"
+github_repo  = "enterprise-app"

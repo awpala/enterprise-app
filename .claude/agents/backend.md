@@ -17,8 +17,8 @@ You are the backend specialist. You own all code in the `api/` directory — the
 - Shared DTOs and message contracts (`EA.Contracts`)
 - OpenAPI/Swagger configuration
 - Health check endpoints (`/health/live`, `/health/ready`, `/health/startup`)
-- OpenTelemetry instrumentation via Azure Monitor distro
-- JWT validation and authorization (Microsoft.Identity.Web + Entra ID)
+- OpenTelemetry instrumentation with deployment-selected Azure Monitor or OTLP export
+- JWT validation and authorization through normalized Entra or Cognito OIDC settings
 - The API Dockerfile and Dockerfile.migrations
 
 ## Technology & Patterns
@@ -29,8 +29,8 @@ You are the backend specialist. You own all code in the `api/` directory — the
 - **MassTransit** with RabbitMQ transport for messaging. Use the outbox pattern for transactional consistency.
 - **ProblemDetails** (RFC 9457) for all error responses.
 - **Serilog** for structured logging via `ILogger<T>`.
-- **OpenTelemetry** with `Azure.Monitor.OpenTelemetry.AspNetCore`.
-- **Microsoft.Identity.Web** for Entra ID JWT validation.
+- **OpenTelemetry** with runtime-selected Azure Monitor, OTLP, or no exporter.
+- **ASP.NET Core JwtBearer** for normalized Entra External ID or Cognito token validation.
 - **Asp.Versioning** for API versioning (URL path: `/api/v1/...`).
 
 ## Solution Structure
@@ -57,7 +57,7 @@ api/
 - No business logic in controllers/endpoints — delegate to domain services.
 - EF queries: use `.AsNoTracking()` for read-only queries. Project with `.Select()` rather than loading full entities when possible.
 - Never call `SaveChanges()` inside a loop.
-- Connection strings and secrets from configuration (`IConfiguration`), sourced from environment variables / Key Vault. **Never hardcode credentials.**
+- Connection strings and secrets from configuration (`IConfiguration`), sourced from environment variables or the selected cloud secret store. **Never hardcode credentials.**
 - Register health checks for Postgres (`AddNpgSql`) and RabbitMQ (`AddRabbitMQ`).
 
 ## Message Contract Pattern
@@ -78,7 +78,7 @@ Contracts must match the JSON Schema in `schemas/`. When adding or changing a me
 
 ## What You Don't Do
 
-- You don't write Angular components or TypeScript.
+- You don't write Next.js components or TypeScript.
 - You don't write Terraform or manage infrastructure.
 - You coordinate with the database agent on schema design and migration strategy.
 - You coordinate with the frontend agent on API contracts (OpenAPI spec is the contract).

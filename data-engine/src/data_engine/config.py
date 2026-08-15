@@ -1,6 +1,7 @@
 """Configuration loaded from environment variables via pydantic-settings."""
 
 import logging
+from typing import Literal
 
 from pydantic_settings import BaseSettings
 
@@ -20,6 +21,7 @@ class Settings(BaseSettings):
     rabbitmq_vhost: str = "/"
 
     log_level: str = "INFO"
+    observability_exporter: Literal["none", "azuremonitor", "otlp"] = "none"
 
     # Reconnect behavior.
     reconnect_delay_initial: float = 1.0

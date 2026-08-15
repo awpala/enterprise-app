@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars for local use. The file is ignored by Git.
+aws_region            = "us-east-1"
+cognito_domain_prefix = "replace-with-globally-unique-prefix"
+
+# Optional federated identity providers are disabled by default. Supply their
+# credentials through TF_VAR_* environment variables, never in this file.
