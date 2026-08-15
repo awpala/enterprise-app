@@ -87,6 +87,22 @@ resource "aws_lb_listener" "http_forward" {
   }
 }
 
+resource "aws_lb_listener_rule" "ui_internal_http" {
+  listener_arn = aws_lb_listener.http_forward.arn
+  priority     = 5
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.ui.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/health", "/api/runtime-config"]
+    }
+  }
+}
+
 resource "aws_lb_listener_rule" "api_http" {
   listener_arn = aws_lb_listener.http_forward.arn
   priority     = 10

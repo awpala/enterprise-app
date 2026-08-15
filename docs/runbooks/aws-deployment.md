@@ -102,7 +102,10 @@ gh run watch <run-id> \
 
 The workflow requires the migration task to exit zero and `/health/ready` to return HTTP 200. After it succeeds, complete the browser and observability checks in the [AWS deployment workbook](../workbooks/aws-deployment-workbook.md#9-verification-evidence).
 
-Do not set the repository variable `DEPLOYMENT_TARGETS=aws` until the first manually dispatched dev deployment succeeds. That variable enables AWS deployment on every applicable push.
+The onboarding script sets the repository variable `DEPLOYMENT_TARGETS` from
+the deployment config. With `DEPLOYMENT_TARGETS=aws`, every non-`main` push
+deploys to `aws-dev`, while every `main` push deploys to `aws-production`.
+Manual dispatch remains available for an explicitly selected environment.
 
 ## Production
 

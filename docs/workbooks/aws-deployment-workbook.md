@@ -113,7 +113,7 @@ Record all four image digests and ECR scan findings. Deploy digests/tags from on
 
 ## 8. Apply and migrate
 
-After reviewing the saved plan, rerun the same onboarding command with `--deploy`. It dispatches the cloud-neutral `deploy.yml` workflow with an explicit AWS target. The AWS adapter performs registry-first apply, four-image build/push, full apply with an AWS-generated CloudFront URL, migration task, smoke test, and retention. Push deployments remain disabled until `DEPLOYMENT_TARGETS=aws` or `both` is deliberately configured after the first successful rehearsal.
+After reviewing the saved plan, rerun the same onboarding command with `--deploy`. It dispatches the cloud-neutral `deploy.yml` workflow with an explicit AWS target. The AWS adapter performs registry-first apply, four-image build/push, full apply with an AWS-generated CloudFront URL, migration task, smoke test, and retention. The onboarding config also sets `DEPLOYMENT_TARGETS`: non-`main` pushes deploy dev, and `main` pushes deploy production.
 
 Gate: migration exit code is zero before application smoke tests. Never automatically roll back a successfully applied database migration by redeploying an older image; use forward-compatible migrations and the documented database recovery decision.
 
@@ -123,6 +123,7 @@ Gate: migration exit code is zero before application smoke tests. Never automati
 APP_URL=$(terraform -chdir=infra/aws output -raw application_url)
 CLUSTER=$(terraform -chdir=infra/aws output -raw ecs_cluster_name)
 curl --fail --retry 12 --retry-delay 10 "$APP_URL/api/health"
+curl --fail --retry 12 --retry-delay 10 "$APP_URL/api/runtime-config"
 curl --fail --retry 12 --retry-delay 10 "$APP_URL/health/ready"
 
 aws ecs list-services --cluster "$CLUSTER"
