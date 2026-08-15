@@ -26,8 +26,14 @@ export function ApplicationHeader({
   theme,
 }: ApplicationHeaderProps) {
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-[10px] bg-[#263f9c] px-[18px] text-white shadow-[0_2px_12px_rgb(0_0_0/18%)]">
-      <IconButton variant="header" onClick={onMenuToggle} aria-expanded={menuOpen} aria-label="Toggle navigation">
+    <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-[10px] bg-[#263f9c] px-[18px] text-white shadow-[0_2px_12px_rgb(0_0_0/18%)]">
+      <IconButton
+        aria-controls="application-navigation"
+        aria-expanded={menuOpen}
+        aria-label="Toggle navigation"
+        onClick={onMenuToggle}
+        variant="header"
+      >
         <Menu />
       </IconButton>
       <Link href="/dashboard" className="text-lg font-[760] tracking-[-0.02em]">Enterprise App</Link>

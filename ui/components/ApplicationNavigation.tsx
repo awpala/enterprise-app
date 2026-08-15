@@ -8,10 +8,18 @@ const navigation = [
   { href: '/runs', label: 'Runs', icon: PlayCircle },
 ] as const;
 
+interface ApplicationNavigationProps {
+  readonly onNavigate: () => void;
+  readonly pathname: string;
+}
+
 /** Primary application navigation. */
-export function ApplicationNavigation({ pathname }: { readonly pathname: string }) {
+export function ApplicationNavigation({ onNavigate, pathname }: ApplicationNavigationProps) {
   return (
-    <aside className="fixed top-16 z-15 h-[calc(100vh-4rem)] w-[230px] border-r border-border bg-surface px-3 py-[18px] shadow-elevated sm:sticky sm:shadow-none">
+    <aside
+      className="fixed bottom-0 left-0 top-16 z-30 w-[230px] shrink-0 overflow-y-auto overscroll-contain border-r border-border bg-surface px-3 py-[18px] shadow-elevated sm:relative sm:inset-auto sm:h-full sm:shadow-none"
+      id="application-navigation"
+    >
       <nav className="grid gap-[5px]">
         {navigation.map(item => {
           const Icon = item.icon;
@@ -26,6 +34,7 @@ export function ApplicationNavigation({ pathname }: { readonly pathname: string 
               )}
               href={item.href}
               key={item.href}
+              onClick={onNavigate}
             >
               <Icon size={19} /> {item.label}
             </Link>
