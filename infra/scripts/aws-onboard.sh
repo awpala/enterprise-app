@@ -318,6 +318,32 @@ ensure_state_bucket() {
       'TagSet=[{Key=project,Value=ea},{Key=environment,Value=shared},{Key=managed-by,Value=terraform},{Key=cloud,Value=aws},{Key=purpose,Value=tfstate-and-oidc-bootstrap}]'
 }
 
+ensure_service_linked_role() {
+  local aws_service_name=$1
+  local role_name=$2
+
+  if aws iam get-role --role-name "$role_name" >/dev/null 2>&1; then
+    echo "Using existing AWS service-linked role $role_name."
+    return
+  fi
+
+  aws iam create-service-linked-role \
+    --aws-service-name "$aws_service_name" >/dev/null
+  echo "Created AWS service-linked role $role_name."
+}
+
+ensure_service_linked_roles() {
+  ensure_service_linked_role \
+    elasticloadbalancing.amazonaws.com \
+    AWSServiceRoleForElasticLoadBalancing
+  ensure_service_linked_role \
+    rds.amazonaws.com \
+    AWSServiceRoleForRDS
+  ensure_service_linked_role \
+    ecs.application-autoscaling.amazonaws.com \
+    AWSServiceRoleForApplicationAutoScaling_ECSService
+}
+
 terraform_state_has() {
   terraform -chdir="$BOOTSTRAP_ROOT" state list 2>/dev/null | rg -Fxq "$1"
 }
@@ -465,6 +491,7 @@ dispatch_deployment() {
 }
 
 ensure_budget
+ensure_service_linked_roles
 ensure_bootstrap
 configure_github
 plan_application
