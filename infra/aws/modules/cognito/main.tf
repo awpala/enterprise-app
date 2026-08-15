@@ -1,5 +1,5 @@
-resource "aws_cognito_user_pool" "this" {
-  name                     = "${var.name_prefix}-users"
+resource "aws_cognito_user_pool" "passwordless" {
+  name                     = "${var.name_prefix}-passwordless-users"
   user_pool_tier           = "ESSENTIALS"
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
@@ -42,7 +42,7 @@ resource "aws_cognito_user_pool" "this" {
 resource "aws_cognito_resource_server" "api" {
   identifier   = "api://${var.name_prefix}"
   name         = "${var.name_prefix}-api"
-  user_pool_id = aws_cognito_user_pool.this.id
+  user_pool_id = aws_cognito_user_pool.passwordless.id
 
   scope {
     scope_name        = "access_as_user"
@@ -53,7 +53,7 @@ resource "aws_cognito_resource_server" "api" {
 resource "aws_cognito_identity_provider" "google" {
   count = var.enable_google_identity_provider ? 1 : 0
 
-  user_pool_id  = aws_cognito_user_pool.this.id
+  user_pool_id  = aws_cognito_user_pool.passwordless.id
   provider_name = "Google"
   provider_type = "Google"
 
@@ -73,7 +73,7 @@ resource "aws_cognito_identity_provider" "google" {
 resource "aws_cognito_identity_provider" "oidc" {
   count = var.upstream_oidc == null ? 0 : 1
 
-  user_pool_id  = aws_cognito_user_pool.this.id
+  user_pool_id  = aws_cognito_user_pool.passwordless.id
   provider_name = var.upstream_oidc.name
   provider_type = "OIDC"
 
@@ -95,7 +95,7 @@ resource "aws_cognito_identity_provider" "oidc" {
 resource "aws_cognito_identity_provider" "saml" {
   count = var.upstream_saml == null ? 0 : 1
 
-  user_pool_id  = aws_cognito_user_pool.this.id
+  user_pool_id  = aws_cognito_user_pool.passwordless.id
   provider_name = var.upstream_saml.name
   provider_type = "SAML"
 
@@ -130,7 +130,7 @@ locals {
 
 resource "aws_cognito_user_pool_client" "ui" {
   name         = "${var.name_prefix}-ui"
-  user_pool_id = aws_cognito_user_pool.this.id
+  user_pool_id = aws_cognito_user_pool.passwordless.id
 
   generate_secret                      = false
   explicit_auth_flows                  = ["ALLOW_USER_AUTH"]
@@ -167,12 +167,12 @@ resource "aws_cognito_user_pool_client" "ui" {
 
 resource "aws_cognito_user_pool_domain" "this" {
   domain                = var.domain_prefix
-  user_pool_id          = aws_cognito_user_pool.this.id
+  user_pool_id          = aws_cognito_user_pool.passwordless.id
   managed_login_version = 2
 }
 
 resource "aws_cognito_managed_login_branding" "this" {
-  user_pool_id                = aws_cognito_user_pool.this.id
+  user_pool_id                = aws_cognito_user_pool.passwordless.id
   client_id                   = aws_cognito_user_pool_client.ui.id
   use_cognito_provided_values = true
 }

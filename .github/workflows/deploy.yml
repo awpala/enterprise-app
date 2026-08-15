@@ -4,6 +4,30 @@ on:
   push:
     branches:
       - "**"
+    paths:
+      - "api/**"
+      - "data-engine/**"
+      - "ui/**"
+      - "infra/aws/**/*.tf"
+      - "infra/aws/**/*.tfvars"
+      - "infra/aws/**/*.tftpl"
+      - "infra/aws/**/.terraform.lock.hcl"
+      - "infra/azure/**/*.tf"
+      - "infra/azure/**/*.tfvars"
+      - "infra/azure/**/*.tftpl"
+      - "infra/azure/**/.terraform.lock.hcl"
+      - "infra/azure/modules/observability/workbooks/*.json"
+      - ".github/workflows/deploy-aws.yml"
+      - ".github/workflows/deploy-azure.yml"
+      - ".github/scripts/aws-build-and-push-images.sh"
+      - ".github/scripts/aws-clean-images.sh"
+      - ".github/scripts/aws-run-migrations-task.sh"
+      - ".github/scripts/azure-build-and-push-images.sh"
+      - ".github/scripts/azure-clean-images.sh"
+      - ".github/scripts/azure-run-migrations-job.sh"
+      - ".github/scripts/compute-context.sh"
+      - ".github/scripts/smoke-test.sh"
+      - "!**/*.md"
   workflow_dispatch:
     inputs:
       target:
@@ -54,6 +78,7 @@ jobs:
           CONFIGURED_TARGETS: ${{ vars.DEPLOYMENT_TARGETS }}
           MANUAL_TARGET: ${{ inputs.target }}
           MANUAL_ENVIRONMENT: ${{ inputs.environment }}
+          PUSH_BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
 
@@ -83,12 +108,15 @@ jobs:
           data_engine_changed=true
           ui_changed=true
           if [[ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]]; then
-            if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-              base="${GITHUB_SHA}~1"
-            else
-              base="origin/main"
+            base="$PUSH_BEFORE"
+            if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+                base="${GITHUB_SHA}~1"
+              else
+                base=$(git merge-base origin/main HEAD)
+              fi
             fi
-            changed=$(git diff --name-only "$base" HEAD -- 2>/dev/null || true)
+            changed=$(git diff --name-only "$base" "$GITHUB_SHA" --)
             api_changed=$(grep -q '^api/' <<<"$changed" && echo true || echo false)
             data_engine_changed=$(grep -q '^data-engine/' <<<"$changed" && echo true || echo false)
             ui_changed=$(grep -q '^ui/' <<<"$changed" && echo true || echo false)

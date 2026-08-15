@@ -1,11 +1,11 @@
 output "user_pool_id" {
   description = "Cognito user pool ID."
-  value       = aws_cognito_user_pool.this.id
+  value       = aws_cognito_user_pool.passwordless.id
 }
 
 output "authority" {
   description = "OIDC issuer used by token validation."
-  value       = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.this.id}"
+  value       = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.passwordless.id}"
 }
 
 output "client_id" {
