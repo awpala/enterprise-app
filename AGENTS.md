@@ -237,7 +237,7 @@ The generated `.sql` pairs with the C# migration of the same stem (e.g. `2026041
 ### Deploy (`deploy.yml`)
 1. **Require an explicit target** → manual runs select `azure`, `aws`, or `both`; push runs require the repository variable `DEPLOYMENT_TARGETS` with one of those values. There is no default provider.
 2. **Detect changes once** → `git diff` identifies changes under `api/`, `data-engine/`, and `ui/`.
-3. **Call provider adapters** → reusable `deploy-azure.yml` and `deploy-aws.yml` workflows run only for selected targets and use protected `azure-{environment}` / `aws-{environment}` GitHub Environments.
+3. **Call provider adapters** → reusable `deploy-azure.yml` and `deploy-aws.yml` workflows run only for selected targets and use protected logical `dev` / `production` GitHub Environments so customer identity-provider registrations are reused across cloud targets.
 4. **Apply registry phase** → create the selected provider registry before image publication.
 5. **Build or copy immutable images** → publish the same four images to ACR or ECR.
 6. **Apply full stack, migrate, and smoke test** → use the provider-native one-off migration workload, then poll the normalized `api_url` output.

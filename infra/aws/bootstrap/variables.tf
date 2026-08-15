@@ -29,7 +29,7 @@ variable "github_repo" {
 variable "github_environments" {
   description = "GitHub Environments permitted to assume the deployment role."
   type        = set(string)
-  default     = ["aws-dev", "aws-production"]
+  default     = ["dev", "production"]
 }
 
 variable "existing_github_oidc_provider_arn" {

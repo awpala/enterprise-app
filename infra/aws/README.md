@@ -17,7 +17,7 @@ The root composes focused modules and owns only cross-module wiring plus generat
 | `ecs-cluster` | ECS cluster, Cloud Map namespace, and shared task network policy |
 | `ecs-iam` | Task execution/task roles and narrowly scoped secret/telemetry permissions |
 | `postgres` | RDS PostgreSQL, subnet group, and database network policy |
-| `cognito` | User pool, API scope, public PKCE client, managed login, and optional IdPs |
+| `cognito` | User pool, API scope, public PKCE client, managed login, Google/Microsoft federation, and passwordless email OTP |
 | `secrets-manager` | PostgreSQL connection string and RabbitMQ credential storage |
 | `observability` | CloudWatch log groups, alarms, and operations dashboard |
 | `rabbitmq` | EFS persistence, Cloud Map registration, task definition, and ECS service |
@@ -38,7 +38,7 @@ infra/scripts/aws-onboard.sh dev \
   --deploy
 ```
 
-The onboarding script is the supported first-deployment entry point. It creates and imports the partial S3 backend, configures GitHub OIDC and environment variables, saves an account-backed application plan, and optionally dispatches the GitHub-hosted build/deployment workflow. Docker is not required in the devcontainer.
+The onboarding script is the supported first-deployment entry point. It creates and imports the partial S3 backend, configures GitHub OIDC and environment variables, saves an account-backed application plan, and optionally dispatches the GitHub-hosted build/deployment workflow. Run `infra/scripts/aws-configure-customer-sso.sh` once before deployment to reuse the protected Google registration and reconcile Microsoft/Outlook SSO. Docker is not required in the devcontainer.
 
 See the [AWS deployment runbook](../../docs/runbooks/aws-deployment.md) for the one-time browser prerequisites, configuration fields, production gates, and failure behavior.
 

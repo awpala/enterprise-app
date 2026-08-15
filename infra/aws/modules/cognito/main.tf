@@ -8,6 +8,10 @@ resource "aws_cognito_user_pool" "this" {
     case_sensitive = false
   }
 
+  sign_in_policy {
+    allowed_first_auth_factors = ["EMAIL_OTP"]
+  }
+
   password_policy {
     minimum_length                   = 12
     require_lowercase                = true
@@ -25,7 +29,7 @@ resource "aws_cognito_user_pool" "this" {
   }
 
   admin_create_user_config {
-    allow_admin_create_user_only = false
+    allow_admin_create_user_only = true
   }
 
   verification_message_template {
@@ -129,6 +133,7 @@ resource "aws_cognito_user_pool_client" "ui" {
   user_pool_id = aws_cognito_user_pool.this.id
 
   generate_secret                      = false
+  explicit_auth_flows                  = ["ALLOW_USER_AUTH"]
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes = [

@@ -24,7 +24,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: azure-${{ inputs.environment }}
+    environment: ${{ inputs.environment }}
     concurrency:
       group: deploy-azure-${{ inputs.environment }}
       cancel-in-progress: ${{ inputs.environment != 'production' }}

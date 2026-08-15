@@ -118,7 +118,7 @@ TFVARS_FILE="envs/${ENVIRONMENT}.tfvars"
 STATE_KEY="aws/${ENVIRONMENT}.tfstate"
 STATE_BUCKET="ea-tfstate-${AWS_NAME_SUFFIX}"
 GITHUB_REPOSITORY="${GITHUB_OWNER}/${GITHUB_REPO}"
-GITHUB_ENVIRONMENT="aws-${ENVIRONMENT}"
+GITHUB_ENVIRONMENT="$ENVIRONMENT"
 
 # Environment credentials take precedence over AWS_PROFILE. Remove them only
 # in this child process so the named short-lived profile is authoritative.
@@ -373,6 +373,7 @@ ensure_bootstrap() {
   export TF_VAR_name_suffix="$AWS_NAME_SUFFIX"
   export TF_VAR_github_owner="$GITHUB_OWNER"
   export TF_VAR_github_repo="$GITHUB_REPO"
+  export TF_VAR_github_environments='["dev","production"]'
 
   terraform -chdir="$BOOTSTRAP_ROOT" init -reconfigure \
     -backend-config="bucket=${STATE_BUCKET}" \
@@ -473,8 +474,35 @@ configure_github() {
 }
 
 plan_application() {
+  local customer_sso_secret_count
+  local microsoft_oidc_issuer
+
+  customer_sso_secret_count=$(gh secret list \
+    --repo "$GITHUB_REPOSITORY" \
+    --env "$GITHUB_ENVIRONMENT" \
+    --json name \
+    --jq '[.[] | select(.name == "GOOGLE_OIDC_CLIENT_ID" or .name == "GOOGLE_OIDC_CLIENT_SECRET" or .name == "MICROSOFT_OIDC_CLIENT_ID" or .name == "MICROSOFT_OIDC_CLIENT_SECRET")] | length')
+  [[ "$customer_sso_secret_count" -eq 4 ]] || {
+    echo "Required Google and Microsoft SSO secrets are missing from GitHub Environment $GITHUB_ENVIRONMENT." >&2
+    echo "Run infra/scripts/aws-configure-customer-sso.sh first." >&2
+    exit 1
+  }
+  microsoft_oidc_issuer=$(gh variable get MICROSOFT_OIDC_ISSUER \
+    --env "$GITHUB_ENVIRONMENT" --repo "$GITHUB_REPOSITORY")
+  [[ "$microsoft_oidc_issuer" == https://* ]] || {
+    echo "MICROSOFT_OIDC_ISSUER is missing or invalid in GitHub Environment $GITHUB_ENVIRONMENT." >&2
+    exit 1
+  }
+
   export AWS_TFSTATE_BUCKET="$STATE_BUCKET"
   export TF_VAR_cognito_domain_prefix="$COGNITO_DOMAIN_PREFIX"
+  export TF_VAR_enable_google_identity_provider=true
+  export TF_VAR_google_client_id="redacted-plan-placeholder"
+  export TF_VAR_google_client_secret="redacted-plan-placeholder"
+  export TF_VAR_upstream_oidc
+  TF_VAR_upstream_oidc=$(jq -cn \
+    --arg issuer "$microsoft_oidc_issuer" \
+    '{name:"Microsoft",issuer:$issuer,client_id:"redacted-plan-placeholder",client_secret:"redacted-plan-placeholder",scopes:"openid profile email"}')
 
   terraform -chdir="$AWS_ROOT" init -reconfigure \
     -backend-config="bucket=${STATE_BUCKET}" \
@@ -500,10 +528,16 @@ dispatch_deployment() {
   echo "gh run list --repo $GITHUB_REPOSITORY --workflow deploy.yml --limit 1"
 }
 
+configure_customer_sso() {
+  "${REPO_ROOT}/infra/scripts/aws-configure-customer-sso.sh" \
+    "$ENVIRONMENT" --config "$CONFIG_FILE" --yes
+}
+
 ensure_budget
 ensure_service_linked_roles
 ensure_bootstrap
 configure_github
+configure_customer_sso
 plan_application
 
 if [[ "$DEPLOY" == "true" ]]; then

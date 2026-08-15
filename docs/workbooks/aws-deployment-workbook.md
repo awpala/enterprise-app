@@ -36,18 +36,18 @@ Record these before the first bootstrap:
 | VPC CIDR | `10.40.0.0/16` | Must be non-overlapping | Network approval |
 | Public application origin | AWS-generated CloudFront URL | AWS-generated CloudFront URL | Terraform output |
 | Cognito domain prefix | Pending | Pending | Uniqueness check |
-| Google OAuth credentials | Optional | Optional | Secrets inventory |
-| Upstream enterprise OIDC | Optional | Optional | Issuer metadata and claims sample |
+| Google OAuth credentials | Existing protected `dev` values | Existing protected `production` values | Secret names and callback test; never print values |
+| Microsoft personal-account OIDC | Scripted app registration | Scripted app registration | Fixed consumer issuer, protected credential, callback test |
 | Budget/alert threshold | Pending | Pending | AWS Budget identifier |
 
 ## 3. Authentication parity matrix
 
 | Client/sign-in type | Azure behavior | AWS target | Prototype state | Production gate |
 |---|---|---|---|---|
-| Native email account | Entra External ID user flow | Cognito email/password | Declared | Create/login/logout/refresh/revoke test |
-| Email one-time passcode | Entra user flow | Cognito custom passwordless flow or accepted exception | Not implemented | Product decision and threat-model review |
-| Google | Portal-managed Entra federation | Optional Cognito Google IdP | Terraform input exists | Exact callback, claim mapping, logout test |
-| Microsoft account | Entra identity provider | Generic OIDC federation through Cognito if issuer permits | Provider slot exists | Confirm supported issuer/client type; test personal account |
+| Native email account | Entra External ID user flow | Disabled; passwords are not an accepted AWS sign-in method | Implemented | Managed login must not offer password authentication |
+| Email one-time passcode | Entra user flow | Cognito `EMAIL_OTP` choice-based sign-in | Implemented | Provisioned-user login/logout/refresh/revoke test |
+| Google | Portal-managed Entra federation | Required Cognito Google IdP | Implemented in Terraform; credentials protected | Exact callback, claim mapping, logout test |
+| Microsoft account | Customer Microsoft identity | Required Cognito OIDC provider pinned to the Microsoft consumer tenant | Implemented in Terraform; credentials protected | Outlook personal-account callback, claim mapping, logout test |
 | Enterprise OIDC | Entra federation | Optional Cognito OIDC IdP | Terraform input exists | Discovery, signing-key rotation, claim mapping test |
 | Enterprise SAML | Entra federation | Optional Cognito SAML IdP | Terraform input exists | Metadata, signature, attribute, and IdP logout tests |
 | Local developer | Synthetic opt-in | Same synthetic opt-in | Implemented | Confirm disabled in production |
@@ -89,7 +89,11 @@ Gate: review the prototype IAM policy before attaching it to production. Use Clo
 
 Copy `infra/aws/envs/dev.deploy.env.example` to the ignored `dev.deploy.env`, fill in its non-secret values, and run `infra/scripts/aws-onboard.sh dev --config infra/aws/envs/dev.deploy.env` without `--deploy`. Terraform generates the CloudFront HTTPS origin, the script configures all remaining inputs, and it saves the account-backed plan as `infra/aws/aws-dev.tfplan`.
 
-Optional Google/upstream OIDC secrets are not part of the initial native Cognito deployment. Add protected GitHub Environment secrets and explicit workflow mappings before enabling those providers; never commit them to a deploy config or tfvars file.
+Run `infra/scripts/aws-configure-customer-sso.sh` before planning. It reuses the
+existing protected Google secrets and creates the Microsoft personal-account
+registration through the authenticated CLI. Both providers are required inputs;
+the workflow fails before Terraform if any credential is absent. Never commit
+provider credentials to a deploy config or tfvars file.
 
 Review the plan for:
 
@@ -134,11 +138,12 @@ aws rds describe-db-instances --query 'DBInstances[].{id:DBInstanceIdentifier,pu
 
 Complete a real browser journey: native sign-in, optional federated sign-ins, token inspection (`iss`, `client_id`, `scope`, `token_use`), create a model, request a run, observe completion, refresh, logout, and revoked/expired-token rejection. Confirm the audit actor and message headers contain normalized subject/tenant/provider values.
 
-Provision the sole native Cognito user from the existing IAM Identity Center
-`admin` identity with `infra/scripts/aws-provision-cognito-admin.sh`; do not copy
-the administrator's email or temporary credential into Git, Terraform variables,
-GitHub configuration, or command output. Synthetic dev access does not satisfy
-the native sign-in gate.
+Provision the sole passwordless Cognito email-OTP profile from the existing IAM
+Identity Center `admin` identity with
+`infra/scripts/aws-provision-cognito-admin.sh`; do not copy the administrator's
+email or any OTP into Git, Terraform variables, GitHub configuration, or command
+output. The script suppresses invitations and creates no password. Synthetic dev
+access does not satisfy the real sign-in gate.
 
 In CloudWatch/X-Ray, capture a correlated trace spanning ALB/API, RabbitMQ publish/consume, and data engine. Confirm alarms are `OK`, log retention matches tfvars, and no secret appears in logs.
 
@@ -166,7 +171,7 @@ Production teardown requires an explicit change record, retained RDS snapshot, r
 - [ ] Account-backed plans contain no policy/security critical findings.
 - [ ] IAM reduced from bootstrap prototype to observed least privilege.
 - [ ] AWS Budgets and cost anomaly detection configured.
-- [ ] DNS, ACM, TLS policy, and callback/logout URLs verified.
+- [ ] CloudFront default TLS and generated-hostname callback/logout URLs verified; no custom DNS or operator-managed ACM certificate is configured.
 - [ ] Required SSO client types pass the parity matrix.
 - [ ] Synthetic dev and guest authentication are disabled or formally accepted.
 - [ ] RDS Multi-AZ, backups, restore drill, maintenance, and deletion protection approved.

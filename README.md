@@ -66,7 +66,7 @@ Synthetic development and guest sessions remain explicit opt-ins. They are conve
 
 The AWS configuration is an accountless prototype: local provider-schema validation passes, but an account-backed plan/apply and all workbook readiness gates remain required before production use.
 
-GitHub Actions uses [deploy.yml](./.github/workflows/deploy.yml) as its cloud-neutral entry point. Manual runs choose `azure`, `aws`, or `both`; automatic push deployments require the repository variable `DEPLOYMENT_TARGETS` to make that choice explicitly. Provider credentials and approvals live in `azure-dev`, `azure-production`, `aws-dev`, and `aws-production` GitHub Environments.
+GitHub Actions uses [deploy.yml](./.github/workflows/deploy.yml) as its cloud-neutral entry point. Manual runs choose `azure`, `aws`, or `both`; automatic push deployments require the repository variable `DEPLOYMENT_TARGETS` to make that choice explicitly. Provider credentials and approvals live in the logical `dev` and `production` GitHub Environments so a customer identity-provider registration is reused rather than duplicated per cloud.
 
 ## Repository guides
 

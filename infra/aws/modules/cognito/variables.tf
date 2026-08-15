@@ -52,7 +52,7 @@ variable "google_client_secret" {
 }
 
 variable "upstream_oidc" {
-  description = "Optional upstream OIDC provider."
+  description = "Required Microsoft personal-account OIDC provider in deployed environments."
   type = object({
     name          = string
     issuer        = string

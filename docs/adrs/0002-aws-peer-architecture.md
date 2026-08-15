@@ -31,9 +31,20 @@ Implement AWS as a peer Terraform root under `infra/aws`, with its own S3 state 
 
 Use a two-to-three-AZ VPC. Place the ALB in public subnets and ECS, RDS, RabbitMQ, and EFS in private subnets. Use one NAT gateway in development and one per AZ in production. Encrypt RDS, EFS, ECR, Secrets Manager, and S3 state using AWS-managed encryption for the prototype; revisit customer-managed keys during hardening.
 
-Use one ALB origin for the Next.js UI and API. Route `/api/v1/*`, health, OpenAPI, and Scalar paths to the API; route all other paths to Next.js. HTTP is sufficient for an accountless Terraform prototype. Any deployed OIDC flow requires a stable HTTPS origin, validated ACM certificate, matching DNS alias, and exact Cognito callback/logout registration.
+Use one ALB origin for the Next.js UI and API. Route `/api/v1/*`, health,
+OpenAPI, and Scalar paths to the API; route all other paths to Next.js. The
+public application origin is the AWS-generated CloudFront HTTPS hostname with
+the CloudFront default certificate. Terraform derives Cognito callback/logout
+registration from that generated hostname. No public Route 53 zone, custom
+domain, DNS alias, or operator-managed ACM certificate is part of the design.
 
-Use Cognito Authorization Code flow with PKCE and a public client. Cognito native email/password is the baseline client type. Google, one generic upstream OIDC provider, and one metadata-driven SAML provider are optional Terraform inputs. Passwordless email OTP is not declared equivalent: Cognito managed login does not provide the same experience with this configuration, so it remains a tracked parity gate.
+Use Cognito Authorization Code flow with PKCE and a public client. Native
+password authentication is not an accepted customer flow. The app client must
+offer the existing Google federation, Microsoft personal-account federation for
+Outlook users, and Cognito email one-time-passcode authentication. Provider
+credentials remain protected GitHub Environment secrets and are never
+committed. The Microsoft issuer is resolved from live OIDC discovery metadata;
+no environment-specific identity URL is embedded in the workflow.
 
 ## Consequences
 
@@ -50,9 +61,15 @@ Use Cognito Authorization Code flow with PKCE and a public client. Cognito nativ
 - RabbitMQ remains self-managed on both clouds. EFS improves persistence on AWS but does not make the single broker highly available. Amazon MQ was not selected because it changes broker administration and topology behavior; evaluate it before production.
 - NAT gateways, ALB, RDS, EFS, CloudWatch ingestion, and continuously running Fargate tasks create a meaningful idle cost.
 - The bootstrap IAM policy is intentionally broad enough for first planning. Replace it with permissions derived from CloudTrail before production.
-- HTTPS depends on DNS and a validated ACM certificate supplied by the operator; Route 53 zone ownership is not assumed.
+- HTTPS uses the generated CloudFront hostname and default certificate; adding
+  a custom domain is outside this decision and requires separate explicit
+  approval.
 - Cognito federation and logout behavior need end-to-end browser tests for every enabled identity provider.
-- No AWS resource in this ADR has yet been applied. The workbook gates promotion on account-backed evidence.
+- Passwordless email OTP requires a pre-provisioned, confirmed user because the
+  managed sign-up page still requires a password; the provisioning script must
+  suppress invitations and omit temporary passwords.
+- The dev stack is account-backed; the workbook gates merge and production
+  promotion on browser and operational evidence.
 
 ## Alternatives considered
 

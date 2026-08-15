@@ -26,6 +26,14 @@ Complete only the identity steps that require a browser:
    gh auth login
    ```
 
+5. Verify the Microsoft CLI session used by the scripted Outlook application
+   registration:
+
+   ```bash
+   az account show
+   az ad signed-in-user show
+   ```
+
 `aws-onboard.sh` rejects an AWS root identity. Do not create or export AWS access keys. Docker is intentionally absent from `ea-dev-env`; GitHub-hosted runners build and push all images.
 
 ## Configure once
@@ -74,9 +82,10 @@ The command is idempotent and performs the entire CLI-amenable sequence:
 2. Creates or updates the monthly AWS Budget and its 80% actual-spend email alert.
 3. Creates and hardens the S3 backend, initializes native S3 state locking, and imports the bucket resources into the bootstrap state.
 4. Reuses an account-level GitHub Actions OIDC provider when one exists; otherwise creates it. It creates or reconciles the environment-scoped GitHub deployment role.
-5. Creates the `aws-dev` GitHub Environment and sets every variable required by the AWS workflow.
-6. Initializes, formats, validates, and saves the account-backed application plan at `infra/aws/aws-dev.tfplan`.
-7. Dispatches `deploy.yml` for AWS/dev. The GitHub-hosted runner creates ECR, builds and pushes all four images, applies the stack, creates the AWS-generated CloudFront HTTPS endpoint, runs migrations, and smoke-tests it.
+5. Reuses the logical `dev` GitHub Environment so the already-configured Google OAuth credentials are not duplicated, and sets every AWS variable required by the workflow.
+6. Reconciles customer SSO through `aws-configure-customer-sso.sh`: it reuses the protected Google values, creates or updates the Microsoft personal-account registration through the authenticated CLI, and writes its generated credential directly to the protected GitHub Environment.
+7. Initializes, formats, validates, and saves the account-backed application plan at `infra/aws/aws-dev.tfplan`; non-secret placeholders model the unreadable GitHub secrets without copying them locally.
+8. Dispatches `deploy.yml` for AWS/dev. The GitHub-hosted runner creates ECR, builds and pushes all four images, applies the stack, creates the AWS-generated CloudFront HTTPS endpoint, runs migrations, and smoke-tests it.
 
 Omit `--deploy` to stop after the saved application plan:
 
@@ -86,6 +95,21 @@ infra/scripts/aws-onboard.sh dev \
 ```
 
 After reviewing the plan, rerun the same command with `--deploy`. Existing state, OIDC, role, and GitHub variables are reconciled rather than recreated.
+
+To reconcile or rotate customer SSO independently of onboarding, run:
+
+```bash
+infra/scripts/aws-configure-customer-sso.sh dev \
+  --config infra/aws/envs/dev.deploy.env
+```
+
+It verifies that the existing protected Google client ID and secret are present,
+creates or reconciles the dedicated Microsoft personal-account app through the
+authenticated Microsoft CLI, stores its generated credential directly in the
+same protected GitHub Environment, and updates AWS/GitHub deployment trust. It
+does not print or persist either provider secret. The Cognito callback registered
+at both providers is
+`https://<cognito-prefix>.auth.<region>.amazoncognito.com/oauth2/idpresponse`.
 
 ## Monitor and verify
 
@@ -111,14 +135,17 @@ infra/scripts/aws-provision-cognito-admin.sh dev \
 ```
 
 The script resolves the administrator's primary email without printing or
-persisting it, confirms the AWS account, and sends one Cognito temporary-password
-invitation. Complete the required password change through the generated managed
-login page. Real sign-in, callback, authenticated API access, refresh, and logout
-are mandatory dev acceptance gates; `Log in as Dev` is not a substitute.
+persisting it, confirms the AWS account, and creates one confirmed passwordless
+profile without sending an invitation or generating a password. Cognito sends an
+email OTP only when that user starts the email-code flow. Google and Microsoft /
+Outlook are also mandatory managed-login options. Real sign-in, callback,
+authenticated API access, refresh, and logout are mandatory dev acceptance
+gates; `Log in as Dev` is not a substitute.
 
 The onboarding script sets the repository variable `DEPLOYMENT_TARGETS` from
 the deployment config. With `DEPLOYMENT_TARGETS=aws`, every non-`main` push
-deploys to `aws-dev`, while every `main` push deploys to `aws-production`.
+deploys to the protected `dev` environment, while every `main` push deploys to
+the protected `production` environment.
 Manual dispatch remains available for an explicitly selected environment.
 
 ## Production
@@ -130,7 +157,7 @@ infra/scripts/aws-onboard.sh production \
   --config infra/aws/envs/production.deploy.env
 ```
 
-Set `GITHUB_PRODUCTION_REVIEWER` to `user:<github-login>` or `team:<organization-team-slug>`. The script configures that reviewer and prevents self-review on the `aws-production` GitHub Environment. Review `infra/aws/aws-production.tfplan` and satisfy every production gate in the workbook before rerunning with `--deploy`. The bootstrap IAM policy is intentionally broad for the first account-backed dev deployment and must be reduced from CloudTrail evidence before production.
+Set `GITHUB_PRODUCTION_REVIEWER` to `user:<github-login>` or `team:<organization-team-slug>`. The script configures that reviewer and prevents self-review on the `production` GitHub Environment. Review `infra/aws/aws-production.tfplan` and satisfy every production gate in the workbook before rerunning with `--deploy`. The bootstrap IAM policy is intentionally broad for the first account-backed dev deployment and must be reduced from CloudTrail evidence before production.
 
 ## Failure behavior
 

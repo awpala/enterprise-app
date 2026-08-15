@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Provisions the sole IAM Identity Center administrator as the native Cognito
-# user for the selected application environment. No email address or password
-# is written to the repository or printed by this script.
+# Provisions the sole IAM Identity Center administrator as a passwordless
+# Cognito email-OTP user. No email address, password, or OTP is persisted or
+# printed by this script.
 set -euo pipefail
 
 usage() {
@@ -10,7 +10,7 @@ Usage: infra/scripts/aws-provision-cognito-admin.sh <dev|production> --config <f
 
   --config FILE  Ignored deployment config based on
                  infra/aws/envs/dev.deploy.env.example.
-  --yes          Send the Cognito invitation without an interactive account check.
+  --yes          Create the passwordless profile without an interactive account check.
 EOF
 }
 
@@ -128,18 +128,18 @@ fi
 if [[ "$EXISTING_USER_COUNT" -eq 1 ]]; then
   USER_STATUS=$(aws cognito-idp list-users --user-pool-id "$USER_POOL_ID" \
     --filter "email = \"${ADMIN_EMAIL}\"" --query 'Users[0].UserStatus' --output text)
-  echo "Cognito administrator already exists with status $USER_STATUS. No invitation sent."
+  echo "Cognito administrator already exists with status $USER_STATUS. No profile created."
   exit 0
 fi
 
 echo "AWS account: $AWS_ACCOUNT_ID"
 echo "Environment: $ENVIRONMENT"
 echo "Identity Center user: admin (primary email redacted)"
-echo "Action: send one Cognito temporary-password invitation"
+echo "Action: create one passwordless Cognito email-OTP profile"
 if [[ "$ASSUME_YES" != "true" ]]; then
-  read -r -p "Type the AWS account ID to send the invitation: " confirmation
+  read -r -p "Type the AWS account ID to create the profile: " confirmation
   [[ "$confirmation" == "$AWS_ACCOUNT_ID" ]] || {
-    echo "Account confirmation did not match; no invitation sent." >&2
+    echo "Account confirmation did not match; no profile created." >&2
     exit 1
   }
 fi
@@ -151,7 +151,7 @@ aws cognito-idp admin-create-user \
     "Name=email,Value=${ADMIN_EMAIL}" \
     'Name=email_verified,Value=true' \
     "Name=name,Value=${ADMIN_NAME}" \
-  --desired-delivery-mediums EMAIL >/dev/null
+  --message-action SUPPRESS >/dev/null
 
-echo "Cognito invitation sent to the Identity Center administrator's primary email."
-echo "Use the temporary password at managed login and set a permanent password when prompted."
+echo "Passwordless Cognito profile created; no invitation or password was generated."
+echo "Use the managed login email-code option; Cognito sends an OTP only when sign-in starts."
