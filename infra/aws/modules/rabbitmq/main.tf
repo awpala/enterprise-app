@@ -136,6 +136,7 @@ resource "aws_ecs_service" "this" {
   launch_type            = "FARGATE"
   enable_execute_command = true
   propagate_tags         = "SERVICE"
+  wait_for_steady_state  = true
 
   network_configuration {
     subnets          = var.private_subnet_ids

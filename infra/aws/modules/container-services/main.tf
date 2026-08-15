@@ -263,6 +263,7 @@ resource "aws_ecs_service" "api" {
   enable_execute_command            = true
   propagate_tags                    = "SERVICE"
   health_check_grace_period_seconds = 60
+  wait_for_steady_state             = true
 
   deployment_circuit_breaker {
     enable   = true
@@ -293,6 +294,7 @@ resource "aws_ecs_service" "ui" {
   enable_execute_command            = true
   propagate_tags                    = "SERVICE"
   health_check_grace_period_seconds = 60
+  wait_for_steady_state             = true
 
   deployment_circuit_breaker {
     enable   = true
@@ -322,6 +324,7 @@ resource "aws_ecs_service" "data_engine" {
   launch_type            = "FARGATE"
   enable_execute_command = true
   propagate_tags         = "SERVICE"
+  wait_for_steady_state  = true
 
   deployment_circuit_breaker {
     enable   = true
