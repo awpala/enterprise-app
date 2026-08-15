@@ -11,12 +11,12 @@ services:
     image: node:22-alpine
     build: !reset null
     working_dir: /app
-    command: npx ng serve --host 0.0.0.0 --port 4200 --proxy-config proxy.conf.json
+    command: npm run dev
     volumes:
       - ../ui:/app
       - ui-node-modules:/app/node_modules
     ports:
-      - "4200:4200"
+      - "3000:3000"
 
 volumes:
   ui-node-modules:

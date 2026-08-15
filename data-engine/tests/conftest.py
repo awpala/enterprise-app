@@ -1,6 +1,6 @@
 """Shared test fixtures for the data engine test suite."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -14,7 +14,7 @@ def normal_request() -> ModelRunRequested:
     return ModelRunRequested(
         messageId=uuid4(),
         correlationId=uuid4(),
-        occurredAtUtc=datetime.now(timezone.utc),
+        occurredAtUtc=datetime.now(UTC),
         modelId=uuid4(),
         modelRunId=uuid4(),
         modelName="Test Normal Model",
@@ -33,7 +33,7 @@ def uniform_request() -> ModelRunRequested:
     return ModelRunRequested(
         messageId=uuid4(),
         correlationId=uuid4(),
-        occurredAtUtc=datetime.now(timezone.utc),
+        occurredAtUtc=datetime.now(UTC),
         modelId=uuid4(),
         modelRunId=uuid4(),
         modelName="Test Uniform Model",

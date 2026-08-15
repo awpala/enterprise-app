@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars for local use. The file is ignored by Git.
+aws_region            = "us-east-1"
+cognito_domain_prefix = "replace-with-globally-unique-prefix"
+
+# Required Google and Microsoft provider values flow from the protected logical
+# GitHub Environment through TF_VAR_* variables, never through this file.

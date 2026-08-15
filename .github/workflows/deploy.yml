@@ -1,199 +1,156 @@
 name: deploy
 
-# Branch → environment mapping:
-#   push to main               → production
-#   push to any other branch   → dev
-#
-# Image tagging:
-#   main       → sha-<sha7>
-#   non-main   → <branch-slug>-<sha7>  (slug = lower, /→-, stripped to [a-z0-9-])
-#
-# OIDC: the `environment:` on the deploy job is what the federated-credential
-# `subject` claim matches against in Entra ID. Do not remove it.
 on:
   push:
     branches:
       - "**"
+    paths:
+      - "api/**"
+      - "data-engine/**"
+      - "ui/**"
+      - "infra/aws/**/*.tf"
+      - "infra/aws/**/*.tfvars"
+      - "infra/aws/**/*.tftpl"
+      - "infra/aws/**/.terraform.lock.hcl"
+      - "infra/azure/**/*.tf"
+      - "infra/azure/**/*.tfvars"
+      - "infra/azure/**/*.tftpl"
+      - "infra/azure/**/.terraform.lock.hcl"
+      - "infra/azure/modules/observability/workbooks/*.json"
+      - ".github/workflows/deploy-aws.yml"
+      - ".github/workflows/deploy-azure.yml"
+      - ".github/scripts/aws-build-and-push-images.sh"
+      - ".github/scripts/aws-clean-images.sh"
+      - ".github/scripts/aws-run-migrations-task.sh"
+      - ".github/scripts/azure-build-and-push-images.sh"
+      - ".github/scripts/azure-clean-images.sh"
+      - ".github/scripts/azure-run-migrations-job.sh"
+      - ".github/scripts/compute-context.sh"
+      - ".github/scripts/smoke-test.sh"
+      - "!**/*.md"
   workflow_dispatch:
+    inputs:
+      target:
+        description: Cloud deployment target
+        required: true
+        type: choice
+        options:
+          - both
+          - azure
+          - aws
+      environment:
+        description: Deployment environment
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+          - production
 
 permissions:
-  id-token: write
   contents: read
+  id-token: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  detect-changes:
-    name: Detect changes
+  context:
+    name: Resolve deployment context
     runs-on: ubuntu-latest
     outputs:
-      api_changed: ${{ steps.changes.outputs.api_changed }}
-      data_engine_changed: ${{ steps.changes.outputs.data_engine_changed }}
+      environment: ${{ steps.context.outputs.environment }}
+      azure_enabled: ${{ steps.context.outputs.azure_enabled }}
+      aws_enabled: ${{ steps.context.outputs.aws_enabled }}
+      api_changed: ${{ steps.context.outputs.api_changed }}
+      data_engine_changed: ${{ steps.context.outputs.data_engine_changed }}
+      ui_changed: ${{ steps.context.outputs.ui_changed }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Detect changed paths
-        id: changes
+      - name: Select targets and detect changes
+        id: context
+        env:
+          CONFIGURED_TARGETS: ${{ vars.DEPLOYMENT_TARGETS }}
+          MANUAL_TARGET: ${{ inputs.target }}
+          MANUAL_ENVIRONMENT: ${{ inputs.environment }}
+          PUSH_BEFORE: ${{ github.event.before }}
         run: |
-          # Compare against the merge base with the default branch.
-          # For pushes to main, compare against the previous commit.
-          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-            BASE="${GITHUB_SHA}~1"
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            selected="${MANUAL_TARGET}"
+            environment="${MANUAL_ENVIRONMENT}"
           else
-            BASE="origin/main"
+            selected="${CONFIGURED_TARGETS}"
+            environment=$([[ "${GITHUB_REF}" == "refs/heads/main" ]] && echo production || echo dev)
           fi
 
-          CHANGED=$(git diff --name-only "$BASE" HEAD -- 2>/dev/null || echo "")
-
-          api_changed=false
-          data_engine_changed=false
-
-          if echo "$CHANGED" | grep -q '^api/'; then
-            api_changed=true
-          fi
-          if echo "$CHANGED" | grep -q '^data-engine/'; then
-            data_engine_changed=true
+          if [[ -z "$selected" ]]; then
+            echo "DEPLOYMENT_TARGETS must explicitly be azure, aws, or both for push deployments." >&2
+            exit 2
           fi
 
-          echo "api_changed=$api_changed" >> "$GITHUB_OUTPUT"
-          echo "data_engine_changed=$data_engine_changed" >> "$GITHUB_OUTPUT"
-          echo "Changes detected — api: $api_changed, data-engine: $data_engine_changed"
+          azure_enabled=false
+          aws_enabled=false
+          case "${selected,,}" in
+            azure) azure_enabled=true ;;
+            aws) aws_enabled=true ;;
+            both|azure,aws|aws,azure) azure_enabled=true; aws_enabled=true ;;
+            *) echo "Unsupported deployment target selection: $selected" >&2; exit 2 ;;
+          esac
 
-  deploy:
-    name: Deploy
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    # Route to the right GitHub Environment so OIDC picks the right
-    # federated credential (dev or production).
-    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'dev' }}
+          api_changed=true
+          data_engine_changed=true
+          ui_changed=true
+          if [[ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]]; then
+            base="$PUSH_BEFORE"
+            if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+                base="${GITHUB_SHA}~1"
+              else
+                base=$(git merge-base origin/main HEAD)
+              fi
+            fi
+            changed=$(git diff --name-only "$base" "$GITHUB_SHA" --)
+            api_changed=$(grep -q '^api/' <<<"$changed" && echo true || echo false)
+            data_engine_changed=$(grep -q '^data-engine/' <<<"$changed" && echo true || echo false)
+            ui_changed=$(grep -q '^ui/' <<<"$changed" && echo true || echo false)
+          fi
 
-    # Serialize production (no in-progress cancellation), coalesce dev
-    # (most recent push wins).
-    concurrency:
-      group: deploy-${{ github.ref == 'refs/heads/main' && 'production' || 'dev' }}
-      cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+          {
+            echo "environment=$environment"
+            echo "azure_enabled=$azure_enabled"
+            echo "aws_enabled=$aws_enabled"
+            echo "api_changed=$api_changed"
+            echo "data_engine_changed=$data_engine_changed"
+            echo "ui_changed=$ui_changed"
+          } >> "$GITHUB_OUTPUT"
 
-    env:
-      TERRAFORM_VERSION: 1.9.8
-      # Exported to every step's shell. GitHub auto-masks secrets in logs.
-      ARM_USE_OIDC: "true"
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  deploy-azure:
+    name: Azure
+    if: needs.context.outputs.azure_enabled == 'true'
+    needs: context
+    uses: ./.github/workflows/deploy-azure.yml
+    with:
+      environment: ${{ needs.context.outputs.environment }}
+      api_changed: ${{ needs.context.outputs.api_changed }}
+      data_engine_changed: ${{ needs.context.outputs.data_engine_changed }}
+      ui_changed: ${{ needs.context.outputs.ui_changed }}
+    secrets: inherit
 
-      # Customer SSO (Entra External ID deployer SP)
-      # Environment-scoped secrets/variable flow in automatically via the
-      # `environment:` selector above. Mapped here to the TF_VAR_* names
-      # that the root module's variables.tf expects. Google OAuth client
-      # credentials are NOT listed here — the Google IDP moved from
-      # Terraform-managed to portal-managed (see Part G of
-      # docs/runbooks/sso-manual-bootstrap.md); the root module no longer
-      # reads google_oidc_* vars.
-      TF_VAR_external_tenant_id:            ${{ secrets.EXTERNAL_TENANT_ID }}
-      TF_VAR_tenant_subdomain:              ${{ vars.TENANT_SUBDOMAIN }}
-      TF_VAR_external_tenant_client_id:     ${{ secrets.EXTERNAL_TENANT_CLIENT_ID }}
-      TF_VAR_external_tenant_client_secret: ${{ secrets.EXTERNAL_TENANT_CLIENT_SECRET }}
-
-      # Exposes the "Log in as Dev" synthetic-session affordance on the SPA
-      # landing page. Enabled in dev so engineers can smoke-test without
-      # provisioning a real External ID session; disabled in prod.
-      ENABLE_DEV_AUTH: ${{ github.ref == 'refs/heads/main' && 'false' || 'true' }}
-
-      # Exposes the "Log in as Guest" prod-only demo/prospecting failsafe
-      # on the SPA landing page. Inverse of ENABLE_DEV_AUTH: ON for prod,
-      # OFF everywhere else. The UI build script (build-ui.sh) forwards
-      # this into ng build; generate-environment.mjs reads it alongside
-      # ENABLE_DEV_AUTH. Authoritative Terraform tfvar for the API side
-      # lives in infra/envs/*.tfvars (allow_guest_auth), so no matching
-      # TF_VAR_* is needed here.
-      ENABLE_GUEST_AUTH: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
-
-      # Change detection outputs — consumed by build-and-push-images.sh.
-      # When unset (e.g. workflow_dispatch), the script defaults to building
-      # all images (safe fallback).
-      API_CHANGED: ${{ needs.detect-changes.outputs.api_changed }}
-      DATA_ENGINE_CHANGED: ${{ needs.detect-changes.outputs.data_engine_changed }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Compute environment, image tag, tfstate key, tfvars file
-        id: ctx
-        run: .github/scripts/compute-context.sh
-
-      - name: Azure login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-          terraform_wrapper: false
-
-      - name: Terraform init
-        working-directory: infra
-        run: |
-          terraform init \
-            -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ vars.TFSTATE_CONTAINER }}" \
-            -backend-config="key=${TFSTATE_KEY}"
-
-      - name: Terraform validate
-        working-directory: infra
-        run: terraform validate
-
-      - name: Terraform apply — phase 1 (RG + ACR)
-        working-directory: infra
-        run: |
-          terraform apply -auto-approve \
-            -target=azurerm_resource_group.this \
-            -target=module.acr \
-            -var-file="${TFVARS_FILE}" \
-            -var "subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-
-      - name: Build and push images (az acr build)
-        run: .github/scripts/build-and-push-images.sh
-
-      - name: Terraform apply — phase 2 (full)
-        working-directory: infra
-        run: |
-          terraform apply -auto-approve \
-            -var-file="${TFVARS_FILE}" \
-            -var "subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-            -var "image_tag=${IMAGE_TAG}"
-
-      - name: Run EF Core migrations (Container Apps Job)
-        run: .github/scripts/run-migrations-job.sh
-
-      - name: Setup Node (for UI build)
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: ui/package-lock.json
-
-      - name: Install SWA CLI
-        run: npm install -g @azure/static-web-apps-cli
-
-      - name: Build UI
-        run: .github/scripts/build-ui.sh
-
-      - name: Deploy UI to Static Web Apps
-        run: .github/scripts/deploy-ui.sh
-
-      - name: Smoke test — /health/ready
-        run: .github/scripts/smoke-test.sh
-
-      - name: Clean stale ACR images
-        run: .github/scripts/clean-acr-images.sh
+  deploy-aws:
+    name: AWS
+    if: needs.context.outputs.aws_enabled == 'true'
+    needs: context
+    uses: ./.github/workflows/deploy-aws.yml
+    with:
+      environment: ${{ needs.context.outputs.environment }}
+      api_changed: ${{ needs.context.outputs.api_changed }}
+      data_engine_changed: ${{ needs.context.outputs.data_engine_changed }}
+      ui_changed: ${{ needs.context.outputs.ui_changed }}
+    secrets: inherit

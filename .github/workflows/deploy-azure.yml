@@ -1,0 +1,117 @@
+name: deploy-azure-adapter
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Logical deployment environment
+        required: true
+        type: string
+      api_changed:
+        required: true
+        type: string
+      data_engine_changed:
+        required: true
+        type: string
+      ui_changed:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: deploy-azure-${{ inputs.environment }}
+      cancel-in-progress: ${{ inputs.environment != 'production' }}
+
+    env:
+      TERRAFORM_VERSION: 1.14.8
+      DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+      API_CHANGED: ${{ inputs.api_changed }}
+      DATA_ENGINE_CHANGED: ${{ inputs.data_engine_changed }}
+      UI_CHANGED: ${{ inputs.ui_changed }}
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_external_tenant_id: ${{ secrets.EXTERNAL_TENANT_ID }}
+      TF_VAR_tenant_subdomain: ${{ vars.TENANT_SUBDOMAIN }}
+      TF_VAR_external_tenant_client_id: ${{ secrets.EXTERNAL_TENANT_CLIENT_ID }}
+      TF_VAR_external_tenant_client_secret: ${{ secrets.EXTERNAL_TENANT_CLIENT_SECRET }}
+      TFSTATE_RESOURCE_GROUP: ${{ vars.TFSTATE_RESOURCE_GROUP }}
+      TFSTATE_STORAGE_ACCOUNT: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+      TFSTATE_CONTAINER: ${{ vars.TFSTATE_CONTAINER }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Azure deployment inputs
+        run: |
+          : "${ARM_CLIENT_ID:?AZURE_CLIENT_ID is required in the selected GitHub Environment}"
+          : "${ARM_TENANT_ID:?AZURE_TENANT_ID is required in the selected GitHub Environment}"
+          : "${ARM_SUBSCRIPTION_ID:?AZURE_SUBSCRIPTION_ID is required in the selected GitHub Environment}"
+          : "${TFSTATE_RESOURCE_GROUP:?TFSTATE_RESOURCE_GROUP is required in the selected GitHub Environment}"
+          : "${TFSTATE_STORAGE_ACCOUNT:?TFSTATE_STORAGE_ACCOUNT is required in the selected GitHub Environment}"
+          : "${TFSTATE_CONTAINER:?TFSTATE_CONTAINER is required in the selected GitHub Environment}"
+
+      - name: Compute deployment context
+        id: context
+        run: .github/scripts/compute-context.sh
+
+      - name: Azure login through OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Initialize and validate Terraform
+        run: |
+          terraform -chdir=infra/azure init \
+            -backend-config="resource_group_name=${TFSTATE_RESOURCE_GROUP}" \
+            -backend-config="storage_account_name=${TFSTATE_STORAGE_ACCOUNT}" \
+            -backend-config="container_name=${TFSTATE_CONTAINER}" \
+            -backend-config="key=${TFSTATE_KEY}"
+          terraform -chdir=infra/azure validate
+
+      - name: Apply registry phase
+        run: |
+          terraform -chdir=infra/azure apply -auto-approve \
+            -target=azurerm_resource_group.this \
+            -target=module.acr \
+            -var-file="${TFVARS_FILE}" \
+            -var="subscription_id=${ARM_SUBSCRIPTION_ID}"
+
+      - name: Build and push images
+        run: .github/scripts/azure-build-and-push-images.sh
+
+      - name: Apply full stack
+        run: |
+          terraform -chdir=infra/azure apply -auto-approve \
+            -var-file="${TFVARS_FILE}" \
+            -var="subscription_id=${ARM_SUBSCRIPTION_ID}" \
+            -var="image_tag=${IMAGE_TAG}"
+
+      - name: Run database migrations
+        run: .github/scripts/azure-run-migrations-job.sh
+
+      - name: Smoke test
+        env:
+          TF_ROOT: infra/azure
+        run: .github/scripts/smoke-test.sh
+
+      - name: Enforce image retention
+        run: .github/scripts/azure-clean-images.sh

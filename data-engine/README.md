@@ -1,4 +1,4 @@
-# Data Engine — Python 3.11+ Async Worker
+# Data Engine — Python 3.11+ RabbitMQ Worker
 
 Companion service to the API. Consumes `model.run.*` commands from RabbitMQ, executes numerical workflows, and publishes lifecycle events (`started`, `completed`, `failed`) back to the broker. Has no direct database access — it is deliberately stateless and driven entirely by messages.
 
@@ -7,19 +7,19 @@ Companion service to the API. Consumes `model.run.*` commands from RabbitMQ, exe
 | Package | Role | Rationale |
 |---|---|---|
 | `pika` | RabbitMQ client | Low-level AMQP 0-9-1 client; explicit about channels, acks, and prefetch — no magic, easy to reason about at-least-once semantics. |
-| `pydantic` 2 | Message models | Validates inbound payloads against the shared JSON Schema contracts. Rejects malformed messages at the edge. |
+| `pydantic` 2 | Message models | Validates inbound payloads with typed models that mirror the shared JSON Schema contracts. Rejects malformed messages at the edge. |
 | `pydantic-settings` | Config | `RABBITMQ_*` / app env vars parsed and typed on startup — fails fast on misconfiguration. |
 | `numpy` 2 + `scipy` 1.14+ | Numerical core | Workflow computations (histograms, metrics) live in `workflows/`. |
-| `azure-monitor-opentelemetry` | Telemetry | Same App Insights sink as the .NET API — preserves correlation across the MQ boundary. |
+| OpenTelemetry SDK/exporters | Telemetry | Runtime-selected Azure Monitor or OTLP export while instrumentation and trace propagation stay provider-neutral. |
 | `opentelemetry-instrumentation-pika` | Trace propagation | Extracts the `traceparent` header from AMQP properties so a single run shows up as one distributed trace spanning API → broker → engine → broker → API. |
 
 Dev-only: `pytest` + `pytest-cov` for tests, `ruff` for lint, `pyright` (standard mode) for types.
 
 ## Architectural Patterns
 
-- **Topology-first wiring.** `topology.py` declares exchanges, queues, routing keys, and DLQ bindings in one place; `main.py` constructs the runtime from it. Adding a new message type is a localized edit, not a scavenger hunt.
+- **Topology-first wiring.** `topology.py` declares MassTransit-compatible exchange names, message URNs, and queues in one place; `main.py` constructs the runtime from it. Logical versioned contract names remain documented in `schemas/`.
 - **Consumer / workflow / producer split.**
-  - `consumers/` — pika plumbing (ack, nack, retry, DLQ).
+  - `consumers/` — pika connection, envelope parsing, acknowledgment, and dispatch.
   - `workflows/` — pure functions over validated Pydantic models. Easy to unit-test without a broker.
   - `producers/` — outbound publish helpers that stamp `messageId`, `correlationId`, `occurredAtUtc`.
 - **Pydantic-validated contracts.** `models/messages.py` mirrors `/schemas/*.json` (JSON Schema Draft 2020-12). Schemas in the repo are the source of truth; Python models are kept in lockstep.
@@ -40,7 +40,9 @@ Dev-only: `pytest` + `pytest-cov` for tests, `ruff` for lint, `pyright` (standar
 
 ## Running Locally
 
-The engine requires RabbitMQ — run the full stack via [`../deploy/README.md`](../deploy/README.md). For isolated iteration:
+Inside `ea-dev-env`, RabbitMQ is supplied by the enclosing environment. Run the worker with `run-data-engine`; the alias captures output and lifecycle metadata under `__logs/local/data-engine-latest.log`.
+
+For isolated iteration on another environment:
 
 ```bash
 cd data-engine
@@ -49,16 +51,19 @@ pip install -e ".[dev]"
 RABBITMQ_HOST=localhost python -m data_engine.main
 ```
 
+On a Docker-capable host, the full stack is documented in [`../deploy/README.md`](../deploy/README.md). Do not invoke Docker inside `ea-dev-env`.
+
 ## Testing
 
 ```bash
 cd data-engine && pytest
 ```
 
-Tests under `tests/` target the `workflows/` layer directly without a broker. Consumer-level contract tests are covered by the API's Testcontainers integration suite.
+Tests under `tests/` cover workflow computation and MassTransit-envelope parsing without requiring a live broker. The API integration suite uses a PostgreSQL Testcontainer and MassTransit in-memory harness; a real cross-language RabbitMQ integration test remains a coverage gap.
 
 ## Gotchas
 
-- **Prefetch matters.** pika consumers set a bounded prefetch so a single slow run doesn't starve the other queues. Don't raise it without thinking about DLQ behavior.
-- **At-least-once, not exactly-once.** Workflows must be idempotent with respect to `messageId` / `correlationId`. The API side reconciles by run ID.
-- **Azure Monitor exporter needs `APPLICATIONINSIGHTS_CONNECTION_STRING`.** Absent in local dev — the engine falls back to stdout logging.
+- **Prefetch is one.** Each worker processes at most one unacknowledged run command at a time. Increase it only after testing memory use, ordering, and failure behavior.
+- **Delivery can repeat.** Durable queues and manual acknowledgments can redeliver a command after a connection failure. The API reconciles lifecycle events by run ID, and worker side effects must remain safe to repeat.
+- **Failures are terminally acknowledged.** The current consumer publishes a failed lifecycle event when it can and then acknowledges the command; it does not declare a retry queue or dead-letter queue.
+- **Telemetry export is explicit.** Set `OBSERVABILITY_EXPORTER=azuremonitor` with `APPLICATIONINSIGHTS_CONNECTION_STRING`, or `OBSERVABILITY_EXPORTER=otlp` with the standard OTLP endpoint. Local development defaults to `none` and retains stdout logging.

@@ -3,8 +3,13 @@ set -euo pipefail
 
 # predefined and derived constants
 BASH_RC="/root/.bashrc"
+BASH_ALIASES="/root/.bash_aliases"
 WORKSPACE_DIR="/workspace"
 LOGFILE="/tmp/setup-env-debug.log"
+GOOGLE_CLOUD_APT_KEY_URL="https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+GOOGLE_CLOUD_APT_KEYRING="/usr/share/keyrings/cloud.google.gpg"
+GOOGLE_CLOUD_APT_SOURCE_FILE="/etc/apt/sources.list.d/google-cloud-sdk.list"
+GOOGLE_CLOUD_APT_SOURCE="deb [signed-by=${GOOGLE_CLOUD_APT_KEYRING}] https://packages.cloud.google.com/apt cloud-sdk main"
 
 # redirect all output to logfile (and still echo to stdout for visibility)
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -19,8 +24,9 @@ echo "--- Environment (sorted) ---"
 printenv | sort
 echo
 
-# ensure /root/.bashrc file exists
+# ensure /root/.bashrc and /root/.bash_aliases files exist
 touch "$BASH_RC"
+touch "$BASH_ALIASES"
 
 # post-process /root/.bashrc
 if [ -f "$BASH_RC" ]; then
@@ -28,7 +34,40 @@ if [ -f "$BASH_RC" ]; then
   sed -i -E 's/^#\s*export\s+/export /' "$BASH_RC" || true
   sed -i -E 's/^#\s*eval\s+/eval /' "$BASH_RC" || true
   sed -i -E 's/^#\s*alias\s+l/alias l/' "$BASH_RC" || true
+
+  if ! grep -q 'bash_aliases' "$BASH_RC" 2>/dev/null; then
+    cat >> "$BASH_RC" <<'EOF'
+if [ -f ~/.bash_aliases ]; then
+  . ~/.bash_aliases
 fi
+EOF
+  fi
+fi
+
+# write dedicated /root/.bash_aliases entries
+if ! grep -q '^export ui=' "$BASH_ALIASES" 2>/dev/null; then
+  echo 'export ui="/workspace/ui"' >> "$BASH_ALIASES"
+fi
+if ! grep -q '^export api=' "$BASH_ALIASES" 2>/dev/null; then
+  echo 'export api="/workspace/api/src/EA.Api"' >> "$BASH_ALIASES"
+fi
+if ! grep -q '^export data_engine=' "$BASH_ALIASES" 2>/dev/null; then
+  echo 'export data_engine="/workspace/data-engine"' >> "$BASH_ALIASES"
+fi
+upsert_alias() {
+  local alias_name=$1
+  local alias_value=$2
+  if grep -q "^alias ${alias_name}=" "$BASH_ALIASES" 2>/dev/null; then
+    sed -i "s|^alias ${alias_name}=.*$|alias ${alias_name}='${alias_value}'|" "$BASH_ALIASES"
+  else
+    echo "alias ${alias_name}='${alias_value}'" >> "$BASH_ALIASES"
+  fi
+}
+
+LOCAL_SERVICE_RUNNER="${WORKSPACE_DIR}/.devcontainer/scripts/run-local-service.sh"
+upsert_alias run-ui "${LOCAL_SERVICE_RUNNER} ui"
+upsert_alias run-api "${LOCAL_SERVICE_RUNNER} api"
+upsert_alias run-data-engine "${LOCAL_SERVICE_RUNNER} data-engine"
 
 on_error() {
   rc=$?
@@ -38,63 +77,56 @@ on_error() {
 }
 trap on_error ERR
 
-# ---- Angular CLI: install globally ----
-echo "--- Installing Angular CLI globally ---"
-npm install -g @angular/cli 2>&1 || echo "Angular CLI global install failed (will retry manually)"
-echo "Angular CLI version: $(ng --version 2>/dev/null | head -1 || echo 'not available')"
-
-# ---- TypeScript CLI: install globally ----
-echo "--- Installing TypeScript globally ---"
-if command -v tsc >/dev/null 2>&1; then
-  echo "TypeScript already available: $(tsc --version 2>/dev/null || echo 'version unknown')"
+# ---- Search tooling ----
+if command -v rg >/dev/null 2>&1; then
+  echo "ripgrep is already installed: $(rg --version | head -n 1)"
+elif command -v apt-get >/dev/null 2>&1; then
+  echo "--- Installing ripgrep ---"
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends ripgrep
+  echo "Installed: $(rg --version | head -n 1)"
 else
-  npm install -g typescript@latest 2>&1 || echo "TypeScript global install failed (will retry manually)"
-  echo "TypeScript version: $(tsc --version 2>/dev/null || echo 'not available')"
+  echo "ERROR: ripgrep is missing and apt-get is unavailable." >&2
+  exit 1
 fi
 
-# ---- Claude Code CLI: install globally via native install ----
-echo "--- Installing Claude CLI globally ---"
-if command -v claude >/dev/null 2>&1; then
-  echo "claude CLI already available: $(claude --version 2>/dev/null || echo 'version unknown')"
+# ---- Google Cloud CLI ----
+if command -v gcloud >/dev/null 2>&1; then
+  echo "Google Cloud CLI is already installed: $(gcloud version 2>/dev/null | sed -n '1p')"
+elif command -v apt-get >/dev/null 2>&1; then
+  echo "--- Installing Google Cloud CLI ---"
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
+    ca-certificates \
+    curl \
+    gnupg
+  curl --fail --silent --show-error --location "$GOOGLE_CLOUD_APT_KEY_URL" \
+    | gpg --dearmor --yes --output "$GOOGLE_CLOUD_APT_KEYRING"
+  printf '%s\n' "$GOOGLE_CLOUD_APT_SOURCE" > "$GOOGLE_CLOUD_APT_SOURCE_FILE"
+  apt-get update
+  CLOUDSDK_SKIP_PY_COMPILATION=1 DEBIAN_FRONTEND=noninteractive \
+    apt-get install --yes --no-install-recommends google-cloud-cli
+  command -v gcloud >/dev/null 2>&1 || {
+    echo "ERROR: Google Cloud CLI installation completed without a gcloud executable." >&2
+    exit 1
+  }
+  echo "Installed Google Cloud CLI: $(gcloud version | sed -n '1p')"
 else
-  echo "Attempting native Claude installer (non-fatal on failure)..."
-  # run installer but don't let a non-zero exit stop the whole script
-  set +e
-  curl -fsSL https://claude.ai/install.sh | bash -s -- || true
-  INSTALL_RC=$?
-  set -e
-
-  # If installer placed binary in ~/.local/bin, add it to PATH for this run
-  if [ -x "$HOME/.local/bin/claude" ]; then
-    export PATH="$HOME/.local/bin:$PATH"
-    if [ -f "$BASH_RC" ] && ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "$BASH_RC" 2>/dev/null; then
-      echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_RC"
-      echo "Added ~/.local/bin to $BASH_RC"
-    fi
-  fi
-
-  # Resolve the binary and report version without causing script failure
-  CLAUDE_BIN=$(command -v claude || echo "$HOME/.local/bin/claude")
-  if [ -x "$CLAUDE_BIN" ]; then
-    CLAUDE_VER=$("$CLAUDE_BIN" --version 2>/dev/null || true)
-    echo "claude CLI version: ${CLAUDE_VER:-available but version not reported}"
-  else
-    echo "claude CLI version: not available"
-    echo "If the installer reported '~/.local/bin' is not in PATH, run:"
-    echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> $BASH_RC && source $BASH_RC"
-  fi
+  echo "ERROR: Google Cloud CLI is missing and apt-get is unavailable." >&2
+  exit 1
 fi
 
-# ---- Angular frontend: install npm dependencies ----
+# ---- Next.js frontend: install npm dependencies ----
 UI_DIR="${WORKSPACE_DIR}/ui"
 if [ -f "${UI_DIR}/package.json" ]; then
-  echo "--- Installing Angular frontend dependencies ---"
+  echo "--- Installing Next.js frontend dependencies ---"
   cd "${UI_DIR}"
   npm ci --prefer-offline 2>&1 || npm install 2>&1 || echo "npm install failed (will retry manually)"
-  echo "Angular frontend dependencies installed."
+  echo "Next.js version: $(npm exec -- next --version 2>/dev/null || echo 'not available')"
+  echo "Next.js frontend dependencies installed."
   cd "${WORKSPACE_DIR}"
 else
-  echo "No Angular frontend found at ${UI_DIR}/package.json — skipping npm install."
+  echo "No Next.js frontend found at ${UI_DIR}/package.json — skipping npm install."
 fi
 
 # ---- Data Engine: create Python virtual environment and install dependencies ----

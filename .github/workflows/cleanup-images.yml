@@ -1,0 +1,83 @@
+name: cleanup-images
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Registry provider to clean
+        required: true
+        type: choice
+        options:
+          - both
+          - azure
+          - aws
+      environment:
+        description: Deployment environment
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+          - production
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  azure:
+    if: inputs.target == 'azure' || inputs.target == 'both'
+    runs-on: ubuntu-latest
+    environment: azure-${{ inputs.environment }}
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.8
+          terraform_wrapper: false
+      - name: Initialize Azure state
+        run: |
+          terraform -chdir=infra/azure init \
+            -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TFSTATE_CONTAINER }}" \
+            -backend-config="key=${{ inputs.environment }}.tfstate"
+      - name: Clean Azure registry
+        run: .github/scripts/azure-clean-images.sh
+
+  aws:
+    if: inputs.target == 'aws' || inputs.target == 'both'
+    runs-on: ubuntu-latest
+    environment: aws-${{ inputs.environment }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_TFSTATE_BUCKET: ${{ vars.AWS_TFSTATE_BUCKET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.8
+          terraform_wrapper: false
+      - name: Initialize AWS state
+        run: |
+          terraform -chdir=infra/aws init \
+            -backend-config="bucket=${AWS_TFSTATE_BUCKET}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="key=aws/${{ inputs.environment }}.tfstate" \
+            -backend-config="use_lockfile=true"
+      - name: Clean AWS registry
+        run: .github/scripts/aws-clean-images.sh

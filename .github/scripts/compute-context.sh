@@ -1,20 +1,30 @@
 #!/usr/bin/env bash
-# Computes ENV_NAME, TFSTATE_KEY, TFVARS_FILE, IMAGE_TAG from GITHUB_REF/GITHUB_REF_NAME.
+# Computes ENV_NAME, TFSTATE_KEY, TFVARS_FILE, and IMAGE_TAG from an explicit
+# DEPLOY_ENVIRONMENT or, for push workflows, GITHUB_REF/GITHUB_REF_NAME.
 # Writes them to both $GITHUB_OUTPUT and $GITHUB_ENV. Requires git in cwd.
 set -euo pipefail
 
 SHORT_SHA=$(git rev-parse --short=7 HEAD)
-if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+if [[ -n "${DEPLOY_ENVIRONMENT:-}" ]]; then
+  case "$DEPLOY_ENVIRONMENT" in
+    dev|production) ENV_NAME="$DEPLOY_ENVIRONMENT" ;;
+    *) echo "Unsupported DEPLOY_ENVIRONMENT: $DEPLOY_ENVIRONMENT" >&2; exit 2 ;;
+  esac
+elif [[ "${GITHUB_REF:-}" == "refs/heads/main" ]]; then
   ENV_NAME="production"
+else
+  ENV_NAME="dev"
+fi
+
+if [[ "$ENV_NAME" == "production" ]]; then
   TFSTATE_KEY="production.tfstate"
   TFVARS_FILE="envs/production.tfvars"
   IMAGE_TAG="sha-${SHORT_SHA}"
 else
-  ENV_NAME="dev"
   TFSTATE_KEY="dev.tfstate"
   TFVARS_FILE="envs/dev.tfvars"
   # Branch slug: lowercase, / → -, keep only [a-z0-9-], collapse dashes, trim.
-  BRANCH_RAW="${GITHUB_REF_NAME}"
+  BRANCH_RAW="${GITHUB_REF_NAME:-manual}"
   BRANCH_SLUG=$(printf '%s' "$BRANCH_RAW" \
     | tr '[:upper:]' '[:lower:]' \
     | tr '/' '-' \

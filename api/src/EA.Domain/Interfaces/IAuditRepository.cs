@@ -14,7 +14,7 @@ public interface IAuditRepository
     /// <param name="pageSize">Number of items per page.</param>
     /// <param name="entityType">Optional filter by entity type (e.g. "Model", "ModelRun").</param>
     /// <param name="entityId">Optional filter by entity identifier.</param>
-    /// <param name="actorOid">Optional filter by actor Entra object identifier.</param>
+    /// <param name="actorSubjectId">Optional filter by normalized actor subject identifier.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A tuple of the paged items and the total count matching the filters.</returns>
     Task<(IReadOnlyList<AuditEvent> Items, int TotalCount)> GetAuditEventsAsync(
@@ -22,6 +22,6 @@ public interface IAuditRepository
         int pageSize,
         string? entityType = null,
         Guid? entityId = null,
-        Guid? actorOid = null,
+        Guid? actorSubjectId = null,
         CancellationToken cancellationToken = default);
 }

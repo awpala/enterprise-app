@@ -1,0 +1,127 @@
+name: deploy-aws-adapter
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Logical deployment environment
+        required: true
+        type: string
+      api_changed:
+        required: true
+        type: string
+      data_engine_changed:
+        required: true
+        type: string
+      ui_changed:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: deploy-aws-${{ inputs.environment }}
+      cancel-in-progress: ${{ inputs.environment != 'production' }}
+
+    env:
+      TERRAFORM_VERSION: 1.14.8
+      DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+      API_CHANGED: ${{ inputs.api_changed }}
+      DATA_ENGINE_CHANGED: ${{ inputs.data_engine_changed }}
+      UI_CHANGED: ${{ inputs.ui_changed }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_TFSTATE_BUCKET: ${{ vars.AWS_TFSTATE_BUCKET }}
+      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      TF_VAR_cognito_domain_prefix: ${{ vars.COGNITO_DOMAIN_PREFIX }}
+      TF_VAR_enable_google_identity_provider: "true"
+      TF_VAR_google_client_id: ${{ secrets.GOOGLE_OIDC_CLIENT_ID }}
+      TF_VAR_google_client_secret: ${{ secrets.GOOGLE_OIDC_CLIENT_SECRET }}
+      MICROSOFT_OIDC_ISSUER: ${{ vars.MICROSOFT_OIDC_ISSUER }}
+      MICROSOFT_OIDC_CLIENT_ID: ${{ secrets.MICROSOFT_OIDC_CLIENT_ID }}
+      MICROSOFT_OIDC_CLIENT_SECRET: ${{ secrets.MICROSOFT_OIDC_CLIENT_SECRET }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate AWS deployment inputs
+        run: |
+          : "${AWS_REGION:?AWS_REGION is required in the selected GitHub Environment}"
+          : "${AWS_TFSTATE_BUCKET:?AWS_TFSTATE_BUCKET is required in the selected GitHub Environment}"
+          : "${AWS_DEPLOY_ROLE_ARN:?AWS_DEPLOY_ROLE_ARN is required in the selected GitHub Environment}"
+          : "${TF_VAR_cognito_domain_prefix:?COGNITO_DOMAIN_PREFIX is required in the selected GitHub Environment}"
+          : "${TF_VAR_google_client_id:?GOOGLE_OIDC_CLIENT_ID is required in the selected GitHub Environment}"
+          : "${TF_VAR_google_client_secret:?GOOGLE_OIDC_CLIENT_SECRET is required in the selected GitHub Environment}"
+          : "${MICROSOFT_OIDC_ISSUER:?MICROSOFT_OIDC_ISSUER is required in the selected GitHub Environment}"
+          : "${MICROSOFT_OIDC_CLIENT_ID:?MICROSOFT_OIDC_CLIENT_ID is required in the selected GitHub Environment}"
+          : "${MICROSOFT_OIDC_CLIENT_SECRET:?MICROSOFT_OIDC_CLIENT_SECRET is required in the selected GitHub Environment}"
+
+      - name: Configure customer SSO Terraform input
+        run: |
+          upstream_oidc=$(jq -cn \
+            --arg issuer "$MICROSOFT_OIDC_ISSUER" \
+            --arg client_id "$MICROSOFT_OIDC_CLIENT_ID" \
+            --arg client_secret "$MICROSOFT_OIDC_CLIENT_SECRET" \
+            '{name:"Microsoft",issuer:$issuer,client_id:$client_id,client_secret:$client_secret,scopes:"openid profile email"}')
+          {
+            echo 'TF_VAR_upstream_oidc<<EA_OIDC_EOF'
+            echo "$upstream_oidc"
+            echo 'EA_OIDC_EOF'
+          } >> "$GITHUB_ENV"
+
+      - name: Configure AWS credentials through OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Compute deployment context
+        id: context
+        run: .github/scripts/compute-context.sh
+
+      - name: Initialize and validate Terraform
+        run: |
+          terraform -chdir=infra/aws init \
+            -backend-config="bucket=${AWS_TFSTATE_BUCKET}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="key=aws/${TFSTATE_KEY}" \
+            -backend-config="use_lockfile=true"
+          terraform -chdir=infra/aws validate
+
+      - name: Apply registry phase
+        run: |
+          terraform -chdir=infra/aws apply -auto-approve \
+            -var-file="${TFVARS_FILE}" \
+            -target=module.container_registry
+
+      - name: Build and push images
+        run: .github/scripts/aws-build-and-push-images.sh
+
+      - name: Apply full stack
+        run: |
+          terraform -chdir=infra/aws apply -auto-approve \
+            -var-file="${TFVARS_FILE}" \
+            -var="image_tag=${IMAGE_TAG}"
+
+      - name: Run database migrations
+        run: .github/scripts/aws-run-migrations-task.sh
+
+      - name: Smoke test
+        env:
+          TF_ROOT: infra/aws
+        run: .github/scripts/smoke-test.sh
+
+      - name: Enforce image retention
+        run: .github/scripts/aws-clean-images.sh

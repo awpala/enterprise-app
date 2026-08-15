@@ -3,7 +3,7 @@ name: enterprise-app
 services:
   ea-dev-env:
     container_name: ea-dev-env
-    image: mcr.microsoft.com/devcontainers/base:bookworm
+    image: mcr.microsoft.com/devcontainers/base:trixie
     user: root
     volumes:
       # workspace (bind mount)
@@ -15,16 +15,18 @@ services:
       - npm-deps:/root/.npm:rw
       - nvm-global:/usr/local/share/nvm:rw
       - npm-global:/usr/local/lib/node_modules:rw
-      - npm-bin:/usr/local/bin:rw
-      - ng-node-modules:/workspace/ui/node_modules:rw
+      - ui-node-modules:/workspace/ui/node_modules:rw
       - gh-config:/root/.config/gh:rw
       - dotnet-nuget:/root/.nuget:rw
       - dotnet-tools:/root/.dotnet:rw
       - terraform-cache:/root/.terraform.d:rw
       - azure-config:/root/.azure:rw
+      - aws-config:/root/.aws:rw
+      - gcloud-config:/root/.config/gcloud:rw
       - claude-config:/root/.claude:rw
+      - codex-config:/root/.codex
     ports:
-      - "4200:4200"
+      - "3000:3000"
       - "5000:5000"
       - "8000:8000"
     command: sleep infinity
@@ -99,15 +101,17 @@ volumes:
   pip-deps:
   npm-deps:
   nvm-global:
-  ng-node-modules:
+  ui-node-modules:
   gh-config:
   dotnet-nuget:
   dotnet-tools:
   terraform-cache:
   azure-config:
+  aws-config:
+  gcloud-config:
   claude-config:
+  codex-config:
   npm-global:
-  npm-bin:
 
 networks:
   ea-net:

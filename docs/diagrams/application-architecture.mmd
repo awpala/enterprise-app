@@ -1,0 +1,33 @@
+flowchart LR
+    person([User])
+    google[Google]
+    microsoft[Microsoft / Outlook]
+
+    subgraph platform[Selected cloud deployment]
+        direction LR
+        identity[OIDC adapter<br/>Entra External ID or Cognito]
+        edge[Provider-managed HTTPS ingress]
+        ui[Next.js UI<br/>ea-ui :3000]
+        api[ASP.NET Core API<br/>ea-api :8000]
+        db[(PostgreSQL 16<br/>system of record)]
+        broker{{RabbitMQ 4<br/>durable messaging}}
+        worker[Python data engine<br/>stateless worker]
+        telemetry[OpenTelemetry adapter<br/>Azure Monitor or ADOT]
+    end
+
+    person -->|HTTPS| edge
+    google -->|federated identity| identity
+    microsoft -->|federated identity| identity
+    ui <-->|Authorization Code + PKCE| identity
+    edge --> ui
+    ui -->|Bearer-authenticated /api/v1| api
+    api <-->|EF Core transactions| db
+    api -->|model.run.requested.v1| broker
+    broker -->|consume command| worker
+    worker -->|model.run.started.v1<br/>completed.v1 or failed.v1| broker
+    broker -->|lifecycle consumers| api
+    api -. traces, metrics, logs .-> telemetry
+    worker -. traces, metrics, logs .-> telemetry
+    ui -. server telemetry .-> telemetry
+
+    cicd[GitHub Actions<br/>OIDC federation] -->|Terraform + immutable images| platform

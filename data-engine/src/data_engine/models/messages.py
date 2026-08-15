@@ -4,12 +4,11 @@ The models mirror the JSON schemas in ``schemas/`` and are compatible with
 the MassTransit envelope format used by the .NET API.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import AliasChoices, BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Shared / Reusable
@@ -80,7 +79,7 @@ class ModelRunStarted(BaseModel):
 
     messageId: UUID = Field(default_factory=uuid4)  # noqa: N815
     correlationId: UUID  # noqa: N815
-    occurredAtUtc: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))  # noqa: N815
+    occurredAtUtc: datetime = Field(default_factory=lambda: datetime.now(UTC))  # noqa: N815
     modelRunId: UUID  # noqa: N815
     modelId: UUID  # noqa: N815
 
@@ -95,7 +94,7 @@ class ModelRunCompleted(BaseModel):
 
     messageId: UUID = Field(default_factory=uuid4)  # noqa: N815
     correlationId: UUID  # noqa: N815
-    occurredAtUtc: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))  # noqa: N815
+    occurredAtUtc: datetime = Field(default_factory=lambda: datetime.now(UTC))  # noqa: N815
     modelRunId: UUID  # noqa: N815
     modelId: UUID  # noqa: N815
     metrics: list[MetricResult]
@@ -113,7 +112,7 @@ class ModelRunFailed(BaseModel):
 
     messageId: UUID = Field(default_factory=uuid4)  # noqa: N815
     correlationId: UUID  # noqa: N815
-    occurredAtUtc: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))  # noqa: N815
+    occurredAtUtc: datetime = Field(default_factory=lambda: datetime.now(UTC))  # noqa: N815
     modelRunId: UUID  # noqa: N815
     modelId: UUID  # noqa: N815
     errorMessage: str  # noqa: N815

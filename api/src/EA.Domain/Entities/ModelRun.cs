@@ -36,7 +36,7 @@ public class ModelRun
     public string? ErrorMessage { get; set; }
 
     /// <summary>
-    /// Gets or sets the Entra object identifier of the user who requested the run.
+    /// Gets or sets the normalized subject identifier of the user who requested the run.
     /// Nullable because some runs may be triggered by the data engine itself
     /// rather than by an interactive user.
     /// </summary>

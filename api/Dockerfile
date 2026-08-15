@@ -11,6 +11,9 @@ RUN dotnet publish src/EA.Api/EA.Api.csproj -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app .
 # Seed data bundled for SeedHostedService (Seeding:Enabled=true); resolved via
 # Path.Combine(AppContext.BaseDirectory, "seed") in SeedHostedService.DefaultSeedPath.

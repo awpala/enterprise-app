@@ -23,7 +23,9 @@ _DISTRIBUTION_GENERATORS: dict[str, Any] = {
         size=n,
     ),
     "exponential": lambda rng, n, p: rng.exponential(scale=max(p.get("stdDev", 1.0), 1e-9), size=n),
-    "lognormal": lambda rng, n, p: rng.lognormal(mean=p.get("mean", 0.0), sigma=max(p.get("stdDev", 1.0), 1e-9), size=n),
+    "lognormal": lambda rng, n, p: rng.lognormal(
+        mean=p.get("mean", 0.0), sigma=max(p.get("stdDev", 1.0), 1e-9), size=n
+    ),
 }
 
 

@@ -17,7 +17,7 @@ public class AuditRepository(AppDbContext dbContext) : IAuditRepository
         int pageSize,
         string? entityType = null,
         Guid? entityId = null,
-        Guid? actorOid = null,
+        Guid? actorSubjectId = null,
         CancellationToken cancellationToken = default)
     {
         var query = dbContext.AuditEvents.AsNoTracking().AsQueryable();
@@ -28,8 +28,8 @@ public class AuditRepository(AppDbContext dbContext) : IAuditRepository
         if (entityId.HasValue)
             query = query.Where(e => e.EntityId == entityId.Value);
 
-        if (actorOid.HasValue)
-            query = query.Where(e => e.ActorOid == actorOid.Value);
+        if (actorSubjectId.HasValue)
+            query = query.Where(e => e.ActorSubjectId == actorSubjectId.Value);
 
         var totalCount = await query.CountAsync(cancellationToken);
 

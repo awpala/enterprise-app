@@ -303,9 +303,8 @@ public class ModelFacade(
             ErrorMessage = isUnsupportedDistribution
                 ? $"Unsupported or missing distribution '{distribution ?? "(none)"}'. Supported distributions: {string.Join(", ", SupportedDistributions.Order())}."
                 : null
-            // RequestedBy / RequestedByName are filled by AuditStampingInterceptor
-            // from ICurrentUser. Data-engine-originated runs (future) will set
-            // these explicitly and the interceptor leaves them alone.
+            // RequestedBy and RequestedByName are filled from ICurrentUser by
+            // AuditStampingInterceptor for authenticated HTTP requests.
         };
 
         if (isUnsupportedDistribution)

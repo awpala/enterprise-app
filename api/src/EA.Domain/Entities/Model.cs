@@ -33,13 +33,13 @@ public class Model : ICreatedAuditable, IUpdatedAuditable
     /// <summary>Gets or sets the UTC timestamp when the model was last updated.</summary>
     public DateTime UpdatedAtUtc { get; set; }
 
-    /// <summary>Gets or sets the Entra object identifier of the user who created the model.</summary>
+    /// <summary>Gets or sets the normalized subject identifier of the user who created the model.</summary>
     public Guid CreatedBy { get; set; }
 
     /// <summary>Gets or sets the display name of the user who created the model, captured at creation time.</summary>
     public string? CreatedByName { get; set; }
 
-    /// <summary>Gets or sets the Entra object identifier of the user who last updated the model.</summary>
+    /// <summary>Gets or sets the normalized subject identifier of the user who last updated the model.</summary>
     public Guid? UpdatedBy { get; set; }
 
     /// <summary>Gets or sets the display name of the user who last updated the model, captured at update time.</summary>

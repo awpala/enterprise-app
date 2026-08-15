@@ -1,7 +1,7 @@
 """Tests for message parsing and consumer logic."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from data_engine.models.messages import (
@@ -18,7 +18,7 @@ class TestMassTransitEnvelopeParsing:
         payload = ModelRunRequested(
             messageId=uuid4(),
             correlationId=uuid4(),
-            occurredAtUtc=datetime.now(timezone.utc),
+            occurredAtUtc=datetime.now(UTC),
             modelId=uuid4(),
             modelRunId=uuid4(),
             modelName="Test Model",
@@ -49,7 +49,7 @@ class TestMassTransitEnvelopeParsing:
         message = {
             "messageId": str(uuid4()),
             "correlationId": str(uuid4()),
-            "occurredAtUtc": datetime.now(timezone.utc).isoformat(),
+            "occurredAtUtc": datetime.now(UTC).isoformat(),
             "modelId": str(uuid4()),
             "modelRunId": str(uuid4()),
             "modelName": "Default Params",
@@ -75,7 +75,7 @@ class TestModelRunRequestedModel:
         original = ModelRunRequested(
             messageId=uuid4(),
             correlationId=uuid4(),
-            occurredAtUtc=datetime.now(timezone.utc),
+            occurredAtUtc=datetime.now(UTC),
             modelId=uuid4(),
             modelRunId=uuid4(),
             modelName="Round Trip",

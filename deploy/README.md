@@ -1,28 +1,30 @@
 # deploy — Local Docker Compose Stack
 
-Everything needed to run the full system on a developer workstation: UI, API, data engine, PostgreSQL, and RabbitMQ. The layout deliberately mirrors the cloud topology (Container Apps + managed Postgres) so "works locally" is a meaningful signal.
+Everything needed to run the full system on a developer workstation: UI, API, data engine, PostgreSQL, and RabbitMQ. The layout mirrors the shared application topology used by both cloud targets.
+
+This workflow is for a Docker-capable host. The `ea-dev-env` devcontainer intentionally has no Docker daemon; use `run-api`, `run-data-engine`, and `run-ui` there instead.
 
 ## Files
 
 | File | Role |
 |---|---|
-| `compose.yaml` | Prod-parity baseline — uses each service's real Dockerfile, real nginx for UI. |
-| `compose.override.yaml` | Dev conveniences — hot reload (API source mount, `ng serve` with proxy), node image swap for UI, debug-friendly envs. Automatically merged by Compose v2 when present. |
+| `compose.yaml` | Production-parity baseline using each service's real Dockerfile. |
+| `compose.override.yaml` | Dev conveniences, including the Next.js development server and source mount. |
 
-The split lets CI smoke-test the same image recipe used in production (`compose.yaml` alone), while day-to-day dev enjoys hot reload (both files merged).
+The split lets the baseline use the same image recipes as production (`compose.yaml` alone), while the merged development configuration runs the UI with hot reload.
 
 ## Local Topology
 
 ```mermaid
 flowchart LR
-    dev([Developer]) -->|4200| ui[ea-ui<br/>nginx or ng serve]
+    dev([Developer]) -->|3000| ui[ea-ui<br/>Next.js]
     dev -->|8000| api[ea-api<br/>ASP.NET Core]
     dev -->|15672| mqui[RabbitMQ Mgmt UI]
     dev -->|5432| pg[(ea-db<br/>postgres:16)]
-    ui -.proxy /api.-> api
+    ui -->|Bearer HTTP| api
     api -->|EF Core| pg
-    api -->|AMQP 5672| mq[[ea-rabbitmq<br/>rabbitmq:4-management]]
-    de[ea-data-engine<br/>Python] -->|AMQP 5672| mq
+    api <-->|publish requests<br/>consume lifecycle events| mq[[ea-rabbitmq<br/>rabbitmq:4-management]]
+    mq <-->|consume requests<br/>publish lifecycle events| de[ea-data-engine<br/>Python]
     mq -.admin.-> mqui
 ```
 
@@ -30,7 +32,7 @@ flowchart LR
 
 | Service | Host Port | Container Port | Credentials |
 |---|---|---|---|
-| UI | 4200 | 80 (prod image) / 4200 (dev override) | — |
+| UI | 3000 | 3000 | — |
 | API | 8000 | 8000 | Bearer token (dev auth handler in Development) |
 | Data Engine | — (no inbound) | — | — |
 | RabbitMQ AMQP | 5672 | 5672 | `guest` / `guest` |
@@ -42,23 +44,26 @@ Health checks gate startup: the API waits for `ea-db` and `ea-rabbitmq` to repor
 ## Common Commands
 
 ```bash
-# Build and start everything (foreground, logs streamed)
+# Baseline images only (foreground, logs streamed)
 docker compose -f deploy/compose.yaml up --build
 
-# Detached
-docker compose -f deploy/compose.yaml up --build -d
+# Development override, including UI hot reload
+docker compose -f deploy/compose.yaml -f deploy/compose.override.yaml up --build
+
+# From deploy/, Compose discovers compose.yaml and compose.override.yaml
+(cd deploy && docker compose up --build)
 
 # Tail logs for one service
-docker compose -f deploy/compose.yaml logs -f ea-api
+docker compose -f deploy/compose.yaml -f deploy/compose.override.yaml logs -f ea-api
 
 # Reset DB and broker state (destroys volumes)
-docker compose -f deploy/compose.yaml down -v
+docker compose -f deploy/compose.yaml -f deploy/compose.override.yaml down -v
 
 # Rebuild one service only
-docker compose -f deploy/compose.yaml up --build ea-data-engine
+docker compose -f deploy/compose.yaml -f deploy/compose.override.yaml up --build ea-data-engine
 ```
 
-Compose v2 picks up `compose.override.yaml` automatically when running from the repo root or `deploy/`.
+Compose discovers `compose.override.yaml` automatically when invoked from `deploy/` without `-f`. From the repository root, pass both files explicitly as shown above.
 
 ## Volumes
 
@@ -66,7 +71,7 @@ Compose v2 picks up `compose.override.yaml` automatically when running from the 
 |---|---|---|
 | `ea-db-data` | PostgreSQL data directory | `docker compose ... down -v` |
 | `ea-rabbitmq-data` | RabbitMQ definitions + mnesia | `docker compose ... down -v` |
-| `ui-node-modules` (override only) | Cached `node_modules` for `ng serve` | `docker volume rm enterprise-app_ui-node-modules` |
+| `ui-node-modules` (override only) | Cached `node_modules` for `next dev` | `docker volume rm enterprise-app_ui-node-modules` |
 
 ## Gotchas
 

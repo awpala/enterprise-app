@@ -1,161 +1,197 @@
 # Enterprise App
 
-A Docker-first, event-driven enterprise demo application organized around a generic "model" domain. The system showcases enterprise-grade patterns end to end: SSO with Microsoft Entra ID, async job processing over RabbitMQ, first-class observability, EF Core migrations, and a repeatable Terraform-driven deployment to Azure Container Apps and Static Web Apps.
+An event-driven model-management application built as four portable containers: a Next.js 16 UI, an ASP.NET Core .NET 10 API, a Python data engine, and an EF Core migration workload. PostgreSQL is the system of record, RabbitMQ carries asynchronous run commands and lifecycle events, and the same application artifacts deploy to Azure or AWS through peer Terraform implementations.
 
-See [`CLAUDE.md`](./CLAUDE.md) for the authoritative stack versions, conventions, and deployment pipeline reference.
+The project demonstrates the full operational path around a compact CRUD domain: federated SSO, authenticated API access, asynchronous messaging, numerical background work, audit attribution, health probes, OpenTelemetry, infrastructure as code, and push-driven delivery.
 
-## Service Topology
-
-```mermaid
-flowchart LR
-    user([User]) -->|HTTPS + Bearer| ui[Angular 20 SPA]
-    ui -->|/api/v1/*| api[ASP.NET Core .NET 10 API]
-    api -->|EF Core / Npgsql| db[(PostgreSQL 16)]
-    api -->|MassTransit publish| mq{{RabbitMQ 4}}
-    mq -->|pika consume| de[Python 3 Data Engine]
-    de -->|pika publish| mq
-    mq -->|MassTransit consume| api
-```
-
-## Azure Target Mapping
+## Architecture
 
 ```mermaid
 flowchart LR
-    swa[Static Web Apps<br/>UI] --> capi[Container Apps<br/>API]
-    capi --> pg[(PostgreSQL<br/>Flexible Server)]
-    capi --> crmq[Container Apps<br/>RabbitMQ]
-    crmq --> cde[Container Apps<br/>Data Engine]
-    capi -.secrets.-> kv[[Key Vault]]
-    capi -.logs/traces.-> law[(Log Analytics)]
-    capi -.telemetry.-> ai[[App Insights]]
-    acr[(Container Registry)] -.images.-> capi
-    acr -.images.-> crmq
-    acr -.images.-> cde
-    job[Container Apps Job<br/>EF Migrations] --> pg
-    acr -.image.-> job
+    person([User])
+    google[Google]
+    microsoft[Microsoft / Outlook]
+
+    subgraph platform[Selected cloud deployment]
+        direction LR
+        identity[OIDC adapter<br/>Entra External ID or Cognito]
+        edge[Provider-managed HTTPS ingress]
+        ui[Next.js UI<br/>ea-ui :3000]
+        api[ASP.NET Core API<br/>ea-api :8000]
+        db[(PostgreSQL 16<br/>system of record)]
+        broker{{RabbitMQ 4<br/>durable messaging}}
+        worker[Python data engine<br/>stateless worker]
+        telemetry[OpenTelemetry adapter<br/>Azure Monitor or ADOT]
+    end
+
+    person -->|HTTPS| edge
+    google -->|federated identity| identity
+    microsoft -->|federated identity| identity
+    ui <-->|Authorization Code + PKCE| identity
+    edge --> ui
+    ui -->|Bearer-authenticated /api/v1| api
+    api <-->|EF Core transactions| db
+    api -->|model.run.requested.v1| broker
+    broker -->|consume command| worker
+    worker -->|model.run.started.v1<br/>completed.v1 or failed.v1| broker
+    broker -->|lifecycle consumers| api
+    api -. traces, metrics, logs .-> telemetry
+    worker -. traces, metrics, logs .-> telemetry
+    ui -. server telemetry .-> telemetry
+
+    cicd[GitHub Actions<br/>OIDC federation] -->|Terraform + immutable images| platform
 ```
 
-## Model-Run Sequence
+The API owns persistence and auditing. Requesting a run persists the `ModelRun` before publishing its command. The data engine consumes that command, performs the numerical workflow without direct database access, and publishes lifecycle events that the API reconciles into PostgreSQL with order-safe status updates. JSON Schemas under [`schemas/`](./schemas/) are the cross-language contract source of truth.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as User
-    participant UI as Angular SPA
-    participant API as ASP.NET Core API
-    participant DB as PostgreSQL
-    participant MQ as RabbitMQ
-    participant DE as Data Engine
-    U->>UI: Trigger "run model"
-    UI->>API: POST /api/v1/models/{id}/runs (Bearer)
-    API->>DB: Insert ModelRun (pending) + outbox row (tx)
-    API-->>UI: 202 Accepted (runId)
-    API->>MQ: publish model.run.requested.v1 (outbox dispatch)
-    MQ->>DE: deliver message
-    DE->>DE: numpy/scipy workflow
-    DE->>MQ: publish model.run.started / completed / failed
-    MQ->>API: deliver via MassTransit consumer
-    API->>DB: Update ModelRun status + AuditEvent
-    UI->>API: GET /api/v1/runs/{id} (poll)
-    API-->>UI: Terminal state + metrics
+The inline diagram is mirrored in [`docs/diagrams/application-architecture.mmd`](./docs/diagrams/application-architecture.mmd) for diagram tooling and review.
+
+## Deployment adapters
+
+Application code depends on normalized OIDC, OpenTelemetry, configuration, and messaging contracts. Provider-specific resource behavior stays in its Terraform root.
+
+| Capability | Azure adapter | AWS adapter |
+|---|---|---|
+| HTTPS application entry point | Container Apps generated HTTPS origins | CloudFront generated HTTPS origin |
+| UI, API, worker, broker | Azure Container Apps | ECS on Fargate |
+| Migration workload | Container Apps Job | ECS one-off task |
+| PostgreSQL | Flexible Server | RDS for PostgreSQL |
+| Container images | Azure Container Registry | Elastic Container Registry |
+| Secrets | Key Vault | Secrets Manager |
+| Customer identity | Entra External ID | Cognito user pool |
+| Telemetry backend | Application Insights and Log Analytics | ADOT, CloudWatch, and X-Ray |
+| Terraform state | Azure Blob Storage | Amazon S3 with native locking |
+
+Neither cloud is the default. Terraform state, credentials, modules, and failure domains remain separate under [`infra/azure/`](./infra/azure/) and [`infra/aws/`](./infra/aws/); [`infra/scripts/deploy.sh`](./infra/scripts/deploy.sh) exposes their shared command contract.
+
+## Local development
+
+### Inside `ea-dev-env`
+
+The devcontainer intentionally has no Docker daemon and must not use Docker-in-Docker. PostgreSQL and RabbitMQ are supplied by the enclosing development environment. Open three terminals and run:
+
+```bash
+run-api
+run-data-engine
+run-ui
 ```
 
-## Authentication
+All three processes are required for a complete model-run lifecycle. The UI is available at `http://localhost:3000`, the API at `http://localhost:8000`, and Scalar at `http://localhost:8000/scalar/v1`.
 
-The platform uses **Microsoft Entra ID** for sign-in. Both workforce tenants (standard Entra ID) and customer-facing CIAM (Entra External ID) are supported — the API validates tokens by issuer/audience configured under the `AzureAd` section, so either flavor of tenant is a pure configuration change. MSAL Angular drives the browser side; `Microsoft.Identity.Web` drives the API side.
+Each alias uses the tracked local-service runner and writes timestamped output plus start/exit metadata under ignored `__logs/local/`; `<service>-latest.log` always points to the newest session for that service.
 
-### Sign-in and API call flow
+The aliases are installed in `/root/.bash_aliases` by [`.devcontainer/scripts/setup-env.sh`](./.devcontainer/scripts/setup-env.sh). After setup, open a new terminal or reload them in the current terminal:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as User
-    participant UI as Angular SPA (MSAL)
-    participant EID as Entra ID / External ID
-    participant API as ASP.NET Core API
-    U->>UI: Click "Sign in"
-    UI->>EID: Authorization Code + PKCE (loginRedirect)
-    EID-->>UI: id_token + code -> access_token (api scope)
-    UI->>UI: MSAL caches tokens, AuthService exposes signals
-    U->>UI: Trigger API action
-    UI->>UI: BearerAuthInterceptor acquireTokenSilent (api scope)
-    UI->>API: GET /api/v1/... (Authorization: Bearer)
-    API->>API: JwtBearer validates issuer/audience/signature
-    API->>API: AuditStampingInterceptor reads oid/tid/idp/email
-    API-->>UI: 200 + payload
+```bash
+source /root/.bash_aliases
 ```
 
-### Frontend (Angular + MSAL)
+The aliases invoke [`.devcontainer/scripts/run-local-service.sh`](./.devcontainer/scripts/run-local-service.sh). For normal development, use the aliases. The equivalent direct invocations are:
 
-- MSAL Angular v3 with `PublicClientApplication`, `InteractionType.Redirect`, Authorization Code + PKCE.
-- MSAL config lives in `ui/src/app/auth/msal.config.ts`; `AuthService` (`ui/src/app/auth/auth.service.ts`) projects MSAL state into Angular signals (`isAuthenticated`, `activeAccount`, `displayName`, `idp`).
-- `BearerAuthInterceptor` (`ui/src/app/auth/bearer-auth.interceptor.ts`) attaches an access token via `acquireTokenSilent` for the configured `aadApiScope` on requests to `${apiUrl}/api/`; other URLs pass through untouched. On `InteractionRequiredAuthError` it falls back to `acquireTokenRedirect`.
-- Route protection is handled by `AuthGuard` / `MsalGuard` at the router layer.
+```bash
+.devcontainer/scripts/run-local-service.sh api
+.devcontainer/scripts/run-local-service.sh data-engine
+.devcontainer/scripts/run-local-service.sh ui
+```
 
-### Backend (ASP.NET Core + Microsoft.Identity.Web)
+The runner accepts exactly one of `api`, `data-engine`, or `ui`. It records the UTC start time, process ID, Git revision, working directory, command, application output, received termination signal, and exit code. Each session has a timestamped log and a stable link to its newest log:
 
-- Bearer validation via `AddMicrosoftIdentityWebApi` bound to the `AzureAd` config section (see `api/src/EA.Api/Program.cs`). Issuer, audience, and signing keys are validated; `NameClaimType` is set to `name`.
-- Authorization is **require-authenticated-user** globally: every controller carries `[Authorize]` (`ModelsController`, `RunsController`, `AuditEventsController`), and both `DefaultPolicy` and `FallbackPolicy` require an authenticated principal. Health endpoints (`/health/*`) are `AllowAnonymous`. No per-scope or per-role gating is applied today — add `RequireScope(...)` / `RequireRole(...)` when granular authorization is needed.
-- Entra External ID tenants are configured by pointing `AzureAd:Authority` at the External ID issuer; no code change is required.
+```bash
+tail -f __logs/local/api-latest.log
+tail -f __logs/local/data-engine-latest.log
+tail -f __logs/local/ui-latest.log
+ls -lt __logs/local/
+```
 
-### Dev and demo auth (non-production)
+An exit code of `0` is a clean shutdown, `130` normally means Ctrl+C, and `143` normally means termination. Diagnose any other nonzero code from the preceding output in the same log. A start entry without an exit entry means the runner or its terminal was killed before shutdown could be recorded. Logs remain local under ignored `__logs/`; never copy a populated runtime log into a tracked path.
 
-Two demonstration-user-oriented synthetic-principal handlers let environments bypass Entra without weakening production:
+To restart a service, stop it with Ctrl+C in its terminal, confirm the exit entry in its latest log, and rerun its alias. Verify the application after all three services start:
 
-| Handler | Scheme | Gate flag | Trigger | Intended use |
-|---|---|---|---|---|
-| `DevAuthHandler` | `Dev` | `AzureAd:Enabled=false` **or** `AzureAd:AllowDev=true` | No `Authorization` header | `docker compose` local stack, Playwright E2E ("Log in as Dev"), curl, integration tests |
-| `GuestAuthHandler` | `Guest` | `AzureAd:AllowGuest=true` | No `Authorization` header | Production sales/demo "Log in as Guest" affordance |
+```bash
+curl --fail http://localhost:8000/health/live
+curl --fail http://localhost:8000/health/ready
+curl --fail http://localhost:3000/api/health
+```
 
-When `AllowDev` or `AllowGuest` is on alongside real Entra, a **policy scheme** (`JwtOrDev` / `JwtOrGuest`) is registered as the default: requests with `Authorization: Bearer ...` forward to `JwtBearer`, everything else forwards to the dev/guest handler. Both flags must be **false in production** (except the explicit guest-demo case). Handlers live in `api/src/EA.Api/Auth/`.
+If an alias is missing or dependencies are stale, rerun the idempotent environment setup and reload the aliases:
 
-### Audit identity
+```bash
+bash .devcontainer/scripts/setup-env.sh
+source /root/.bash_aliases
+```
 
-`AuditStampingInterceptor` reads `oid`, `tid`, `idp`, `name`, and email from the authenticated principal (via the request-scoped `ICurrentUser`) and stamps them onto `audit_events` rows and onto outbound RabbitMQ messages via `UserContextPublishFilter<T>` (headers `x-user-oid`, `x-user-tid`, `x-user-idp`, `x-user-name`, `x-user-email`). See `CLAUDE.md › Observability` for the audited event list.
+The setup installs repository dependencies, `rg`, Google Cloud CLI, and the aliases. AWS, Azure, Google Cloud, and GitHub authentication remain explicit user sessions; the runner does not store credentials.
 
-## Services
+### On a Docker-capable host
 
-| Service | Path | Tech | Responsibility | Azure Target |
-|---|---|---|---|---|
-| UI | `ui/` | Angular 20, MSAL, Material, App Insights JS | SPA; Entra auth; model CRUD + run visualization | Static Web Apps |
-| API | `api/` | ASP.NET Core .NET 10, EF Core, MassTransit | System of record; command origination; audit | Container Apps |
-| Data Engine | `data-engine/` | Python 3.11+, pika, Pydantic, numpy, scipy | Async numerical workflows driven by messages | Container Apps |
-| Broker | — | RabbitMQ 4 (management image) | Transport for `model.run.*` routing keys | Container Apps |
-| Database | — | PostgreSQL 16 | Relational store; EF Core migrations | PostgreSQL Flexible Server |
-| Migrations | `api/Dockerfile.migrations` | EF Core bundle | Idempotent schema apply on deploy | Container Apps Job |
+The host-only Compose workflow starts the same services together:
 
-## CI/CD and Azure Mapping
+```bash
+docker compose -f deploy/compose.yaml up --build
+```
 
-| Pipeline stage (see `.github/workflows/`) | Actor | Azure surface touched | Terraform module(s) |
-|---|---|---|---|
-| `ci.yml` — unit tests (every push) | GitHub Actions | none | — |
-| `ci.yml` — integration tests (PRs, main) | Testcontainers on runner | none | — |
-| `deploy.yml` phase 1 — bootstrap | `terraform apply` | Resource Group, ACR | `container-registry/` |
-| `deploy.yml` — selective build | `az acr build` / `az acr import` | Container Registry | `container-registry/` |
-| `deploy.yml` phase 2 — full apply | `terraform apply` | Container Apps, PG, KV, Obs, SWA, Entra External ID | `container-apps/`, `postgres/`, `key-vault/`, `observability/`, `static-web-app/`, `entra-external-id/`, `diagnostics/` |
-| `deploy.yml` — migrations | Container Apps Job | PostgreSQL Flexible Server | `postgres/` |
-| `deploy.yml` — SWA publish | SWA deploy action | Static Web Apps | `static-web-app/` |
-| `deploy.yml` — smoke | `curl /health/ready` | Container Apps | — |
-| `cleanup-acr.yml` (on merge to main) | `az acr repository` | Container Registry | — |
+See [`deploy/README.md`](./deploy/README.md) for ports, local credentials, volumes, and reset behavior.
 
-Image tags: `sha-<sha7>` on `main`, `<branch-slug>-<sha7>` elsewhere.
+## Verification
 
-## Getting Started
+Run the suites independently so the devcontainer does not attempt Docker-backed Testcontainers tests:
 
-- **Local full stack** — see [`deploy/README.md`](./deploy/README.md). One command (`docker compose -f deploy/compose.yaml up --build`) brings up UI, API, data-engine, Postgres, and RabbitMQ.
-- **Cloud deployment** — see `infra/` for the Terraform root and modules. Deployment is CI-driven via `.github/workflows/deploy.yml`.
-- **Devcontainer** — the VS Code devcontainer in `.devcontainer/` provisions all CLIs (dotnet, node, python, terraform, az). Missing tools should be added to `.devcontainer/scripts/setup-env.sh`.
+```bash
+# API unit tests
+dotnet test api/tests/EA.Api.Tests/
 
-## Subproject READMEs
+# Data-engine tests and static checks
+(cd data-engine && .venv/bin/pytest && .venv/bin/ruff check src tests && .venv/bin/pyright)
 
-| Area | README |
+# UI lint, unit tests, and production build
+(cd ui && npm run lint && npm test && npm run build)
+
+# Both Terraform roots and their bootstraps
+infra/scripts/deploy.sh validate azure dev
+infra/scripts/deploy.sh validate aws dev
+terraform -chdir=infra/azure/bootstrap init -backend=false
+terraform -chdir=infra/azure/bootstrap validate
+terraform -chdir=infra/aws/bootstrap init -backend=false
+terraform -chdir=infra/aws/bootstrap validate
+```
+
+API integration tests use Testcontainers and therefore run on a Docker-capable host or in GitHub Actions:
+
+```bash
+dotnet test api/tests/EA.Api.IntegrationTests/
+```
+
+## Authentication contract
+
+The browser uses `oidc-client-ts` with Authorization Code + PKCE. The request-time `/api/runtime-config` route exposes only public deployment values: `AUTH_PROVIDER`, `AUTH_AUTHORITY`, `AUTH_CLIENT_ID`, `AUTH_API_SCOPE`, and the optional logout endpoint. The API validates access tokens through the matching normalized `Authentication:*` settings and maps provider claims into stable subject, tenant/issuer, identity-provider, name, and email values.
+
+Google and Microsoft/Outlook are federated through the selected cloud identity adapter. Synthetic developer and guest sessions are explicit opt-ins for local or approved demo use; they are not substitutes for deployed SSO acceptance.
+
+## Delivery workflow
+
+[`deploy.yml`](./.github/workflows/deploy.yml) is the only cloud-neutral deployment entry point.
+
+- Every non-`main` push that matches deployment paths targets the protected `dev` GitHub Environment.
+- Every matching `main` push targets the protected `production` GitHub Environment.
+- Push deployments require the repository variable `DEPLOYMENT_TARGETS` to be `azure`, `aws`, or `both`.
+- Manual dispatch requires an explicit provider and environment.
+- Documentation-only and unrelated script changes do not trigger a deployment.
+- Provider adapters create the registry, publish four immutable images, apply the full stack, run migrations, smoke-test the normalized API URL, and enforce image retention.
+
+Provider credentials and customer identity secrets live in the logical `dev` and `production` GitHub Environments. They are never committed or exposed by runtime configuration.
+
+## Repository guides
+
+| Area | Guide |
 |---|---|
-| API (ASP.NET Core) | [`api/README.md`](./api/README.md) |
-| UI (Angular) | [`ui/README.md`](./ui/README.md) |
-| Data Engine (Python) | [`data-engine/README.md`](./data-engine/README.md) |
-| Local Stack (Compose) | [`deploy/README.md`](./deploy/README.md) |
-| Documentation Index | [`docs/README.md`](./docs/README.md) |
-
-## Repository Layout
-
-See `CLAUDE.md` for the canonical tree. Top-level folders: `api/`, `ui/`, `data-engine/`, `infra/`, `deploy/`, `schemas/` (JSON Schema message contracts, Draft 2020-12), `docs/`, and `.github/`.
+| Contributor and agent conventions | [`AGENTS.md`](./AGENTS.md) |
+| Documentation map and decisions | [`docs/README.md`](./docs/README.md) |
+| API | [`api/README.md`](./api/README.md) |
+| UI | [`ui/README.md`](./ui/README.md) |
+| Data engine | [`data-engine/README.md`](./data-engine/README.md) |
+| Message contracts | [`schemas/README.md`](./schemas/README.md) |
+| Local Compose | [`deploy/README.md`](./deploy/README.md) |
+| Devcontainer processes and logs | [Local development](#local-development) |
+| Shared infrastructure contract | [`infra/README.md`](./infra/README.md) |
+| Azure implementation | [`infra/azure/README.md`](./infra/azure/README.md) |
+| AWS implementation and onboarding | [`infra/aws/README.md`](./infra/aws/README.md) |

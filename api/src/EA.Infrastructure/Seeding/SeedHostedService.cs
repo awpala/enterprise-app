@@ -8,8 +8,9 @@ using Microsoft.Extensions.Logging;
 namespace EA.Infrastructure.Seeding;
 
 /// <summary>
-/// <see cref="IHostedService"/> that runs <see cref="ModelSeeder"/> exactly once
-/// on application startup, after the DbContext has been migrated.
+/// <see cref="IHostedService"/> that conditionally invokes <see cref="ModelSeeder"/>
+/// once during application startup. The seeder applies migrations before reading
+/// seed files.
 /// </summary>
 public sealed class SeedHostedService(
     IServiceProvider serviceProvider,
@@ -18,10 +19,9 @@ public sealed class SeedHostedService(
 {
     /// <summary>
     /// Default seed root path when <c>Seeding:SeedPath</c> is not configured.
-    /// Resolves to <c>{AppContext.BaseDirectory}/seed</c> so it works both in
-    /// the devcontainer (where the publish output sits under the repo) and in
-    /// the deployed container image (where <c>seed/</c> is copied to
-    /// <c>/app/seed</c> alongside the published assemblies).
+    /// Resolves to <c>{AppContext.BaseDirectory}/seed</c>, matching the deployed
+    /// image layout. Local configuration can override it with the repository's
+    /// seed directory.
     /// </summary>
     public static readonly string DefaultSeedPath = Path.Combine(AppContext.BaseDirectory, "seed");
 

@@ -1,65 +1,52 @@
 ---
 name: scaffold-data-engine-worker
-description: Scaffolds a new RabbitMQ consumer worker in the Python data-engine service, including Pydantic message model, consumer handler, producer helper, and pytest test stubs.
+description: Scaffolds a RabbitMQ lifecycle consumer or producer in the synchronous Python data-engine service with Pydantic contracts, workflow separation, and pytest coverage.
 disable-model-invocation: false
 ---
 
 ## Inputs
 
-- **Message name** (e.g., `AnalysisJobRequested`)
-- **Version** (e.g., `v1`)
+- **Logical contract name** (for example, `model.run.requested.v1`)
+- **MassTransit CLR message type and URN**
 - **Direction** (`consume`, `produce`, or `both`)
-- **Payload properties** (e.g., `job_id: UUID, dataset_id: UUID, parameters: dict | None`)
-- **Workflow description** (brief description of the computation or processing the worker performs)
+- **Payload properties**
+- **Workflow behavior**
 
 ## What It Produces
 
-1. **Pydantic message model** at `data-engine/src/data_engine/models/{message_name_snake}_{version}.py`
-   - Mirrors the JSON Schema in `schemas/`
-   - Includes `message_id`, `correlation_id`, `occurred_at_utc` plus payload fields
-   - Uses `model_validate_json()` for deserialization
-
-2. **Consumer handler** at `data-engine/src/data_engine/consumers/{message_name_snake}_{version}_consumer.py` (if `consume` or `both`)
-   - Async `handle(body: bytes, correlation_id: str) -> None` function
-   - Validates message via Pydantic before processing
-   - Delegates to a workflow function in `workflows/`
-   - Structured log entries at start, completion, and on error
-   - OpenTelemetry span wrapping the handler body
-
-3. **Workflow module** at `data-engine/src/data_engine/workflows/{message_name_snake}_{version}_workflow.py`
-   - Pure computation / processing function, no I/O side-effects
-   - Type-annotated inputs and output
-   - Docstring describing what the workflow computes
-
-4. **Producer helper** at `data-engine/src/data_engine/producers/{result_message_name_snake}_{version}_producer.py` (if `produce` or `both`)
-   - `async def publish(channel, payload, correlation_id: str) -> None`
-   - Sets routing key, content-type `application/json`, and propagates trace headers
-   - Derives result message name from convention: `{Entity}Job{Action}` → result is `{Entity}JobCompleted`
-
-5. **Consumer registration** — snippet to wire the new consumer into `data-engine/src/data_engine/main.py`
-
-6. **Unit test stubs** at `data-engine/tests/unit/test_{message_name_snake}_{version}_consumer.py`
-   - One test for the happy path (valid message, expected workflow call)
-   - One test for validation failure (malformed body raises `ValidationError`)
-   - One test for idempotency (duplicate `messageId` is handled gracefully)
+1. **Pydantic message model** in `data-engine/src/data_engine/models/messages.py` that mirrors the corresponding schema under `schemas/`.
+2. **Transport constants** in `data-engine/src/data_engine/topology.py` for the MassTransit fanout exchange, message URN, and consumer queue.
+3. **Consumer behavior** under `data-engine/src/data_engine/consumers/` when consuming:
+   - validates the MassTransit envelope and payload with Pydantic;
+   - delegates numerical work to `workflows/`;
+   - uses explicit acknowledgment and bounded prefetch;
+   - logs message, correlation, model, and run identifiers;
+   - publishes a failure lifecycle event when a validated run cannot complete.
+4. **Producer behavior** under `data-engine/src/data_engine/producers/` when producing:
+   - emits a MassTransit-compatible JSON envelope;
+   - sets the matching message URN;
+   - propagates the workflow correlation ID and trace headers;
+   - preserves the versioned schema contract.
+5. **Pure workflow code** under `data-engine/src/data_engine/workflows/`, with no RabbitMQ or database access.
+6. **pytest coverage** under `data-engine/tests/` for valid processing, validation failure, workflow failure, and message acknowledgment behavior.
 
 ## Conventions Applied
 
-- Routing key format: `{domain}.{entity}.{action}.{version}` in lowercase dotted notation
-  - e.g., `analysis.job.requested.v1` → result `analysis.job.completed.v1`
-- All message models use snake_case field names with Pydantic `model_config = ConfigDict(populate_by_name=True)`
-- `message_id` is `UUID` (validated as uuid4)
-- `occurred_at_utc` is `datetime` with `timezone=True` enforced via Pydantic validator
-- Consumer must ack after successful processing; nack (without requeue) on `ValidationError`; nack (with requeue) on transient errors
-- Span name convention: `data-engine.{domain}.{action}` (e.g., `data-engine.analysis.process`)
-- `correlation_id` is extracted from the AMQP message property and attached to all log records and the OTel span
+- Logical contract names use `{domain}.{entity}.{action}.{version}`, such as `model.run.completed.v1`.
+- RabbitMQ transport uses the existing MassTransit CLR-type fanout exchange pattern; do not invent routing-key dispatch alongside it.
+- Every message carries `messageId`, `correlationId`, and `occurredAtUtc` plus its domain payload.
+- Field names stay wire-compatible with the JSON Schemas and .NET records.
+- The data engine remains stateless and never accesses PostgreSQL directly.
+- OpenTelemetry context is propagated across message headers.
+- Use Python 3.11+ typing, standard `logging`, pika, and Pydantic v2; do not convert the service to an unrelated async framework as part of scaffolding.
 
-## Output Checklist
+## Verification
 
-Before finalising, verify:
-- [ ] Pydantic model field names and types match the JSON Schema in `schemas/`
-- [ ] Consumer properly validates before processing (no raw `json.loads` without validation)
-- [ ] Workflow is tested independently from the consumer (pure function, no RabbitMQ dependency)
-- [ ] Producer sets `correlation_id` AMQP property and propagates W3C trace headers
-- [ ] All new modules are importable (no circular imports)
-- [ ] `pyproject.toml` updated if a new third-party dependency was introduced
+```bash
+cd data-engine
+.venv/bin/pytest
+.venv/bin/ruff check src tests
+.venv/bin/pyright
+```
+
+Do not invoke Docker inside `ea-dev-env`. Cross-service Testcontainers coverage runs on a Docker-capable host or in GitHub Actions.

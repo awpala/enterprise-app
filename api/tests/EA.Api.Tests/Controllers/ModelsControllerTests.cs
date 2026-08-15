@@ -144,7 +144,7 @@ public class ModelsControllerTests
             Name = "New",
             Status = ModelStatus.Draft,
             Version = 1,
-            CreatedBy = _currentUser.Oid!.Value,
+            CreatedBy = _currentUser.SubjectId!.Value,
             CreatedByName = _currentUser.Name,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -155,7 +155,7 @@ public class ModelsControllerTests
                 "New",
                 null,
                 null,
-                _currentUser.Oid!.Value,
+                _currentUser.SubjectId!.Value,
                 _currentUser.Name,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(createdModel);
@@ -169,7 +169,7 @@ public class ModelsControllerTests
                 "New",
                 null,
                 null,
-                _currentUser.Oid!.Value,
+                _currentUser.SubjectId!.Value,
                 _currentUser.Name,
                 It.IsAny<CancellationToken>()),
             Times.Once);

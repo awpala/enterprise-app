@@ -5,8 +5,8 @@
 # Behavior:
 # - Single purpose: stop/delete high-cost services in target env(s) and retain
 #   resource groups and non-billing resources (CIAM, Key Vault metadata).
-# - Usage: ./az-teardown.sh --env both
-#   If --env is omitted, defaults to both.
+# - Requires AZURE_DEV_RESOURCE_GROUP and AZURE_PRODUCTION_RESOURCE_GROUP from
+#   an ignored operator configuration. It always targets both configured groups.
 
 set -euo pipefail
 
@@ -21,7 +21,9 @@ log_warn()    { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
 log_success() { echo -e "${GREEN}[OK]${RESET}    $*"; }
 log_step()    { echo -e "\n${BOLD}==> $*${RESET}"; }
 
-declare -A RG=( [dev]=ea-dev-rg [prod]=ea-prod-rg )
+: "${AZURE_DEV_RESOURCE_GROUP:?Set AZURE_DEV_RESOURCE_GROUP from the approved operator configuration.}"
+: "${AZURE_PRODUCTION_RESOURCE_GROUP:?Set AZURE_PRODUCTION_RESOURCE_GROUP from the approved operator configuration.}"
+declare -A RG=( [dev]="$AZURE_DEV_RESOURCE_GROUP" [prod]="$AZURE_PRODUCTION_RESOURCE_GROUP" )
 
 strip_costs_env() {
   local rg="$1"

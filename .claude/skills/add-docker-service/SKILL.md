@@ -7,7 +7,7 @@ disable-model-invocation: true
 ## Inputs
 
 - **Service name** (e.g., `api`, `worker`, `ui`)
-- **Technology** (e.g., `.NET 10`, `Angular 20`, `Python 3.12`)
+- **Technology** (e.g., `.NET 10`, `Next.js 16`, `Python 3.12`)
 - **Exposed ports** (e.g., `8000`)
 - **Dependencies** (e.g., `postgres`, `rabbitmq`)
 
@@ -24,9 +24,9 @@ disable-model-invocation: true
 - Build: `mcr.microsoft.com/dotnet/sdk:10.0` → `dotnet restore` → `dotnet publish`
 - Runtime: `mcr.microsoft.com/dotnet/aspnet:10.0`, non-root user, port 8000
 
-### Angular 20
+### Next.js 16
 - Build: `node:22` → `npm ci` → `npm run build`
-- Runtime: `nginx:alpine`, copy `dist/` to `/usr/share/nginx/html`
+- Runtime: `node:22-alpine`, copy standalone output, run as non-root on port 3000
 
 ### Python
 - Runtime: `python:3.12-slim`, non-root user, `pip install --no-cache-dir`
@@ -40,3 +40,4 @@ disable-model-invocation: true
 - `ENV PYTHONUNBUFFERED=1` for Python services
 - Compose: use `depends_on` for startup ordering, named volumes for data persistence
 - Compose environment variables use same keys as production (different values)
+- Do not run Docker inside `ea-dev-env`; validate container builds in CI or on a Docker-capable host.

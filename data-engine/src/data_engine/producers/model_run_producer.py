@@ -6,7 +6,6 @@ corresponding message-type exchanges.
 
 import json
 import logging
-from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 import pika

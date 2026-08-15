@@ -6,24 +6,23 @@ disable-model-invocation: false
 
 ## Inputs
 
-- **Message name** (e.g., `AnalysisJobRequested`)
+- **Message name** (for example, `ModelRunRequested`)
 - **Version** (e.g., `v1`)
 - **Type** (`command` or `event`)
-- **Payload properties** (e.g., `JobId: Guid, DatasetId: Guid, Parameters: object?`)
+- **Payload properties** (for example, `ModelRunId: Guid`, `ModelId: Guid`, and lifecycle-specific data)
 
 ## What It Produces
 
-1. **JSON Schema** at `schemas/{message.name.dotted}.{version}.json` — Draft 2020-12, includes `messageId`, `correlationId`, `occurredAtUtc` plus payload
-2. **C# record** in `api/src/Demo.Contracts/Messages/{MessageName}{Version}.cs`
-3. **MassTransit consumer** (if event/command is consumed by API) in `api/src/Demo.Infrastructure/Consumers/{MessageName}{Version}Consumer.cs`
-4. **Consumer registration** added to MassTransit config in `Program.cs`
-5. **Receive endpoint** with retry policy and in-memory outbox
+1. **JSON Schema** at `schemas/{message-name-kebab}.{version}.schema.json` — Draft 2020-12, includes `messageId`, `correlationId`, `occurredAtUtc` plus payload
+2. **C# record** in `api/src/EA.Contracts/Messages/{MessageName}.cs`
+3. **API consumer**, when the API consumes the event, in `api/src/EA.Infrastructure/Consumers/{MessageName}Consumer.cs`
+4. **Python model, topology constants, and handler changes**, when the data engine consumes or produces the contract
+5. **Transport wiring** synchronized between `Program.cs` and `data-engine/src/data_engine/topology.py`
 
 ## Conventions Applied
 
-- Routing key: `{domain}.{entity}.{action}.{version}` in lowercase dotted format
+- Logical contract key: `{domain}.{entity}.{action}.{version}` in lowercase dotted format; the current MassTransit/pika bridge transports CLR-type fanout exchanges.
 - All messages include `MessageId` (Guid), `CorrelationId` (Guid), `OccurredAtUtc` (DateTimeOffset)
-- Consumer must be idempotent (check for duplicate `MessageId`)
-- Use `UseMessageRetry(r => r.Interval(3, TimeSpan.FromSeconds(5)))` by default
-- Use `UseInMemoryOutbox()` on receive endpoints
+- Consumer state transitions must tolerate duplicate and out-of-order lifecycle delivery.
+- Configure retry and outbox behavior explicitly when the handler's side effects require them; do not document nonexistent middleware as already wired.
 - JSON Schema and C# record must stay in sync — validate in contract tests

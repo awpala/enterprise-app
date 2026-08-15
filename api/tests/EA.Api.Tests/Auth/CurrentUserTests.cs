@@ -8,10 +8,7 @@ using NUnit.Framework;
 namespace EA.Api.Tests.Auth;
 
 /// <summary>
-/// Claim-parsing tests for <see cref="CurrentUser"/>. Exercises the External ID
-/// claim shapes — including the <c>idp</c>-absent local-account path — that
-/// Phase 2A documented as the <see cref="Domain.Interfaces.ICurrentUser.Idp"/>
-/// fallback contract.
+/// Claim-parsing tests for the provider-neutral <see cref="CurrentUser"/> adapter.
 /// </summary>
 [TestFixture]
 public class CurrentUserTests
@@ -27,11 +24,11 @@ public class CurrentUserTests
 
         var sut = BuildSut(principal);
 
-        sut.Idp.Should().Be("email");
+        sut.IdentityProvider.Should().Be("email");
     }
 
     [Test]
-    public void Oid_ParsesGuidFromClaim()
+    public void SubjectId_PreservesGuidFromEntraObjectClaim()
     {
         var expected = Guid.NewGuid();
         var principal = BuildPrincipal(
@@ -40,7 +37,38 @@ public class CurrentUserTests
 
         var sut = BuildSut(principal);
 
-        sut.Oid.Should().Be(expected);
+        sut.SubjectId.Should().Be(expected);
+    }
+
+    [Test]
+    public void CognitoClaims_MapToStableSubjectTenantAndProvider()
+    {
+        var principal = BuildPrincipal(
+            isAuthenticated: true,
+            new Claim("sub", "cognito-subject-123"),
+            new Claim("iss", "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_example"),
+            new Claim("cognito:username", "native-user"));
+
+        var first = BuildSut(principal);
+        var second = BuildSut(principal);
+
+        first.SubjectId.Should().NotBeNull();
+        first.SubjectId.Should().Be(second.SubjectId);
+        first.TenantId.Should().NotBeNull();
+        first.IdentityProvider.Should().Be("cognito");
+        first.Name.Should().Be("native-user");
+    }
+
+    [Test]
+    public void CognitoFederatedUsername_IdentifiesUpstreamProvider()
+    {
+        var principal = BuildPrincipal(
+            isAuthenticated: true,
+            new Claim("sub", "federated-subject"),
+            new Claim("iss", "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_example"),
+            new Claim("cognito:username", "Google_123456"));
+
+        BuildSut(principal).IdentityProvider.Should().Be("Google");
     }
 
     [Test]

@@ -5,17 +5,15 @@ namespace EA.Infrastructure.Messaging;
 
 /// <summary>
 /// MassTransit send/publish filter that stamps the current authenticated user's
-/// identity onto every outbound message as transport headers. Downstream
-/// consumers (including the Python data engine) read these headers to attribute
-/// a command back to the originating HTTP caller without expanding the message
-/// body contract.
+/// identity onto every outbound message as transport headers. This makes caller
+/// context available to downstream consumers without expanding the message body
+/// contract; consumers opt in to reading the headers they need.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Registered as an open generic against <see cref="SendContext{T}"/> — MassTransit v8
-/// dispatches the typed variant for both <c>Publish</c> and <c>Send</c> pipelines
-/// when wired via <c>ConfigureSend</c> / <c>ConfigurePublish</c> with
-/// <c>UseSendFilter(typeof(UserContextPublishFilter&lt;&gt;), context)</c>.
+/// <c>Program.cs</c> registers the open generic with both
+/// <c>UseSendFilter</c> and <c>UsePublishFilter</c>, matching the two filter
+/// interfaces implemented by this type.
 /// </para>
 /// <para>
 /// The filter depends on the request-scoped <see cref="ICurrentUser"/>; MassTransit
@@ -34,19 +32,19 @@ public sealed class UserContextPublishFilter<T>(ICurrentUser currentUser)
     where T : class
 {
     /// <summary>
-    /// Header name carrying the Entra object identifier of the caller.
+    /// Header name carrying the normalized OIDC subject identifier of the caller.
     /// </summary>
-    public const string UserOidHeader = "x-user-oid";
+    public const string UserSubjectHeader = "x-user-subject";
 
     /// <summary>
-    /// Header name carrying the Entra tenant identifier of the caller.
+    /// Header name carrying the normalized tenant or issuer identifier of the caller.
     /// </summary>
-    public const string UserTidHeader = "x-user-tid";
+    public const string UserTenantHeader = "x-user-tenant";
 
     /// <summary>
     /// Header name carrying the upstream identity provider of the caller.
     /// </summary>
-    public const string UserIdpHeader = "x-user-idp";
+    public const string UserIdentityProviderHeader = "x-user-identity-provider";
 
     /// <summary>
     /// Header name carrying the caller's display name.
@@ -82,19 +80,19 @@ public sealed class UserContextPublishFilter<T>(ICurrentUser currentUser)
             return;
         }
 
-        if (currentUser.Oid is { } oid)
+        if (currentUser.SubjectId is { } oid)
         {
-            context.Headers.Set(UserOidHeader, oid.ToString());
+            context.Headers.Set(UserSubjectHeader, oid.ToString());
         }
 
-        if (currentUser.Tid is { } tid)
+        if (currentUser.TenantId is { } tid)
         {
-            context.Headers.Set(UserTidHeader, tid.ToString());
+            context.Headers.Set(UserTenantHeader, tid.ToString());
         }
 
-        if (!string.IsNullOrEmpty(currentUser.Idp))
+        if (!string.IsNullOrEmpty(currentUser.IdentityProvider))
         {
-            context.Headers.Set(UserIdpHeader, currentUser.Idp);
+            context.Headers.Set(UserIdentityProviderHeader, currentUser.IdentityProvider);
         }
 
         if (!string.IsNullOrEmpty(currentUser.Name))

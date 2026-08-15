@@ -14,7 +14,9 @@ dependencies = [
     "numpy>=2.0,<3",
     "scipy>=1.14,<2",
     "azure-monitor-opentelemetry>=1.6,<2",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.27,<2",
     "opentelemetry-instrumentation-pika>=0.48b0",
+    "opentelemetry-sdk>=1.27,<2",
 ]
 
 [project.optional-dependencies]

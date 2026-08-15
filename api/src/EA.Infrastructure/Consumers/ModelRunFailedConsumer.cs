@@ -22,19 +22,16 @@ public class ModelRunFailedConsumer(
             "Received ModelRunFailed for run {ModelRunId}, model {ModelId} (MessageId: {MessageId}, CorrelationId: {CorrelationId})",
             message.ModelRunId, message.ModelId, message.MessageId, message.CorrelationId);
 
-        var run = await repository.GetModelRunByIdAsync(message.ModelRunId, context.CancellationToken);
-        if (run is null)
+        var updated = await repository.MarkModelRunFailedAsync(
+            message.ModelRunId,
+            message.OccurredAtUtc,
+            message.ErrorMessage,
+            context.CancellationToken);
+        if (!updated)
         {
             logger.LogWarning("Model run {ModelRunId} not found, skipping", message.ModelRunId);
             return;
         }
-
-        run.Status = ModelRunStatus.Failed;
-        run.CompletedAtUtc = message.OccurredAtUtc;
-        run.ErrorMessage = message.ErrorMessage;
-
-        await repository.UpdateModelRunAsync(run, context.CancellationToken);
-        await repository.SaveChangesAsync(context.CancellationToken);
 
         logger.LogWarning("Model run {ModelRunId} failed: {ErrorMessage}",
             message.ModelRunId, message.ErrorMessage);

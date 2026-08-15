@@ -1,4 +1,7 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using EA.Domain.Interfaces;
 using Microsoft.AspNetCore.Http;
 
@@ -6,9 +9,8 @@ namespace EA.Api.Auth;
 
 /// <summary>
 /// <see cref="IHttpContextAccessor"/>-backed implementation of <see cref="ICurrentUser"/>.
-/// Parses Entra External ID claim shapes, including the <c>emails</c> array emitted
-/// on ID tokens for local (email-OTP) accounts, and defaults <c>Idp</c> to
-/// <c>"email"</c> when the <c>idp</c> claim is absent.
+/// Normalizes Entra External ID, Cognito, and standard OIDC claim shapes into
+/// the provider-neutral <see cref="ICurrentUser"/> contract.
 /// </summary>
 public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
 {
@@ -18,29 +20,35 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
     private ClaimsPrincipal? Principal => httpContextAccessor.HttpContext?.User;
 
     /// <inheritdoc />
-    public Guid? Oid
+    public Guid? SubjectId
     {
         get
         {
             var raw = Principal?.FindFirst(OidClaimType)?.Value
-                      ?? Principal?.FindFirst("oid")?.Value;
-            return Guid.TryParse(raw, out var parsed) ? parsed : null;
+                      ?? Principal?.FindFirst("oid")?.Value
+                      ?? Principal?.FindFirst("sub")?.Value;
+            var issuer = Principal?.FindFirst("iss")?.Value ?? string.Empty;
+            return ToStableGuid(string.IsNullOrWhiteSpace(raw) ? null : $"{issuer}|{raw}", raw);
         }
     }
 
     /// <inheritdoc />
-    public Guid? Tid
+    public Guid? TenantId
     {
         get
         {
             var raw = Principal?.FindFirst(TidClaimType)?.Value
                       ?? Principal?.FindFirst("tid")?.Value;
-            return Guid.TryParse(raw, out var parsed) ? parsed : null;
+            if (!string.IsNullOrWhiteSpace(raw) && Guid.TryParse(raw, out var parsed))
+                return parsed;
+
+            var issuer = Principal?.FindFirst("iss")?.Value;
+            return ToStableGuid(issuer, issuer);
         }
     }
 
     /// <inheritdoc />
-    public string? Idp
+    public string? IdentityProvider
     {
         get
         {
@@ -51,8 +59,39 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
             if (!string.IsNullOrWhiteSpace(idp))
                 return idp;
 
-            // No idp claim is emitted for local email-OTP accounts in External ID.
-            // Only default to "email" when the principal is actually authenticated.
+            var identities = Principal.FindFirst("identities")?.Value;
+            if (!string.IsNullOrWhiteSpace(identities))
+            {
+                try
+                {
+                    using var document = JsonDocument.Parse(identities);
+                    var first = document.RootElement.ValueKind == JsonValueKind.Array
+                        ? document.RootElement.EnumerateArray().FirstOrDefault()
+                        : default;
+                    if (first.ValueKind == JsonValueKind.Object
+                        && first.TryGetProperty("providerName", out var providerName)
+                        && providerName.GetString() is { Length: > 0 } federatedProvider)
+                        return federatedProvider;
+                }
+                catch (JsonException)
+                {
+                    // Malformed optional federation metadata should not reject an
+                    // otherwise valid token; fall through to issuer inference.
+                }
+            }
+
+            var issuer = Principal.FindFirst("iss")?.Value ?? string.Empty;
+            if (issuer.Contains("amazonaws.com", StringComparison.OrdinalIgnoreCase))
+            {
+                // Cognito federated usernames use `<provider>_<subject>`.
+                // Native users do not, so preserve `cognito` for that path.
+                var username = Principal.FindFirst("cognito:username")?.Value;
+                var separator = username?.IndexOf('_') ?? -1;
+                return separator > 0 ? username![..separator] : "cognito";
+            }
+
+            // If an authenticated principal has no provider metadata, retain a
+            // stable provider-neutral fallback instead of returning an empty value.
             return Principal.Identity?.IsAuthenticated == true ? "email" : null;
         }
     }
@@ -60,7 +99,9 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
     /// <inheritdoc />
     public string? Name =>
         Principal?.FindFirst("name")?.Value
-        ?? Principal?.FindFirst(ClaimTypes.Name)?.Value;
+        ?? Principal?.FindFirst(ClaimTypes.Name)?.Value
+        ?? Principal?.FindFirst("username")?.Value
+        ?? Principal?.FindFirst("cognito:username")?.Value;
 
     /// <inheritdoc />
     public string? Email
@@ -70,13 +111,13 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
             if (Principal is null)
                 return null;
 
-            // External ID ID tokens carry an "emails" array for local accounts.
-            // FindAll returns each value; take the first non-empty entry.
+            // Prefer the provider's emails claim, then common OIDC email claims.
             var emails = Principal.FindFirst("emails")?.Value;
             if (!string.IsNullOrWhiteSpace(emails))
                 return emails;
 
             return Principal.FindFirst("preferred_username")?.Value
+                   ?? Principal.FindFirst("email")?.Value
                    ?? Principal.FindFirst(ClaimTypes.Email)?.Value;
         }
     }
@@ -84,4 +125,20 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
     /// <inheritdoc />
     public bool IsAuthenticated =>
         httpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated ?? false;
+
+    private static Guid? ToStableGuid(string? value, string? directGuidCandidate)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        if (Guid.TryParse(directGuidCandidate, out var parsed))
+            return parsed;
+
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        Span<byte> bytes = stackalloc byte[16];
+        hash.AsSpan(0, 16).CopyTo(bytes);
+        bytes[7] = (byte)((bytes[7] & 0x0F) | 0x50);
+        bytes[8] = (byte)((bytes[8] & 0x3F) | 0x80);
+        return new Guid(bytes);
+    }
 }
