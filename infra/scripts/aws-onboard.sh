@@ -311,7 +311,7 @@ ensure_state_bucket() {
   aws s3api put-bucket-lifecycle-configuration \
     --bucket "$STATE_BUCKET" \
     --lifecycle-configuration \
-      '{"Rules":[{"ID":"expire-old-state-versions","Status":"Enabled","Filter":{},"NoncurrentVersionExpiration":{"NoncurrentDays":90}}]}'
+      '{"Rules":[{"ID":"expire-old-state-versions","Status":"Enabled","Filter":{"Prefix":""},"NoncurrentVersionExpiration":{"NoncurrentDays":90}}]}'
   aws s3api put-bucket-tagging \
     --bucket "$STATE_BUCKET" \
     --tagging \
