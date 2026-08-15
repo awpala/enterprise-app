@@ -143,15 +143,18 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const logout = useCallback(async () => {
     localStorage.removeItem(DEV_SESSION_KEY);
     localStorage.removeItem(GUEST_SESSION_KEY);
-    setSynthetic(null);
-    setUser(null);
+    if (synthetic) {
+      setSynthetic(null);
+      router.replace('/');
+      return;
+    }
     if (managerRef.current) {
       if (config?.auth.provider === 'cognito' && config.auth.logoutEndpoint) {
         await managerRef.current.removeUser();
         const endpoint = new URL('/logout', config.auth.logoutEndpoint);
         endpoint.searchParams.set('client_id', config.auth.clientId);
         endpoint.searchParams.set('logout_uri', window.location.origin);
-        window.location.assign(endpoint);
+        window.location.replace(endpoint);
         return;
       }
       try {
@@ -162,8 +165,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         await managerRef.current.removeUser();
       }
     }
+    setUser(null);
     router.replace('/');
-  }, [config, router]);
+  }, [config, router, synthetic]);
 
   const getAccessToken = useCallback(async () => {
     if (synthetic) return null;

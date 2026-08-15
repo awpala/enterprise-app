@@ -84,7 +84,7 @@ check_managed_login() {
         --data-urlencode "identity_provider=$provider")
       [[ "$status" == "$EXPECTED_HTTP_STATUS" ]] || return 1
       if [[ "$provider" == "Google" ]] \
-        && rg -qi "$GOOGLE_REDIRECT_ERROR_PATTERN" "$TEMP_DIR/${provider}-login.html"; then
+        && grep -Eqi "$GOOGLE_REDIRECT_ERROR_PATTERN" "$TEMP_DIR/${provider}-login.html"; then
         return 1
       fi
 

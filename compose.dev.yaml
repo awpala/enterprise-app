@@ -22,6 +22,7 @@ services:
       - terraform-cache:/root/.terraform.d:rw
       - azure-config:/root/.azure:rw
       - aws-config:/root/.aws:rw
+      - gcloud-config:/root/.config/gcloud:rw
       - claude-config:/root/.claude:rw
       - codex-config:/root/.codex
     ports:
@@ -107,6 +108,7 @@ volumes:
   terraform-cache:
   azure-config:
   aws-config:
+  gcloud-config:
   claude-config:
   codex-config:
   npm-global:

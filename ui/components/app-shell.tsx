@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Github, LayoutDashboard, LogOut, Menu, Moon, PlayCircle, Sun, TestTube2, X } from 'lucide-react';
+import { DARK_THEME } from '@/lib/theme';
 import { useAuth } from './auth-provider';
+import { useTheme } from './theme-provider';
 
 const navigation = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -14,28 +16,14 @@ const navigation = [
 
 export function AppShell({ children }: { readonly children: ReactNode }) {
   const auth = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(true);
-  const [dark, setDark] = useState(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem('ea:theme');
-    const enabled = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setDark(enabled);
-    document.documentElement.dataset.theme = enabled ? 'dark' : 'light';
-  }, []);
 
   useEffect(() => {
     if (!auth.loading && !auth.isAuthenticated) router.replace('/');
   }, [auth.loading, auth.isAuthenticated, router]);
-
-  const toggleTheme = () => {
-    const next = !dark;
-    setDark(next);
-    localStorage.setItem('ea:theme', next ? 'dark' : 'light');
-    document.documentElement.dataset.theme = next ? 'dark' : 'light';
-  };
 
   if (auth.loading || !auth.isAuthenticated) {
     return <main className="centered-page"><div className="spinner" aria-label="Loading session" /></main>;
@@ -51,7 +39,7 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
         <span className="topbar-spacer" />
         <span className="target-pill">{auth.config?.deploymentTarget}</span>
         <button className="icon-button" onClick={toggleTheme} aria-label="Toggle theme">
-          {dark ? <Sun /> : <Moon />}
+          {theme === DARK_THEME ? <Sun /> : <Moon />}
         </button>
         <a className="icon-button" href="https://github.com/awpala/enterprise-app" target="_blank" rel="noreferrer" aria-label="View source">
           <Github />

@@ -22,6 +22,7 @@
       "installBicep": true,
     },
     "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/dhoeric/features/google-cloud-cli:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers-extra/features/claude-code:2.0.3": {},
     "ghcr.io/jsburckhardt/devcontainer-features/codex:1": {},

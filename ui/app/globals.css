@@ -34,6 +34,7 @@
 
 * { box-sizing: border-box; }
 html, body { min-height: 100%; }
+html:not([data-theme]) body { visibility: hidden; }
 body {
   margin: 0;
   background: var(--bg);
