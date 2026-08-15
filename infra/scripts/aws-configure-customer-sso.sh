@@ -202,3 +202,5 @@ gh variable set MICROSOFT_OIDC_ISSUER \
 
 echo "Customer SSO prerequisites reconciled without printing or persisting credentials."
 echo "Google and Microsoft/Outlook will be required by the next AWS deployment."
+echo "One-time Google Cloud UI requirement: add this Authorized redirect URI to the reused OAuth client:"
+echo "$OIDC_CALLBACK"

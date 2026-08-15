@@ -150,7 +150,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         await managerRef.current.removeUser();
         const endpoint = new URL('/logout', config.auth.logoutEndpoint);
         endpoint.searchParams.set('client_id', config.auth.clientId);
-        endpoint.searchParams.set('logout_uri', `${window.location.origin}/`);
+        endpoint.searchParams.set('logout_uri', window.location.origin);
         window.location.assign(endpoint);
         return;
       }

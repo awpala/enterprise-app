@@ -110,6 +110,11 @@ same protected GitHub Environment, and updates AWS/GitHub deployment trust. It
 does not print or persist either provider secret. The Cognito callback registered
 at both providers is
 `https://<cognito-prefix>.auth.<region>.amazoncognito.com/oauth2/idpresponse`.
+Microsoft is reconciled through its CLI. Google does not expose an equivalent
+supported CLI for editing an existing OAuth client's redirect URIs, so add that
+exact URI once in Google Cloud Console under **APIs & Services → Credentials →
+the reused OAuth 2.0 Client ID → Authorized redirect URIs**. Keep the existing
+Azure redirect URI on the client.
 
 ## Monitor and verify
 

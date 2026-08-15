@@ -16,6 +16,7 @@ readonly PKCE_VERIFIER_RANDOM_BYTES=48
 readonly OAUTH_STATE_RANDOM_BYTES=16
 readonly EXPECTED_HTTP_STATUS="200"
 readonly OAUTH_ERROR_QUERY_FRAGMENT="error="
+readonly GOOGLE_REDIRECT_ERROR_PATTERN='data-error-code="redirect_uri_mismatch"|Error 400: redirect_uri_mismatch'
 readonly AWS_IDP_PAGE_SIZE=60
 readonly SMOKE_MAX_ATTEMPTS=6
 readonly SMOKE_RETRY_DELAY_SECONDS=10
@@ -82,6 +83,10 @@ check_managed_login() {
         --data-urlencode "code_challenge_method=$PKCE_CHALLENGE_METHOD" \
         --data-urlencode "identity_provider=$provider")
       [[ "$status" == "$EXPECTED_HTTP_STATUS" ]] || return 1
+      if [[ "$provider" == "Google" ]] \
+        && rg -qi "$GOOGLE_REDIRECT_ERROR_PATTERN" "$TEMP_DIR/${provider}-login.html"; then
+        return 1
+      fi
 
       effective_url=$(curl -sS -L -o /dev/null -w '%{url_effective}' \
         --get "$authorization_endpoint" \
@@ -96,6 +101,24 @@ check_managed_login() {
       [[ "$effective_url" != *"$OAUTH_ERROR_QUERY_FRAGMENT"* ]] || return 1
     done
   fi
+}
+
+check_cognito_logout() {
+  [[ "$TF_ROOT" == "$AWS_TF_ROOT" ]] || return 0
+
+  local runtime_config logout_endpoint client_id result status effective_url
+  runtime_config=$(curl -fsS "${APPLICATION_URL}${RUNTIME_CONFIG_PATH}")
+  logout_endpoint=$(jq -r '.auth.logoutEndpoint' <<<"$runtime_config")
+  client_id=$(jq -r '.auth.clientId' <<<"$runtime_config")
+  result=$(curl -sS -L -o /dev/null -w '%{http_code}\t%{url_effective}' \
+    --get "${logout_endpoint}/logout" \
+    --data-urlencode "client_id=$client_id" \
+    --data-urlencode "logout_uri=$APPLICATION_URL")
+  status=${result%%$'\t'*}
+  effective_url=${result#*$'\t'}
+
+  [[ "$status" == "$EXPECTED_HTTP_STATUS" ]] || return 1
+  [[ "${effective_url%/}" == "${APPLICATION_URL%/}" ]]
 }
 
 check_aws_customer_auth() {
@@ -126,6 +149,7 @@ for ((attempt = 1; attempt <= SMOKE_MAX_ATTEMPTS; attempt++)); do
     && curl -fsS "${APPLICATION_URL}${UI_HEALTH_PATH}" \
     && curl -fsS "${APPLICATION_URL}${RUNTIME_CONFIG_PATH}" \
     && check_managed_login \
+    && check_cognito_logout \
     && check_aws_customer_auth; then
     echo
     echo "API, browser runtime configuration, and required customer authentication ready."
