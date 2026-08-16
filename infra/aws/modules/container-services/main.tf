@@ -157,8 +157,8 @@ resource "aws_ecs_task_definition" "api" {
   family                   = "${var.name_prefix}-api"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = 512
-  memory                   = 1024
+  cpu                      = 256
+  memory                   = 512
   execution_role_arn       = var.execution_role_arn
   task_role_arn            = var.task_role_arn
   container_definitions = jsonencode([
@@ -181,8 +181,8 @@ resource "aws_ecs_task_definition" "ui" {
   family                   = "${var.name_prefix}-ui"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = 512
-  memory                   = 1024
+  cpu                      = 256
+  memory                   = 512
   execution_role_arn       = var.execution_role_arn
   task_role_arn            = var.task_role_arn
   container_definitions = jsonencode([
@@ -205,8 +205,8 @@ resource "aws_ecs_task_definition" "data_engine" {
   family                   = "${var.name_prefix}-data-engine"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = 512
-  memory                   = 1024
+  cpu                      = 256
+  memory                   = 512
   execution_role_arn       = var.execution_role_arn
   task_role_arn            = var.task_role_arn
   container_definitions = jsonencode([

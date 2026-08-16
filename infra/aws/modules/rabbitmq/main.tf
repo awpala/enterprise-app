@@ -72,8 +72,8 @@ resource "aws_ecs_task_definition" "this" {
   family                   = "${var.name_prefix}-rabbitmq"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = 512
-  memory                   = 1024
+  cpu                      = 256
+  memory                   = 512
   execution_role_arn       = var.execution_role_arn
   task_role_arn            = var.task_role_arn
 
