@@ -1,6 +1,6 @@
 # Enterprise App
 
-An event-driven model-management application built as four portable containers: a Next.js 16 UI, an ASP.NET Core .NET 10 API, a Python data engine, and an EF Core migration workload. PostgreSQL is the system of record, RabbitMQ carries asynchronous run commands and lifecycle events, and the same application artifacts deploy to Azure or AWS through peer Terraform implementations.
+An event-driven model-management application built as four portable containers: a Next.js 16 UI, an ASP.NET Core .NET 10 API, a Python data engine, and an EF Core migration workload. PostgreSQL is the system of record, RabbitMQ carries asynchronous run commands and lifecycle events, and the same application artifacts run continuously on Coolify, with optional Azure or AWS deployments through peer Terraform implementations.
 
 The project demonstrates the full operational path around a compact CRUD domain: federated SSO, authenticated API access, asynchronous messaging, numerical background work, audit attribution, health probes, OpenTelemetry, infrastructure as code, and push-driven delivery.
 
@@ -12,16 +12,16 @@ flowchart LR
     google[Google]
     microsoft[Microsoft / Outlook]
 
-    subgraph platform[Selected cloud deployment]
+    subgraph platform[Independent deployment]
         direction LR
-        identity[OIDC adapter<br/>Entra External ID or Cognito]
-        edge[Provider-managed HTTPS ingress]
+        identity[OIDC adapter<br/>Keycloak, Entra, or Cognito]
+        edge[Traefik or cloud HTTPS ingress]
         ui[Next.js UI<br/>ea-ui :3000]
         api[ASP.NET Core API<br/>ea-api :8000]
         db[(PostgreSQL 16<br/>system of record)]
         broker{{RabbitMQ 4<br/>durable messaging}}
         worker[Python data engine<br/>stateless worker]
-        telemetry[OpenTelemetry adapter<br/>Azure Monitor or ADOT]
+        telemetry[Coolify logs or cloud telemetry]
     end
 
     person -->|HTTPS| edge
@@ -39,7 +39,8 @@ flowchart LR
     worker -. traces, metrics, logs .-> telemetry
     ui -. server telemetry .-> telemetry
 
-    cicd[GitHub Actions<br/>OIDC federation] -->|Terraform + immutable images| platform
+    coolify[Coolify GitHub App] -->|main pushes + Compose| platform
+    cicd[GitHub Actions<br/>cloud OIDC federation] -->|Optional Terraform + images| platform
 ```
 
 The API owns persistence and auditing. Requesting a run persists the `ModelRun` before publishing its command. The data engine consumes that command, performs the numerical workflow without direct database access, and publishes lifecycle events that the API reconciles into PostgreSQL with order-safe status updates. JSON Schemas under [`schemas/`](./schemas/) are the cross-language contract source of truth.
@@ -48,21 +49,21 @@ The inline diagram is mirrored in [`docs/diagrams/application-architecture.mmd`]
 
 ## Deployment adapters
 
-Application code depends on normalized OIDC, OpenTelemetry, configuration, and messaging contracts. Provider-specific resource behavior stays in its Terraform root.
+Application code depends on normalized OIDC, OpenTelemetry, configuration, and messaging contracts. Coolify uses root `compose.prod.yaml`; cloud-specific resource behavior stays in its Terraform root.
 
-| Capability | Azure adapter | AWS adapter |
-|---|---|---|
-| HTTPS application entry point | Container Apps generated HTTPS origins | CloudFront generated HTTPS origin |
-| UI, API, worker, broker | Azure Container Apps | ECS on Fargate |
-| Migration workload | Container Apps Job | ECS one-off task |
-| PostgreSQL | Flexible Server | RDS for PostgreSQL |
-| Container images | Azure Container Registry | Elastic Container Registry |
-| Secrets | Key Vault | Secrets Manager |
-| Customer identity | Entra External ID | Cognito user pool |
-| Telemetry backend | Application Insights and Log Analytics | ADOT, CloudWatch, and X-Ray |
-| Terraform state | Azure Blob Storage | Amazon S3 with native locking |
+| Capability | Coolify | Azure adapter | AWS adapter |
+|---|---|---|---|
+| HTTPS entry point | Traefik and portfolio subdomains | Container Apps HTTPS origins | CloudFront HTTPS origin |
+| UI, API, worker, broker | Docker Compose on Hetzner | Azure Container Apps | ECS on Fargate |
+| Migration workload | One-shot Compose service | Container Apps Job | ECS one-off task |
+| PostgreSQL | PostgreSQL 16 with pgAdmin | Flexible Server | RDS for PostgreSQL |
+| Container images | Built on the Coolify server | Azure Container Registry | Elastic Container Registry |
+| Secrets | Coolify runtime environment | Key Vault | Secrets Manager |
+| Customer identity | Self-hosted Keycloak | Entra External ID | Cognito user pool |
+| Operational visibility | Logs, RabbitMQ Management, pgAdmin | Application Insights and Log Analytics | ADOT, CloudWatch, and X-Ray |
+| Terraform state | Not used | Azure Blob Storage | Amazon S3 with native locking |
 
-Neither cloud is the default. Terraform state, credentials, modules, and failure domains remain separate under [`infra/azure/`](./infra/azure/) and [`infra/aws/`](./infra/aws/); [`infra/scripts/deploy.sh`](./infra/scripts/deploy.sh) exposes their shared command contract.
+Coolify is the evergreen demo; neither cloud is selected by default. Terraform state, credentials, modules, and failure domains remain separate under [`infra/azure/`](./infra/azure/) and [`infra/aws/`](./infra/aws/); [`infra/scripts/deploy.sh`](./infra/scripts/deploy.sh) exposes their shared command contract.
 
 ## Local development
 

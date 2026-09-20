@@ -4,7 +4,7 @@
 
 Coolify is the evergreen home for this disposable portfolio demo. Every push to `main` deploys through Coolify's native GitHub App integration. AWS and Azure are independent, optional demonstrations, selected explicitly. Coolify requires no Terraform execution, state, cloud hosting credentials, GitHub Actions deployment workflow, or deployment enablement flag.
 
-**Current checkpoint:** the operator has created the Coolify Compose application with `/compose.prod.yaml`. DNS for all four domains is verified. The stack and application changes are implemented locally. Provider credentials are now available locally. Publishing, container validation, and the first live deployment remain to be completed.
+**Current checkpoint:** the operator has created the Coolify Compose application with `/compose.prod.yaml`. DNS for all four domains is verified. The stack and application changes are implemented locally. Provider credentials are available locally. The feature branch and draft PR are published; the full production stack and API integration checks passed in CI. The first live deployment remains to be completed.
 
 All deployments own separate databases and queues. Complete loss of demo data and local identities is acceptable on all targets. Named volumes preserve state during routine redeploys; backups, replication, restoration exercises, and high availability are outside scope. Recovery recreates this application and seeds fresh data.
 
@@ -58,7 +58,7 @@ Run from the repository root:
 python3 deploy/coolify/init-env.py
 ```
 
-This creates the ignored `deploy/coolify/.env` with randomly generated service passwords and owner-only file permissions. An existing file is preserved. The file has already been generated in the current workspace, including the pgAdmin password. Enter provider credentials there as setup progresses; do not paste them into chat. Copy its values into the application's **production** environment variables in Coolify before deployment. These are runtime values, not Docker build arguments.
+This creates the ignored `deploy/coolify/.env` with randomly generated service passwords and owner-only file permissions. An existing file is preserved. The file has already been generated in the current workspace, including the pgAdmin password. Enter provider credentials there as setup progresses; do not paste them into chat. Copy its values into the application's **production** environment variables in Coolify before deployment. For every variable, enable **Runtime** and disable **Build time**. None of these values is a Docker build argument. [Coolify variable scopes](https://coolify.io/docs/applications/configuration/environment-variables)
 
 | Variable | Purpose |
 |---|---|
@@ -198,5 +198,5 @@ For a fresh demo, stop only this Coolify application, remove its selected persis
 | Local implementation | Compose, realm/database bootstrap, admin UIs, OIDC adapter, cloud opt-out, and runbook present |
 | Local secrets | Ignored `.env` contains service passwords and provider credentials; no values tracked |
 | Provider setup | Operator supplied Google client credentials; dedicated Microsoft app created and verified through Azure CLI (credential expires September 20, 2027) |
-| Publication and container validation | Pending |
+| Publication and container validation | Feature branch / PR 24 published; Compose build, startup, guest run, repeat migrations, and API integration tests passed in CI |
 | Live deployment / browser verification / push auto-deploy | Pending |

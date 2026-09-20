@@ -15,7 +15,8 @@ The development occurs within a VS Code-based Devcontainer, as defined in `.devc
 - **Python 3 Data Engine** (`data-engine`) - companion service for numerical computations and data-related workflows, jobs, etc.; transmits data via RabbitMQ
 - **RabbitMQ** — message broker for async job workflows
 - **PostgreSQL** — relational data store, managed via EF Core migrations
-- **Azure Container Apps or AWS ECS/Fargate** — deployment-selected application runtime
+- **Coolify / Traefik** — evergreen production Compose stack with Keycloak, pgAdmin, and RabbitMQ Management
+- **Azure Container Apps or AWS ECS/Fargate** — optional cloud application runtime
 - **Terraform** (`infra/azure`, `infra/aws`) — peer provider implementations behind common orchestration
 
 ### Interaction Flow
@@ -73,7 +74,8 @@ High-level layout only — a single level of expansion per service, intentionall
 │       ├── topology.py                 # Exchange / queue / binding declarations
 │       └── config.py                   # Settings loader
 ├── schemas/                            # JSON Schema message contracts (source of truth)
-├── deploy/                             # Docker Compose local stack (compose.yaml + overrides)
+├── compose.prod.yaml                   # Independent production Coolify stack
+├── deploy/                             # Local Compose and Coolify bootstrap/configuration
 ├── infra/                              # Common deployment contract
 │   ├── scripts/                        # Cloud-selected Terraform entry point
 │   ├── azure/                          # Azure root, bootstrap, envs, and modules

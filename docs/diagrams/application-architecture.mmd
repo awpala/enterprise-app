@@ -3,16 +3,16 @@ flowchart LR
     google[Google]
     microsoft[Microsoft / Outlook]
 
-    subgraph platform[Selected cloud deployment]
+    subgraph platform[Independent deployment]
         direction LR
-        identity[OIDC adapter<br/>Entra External ID or Cognito]
-        edge[Provider-managed HTTPS ingress]
+        identity[OIDC adapter<br/>Keycloak, Entra, or Cognito]
+        edge[Traefik or cloud HTTPS ingress]
         ui[Next.js UI<br/>ea-ui :3000]
         api[ASP.NET Core API<br/>ea-api :8000]
         db[(PostgreSQL 16<br/>system of record)]
         broker{{RabbitMQ 4<br/>durable messaging}}
         worker[Python data engine<br/>stateless worker]
-        telemetry[OpenTelemetry adapter<br/>Azure Monitor or ADOT]
+        telemetry[Coolify logs or cloud telemetry]
     end
 
     person -->|HTTPS| edge
@@ -30,4 +30,5 @@ flowchart LR
     worker -. traces, metrics, logs .-> telemetry
     ui -. server telemetry .-> telemetry
 
-    cicd[GitHub Actions<br/>OIDC federation] -->|Terraform + immutable images| platform
+    coolify[Coolify GitHub App] -->|main pushes + Compose| platform
+    cicd[GitHub Actions<br/>cloud OIDC federation] -->|Optional Terraform + images| platform

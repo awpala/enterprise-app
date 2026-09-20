@@ -151,6 +151,7 @@ exit 77
 MOCK
 cp "${temporary_root}/bin/aws" "${temporary_root}/bin/terraform"
 cp "${temporary_root}/bin/aws" "${temporary_root}/bin/gh"
+cp "${temporary_root}/bin/aws" "${temporary_root}/bin/rg"
 chmod +x "${temporary_root}/bin/"*
 cat > "${temporary_root}/onboard.env" <<'CONFIG'
 AWS_PROFILE=fixture
