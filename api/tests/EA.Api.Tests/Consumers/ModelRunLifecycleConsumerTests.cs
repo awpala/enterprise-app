@@ -1,4 +1,5 @@
 using EA.Contracts.Messages;
+using EA.Domain.Entities;
 using EA.Domain.Interfaces;
 using EA.Infrastructure.Consumers;
 using MassTransit;
@@ -25,25 +26,26 @@ public class ModelRunLifecycleConsumerTests
     }
 
     [Test]
-    public async Task CompletedConsumer_UsesAtomicLifecycleUpdateAndPersistsMetrics()
+    public async Task CompletedConsumer_SubmitsCompletionAndMetricsTogether()
     {
         var repository = new Mock<IModelRepository>();
         var message = new ModelRunCompleted(
             Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), Guid.NewGuid(),
             [new MetricResult("mean", 1.25m)], null, null);
         repository.Setup(value => value.MarkModelRunCompletedAsync(
-                message.ModelRunId, message.OccurredAtUtc, null, null, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
-        repository.Setup(value => value.AddModelMetricsAsync(
-                It.Is<IEnumerable<EA.Domain.Entities.ModelMetric>>(metrics => metrics.Single().ModelRunId == message.ModelRunId),
+                message.ModelRunId, message.OccurredAtUtc, null, null,
+                It.Is<IReadOnlyCollection<ModelMetric>>(metrics => metrics.Count == 1
+                    && metrics.Single().ModelRunId == message.ModelRunId
+                    && metrics.Single().MetricName == "mean"
+                    && metrics.Single().MetricValue == 1.25m),
                 It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        repository.Setup(value => value.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+            .ReturnsAsync(true);
         var context = Context(message);
 
         await new ModelRunCompletedConsumer(repository.Object, NullLogger<ModelRunCompletedConsumer>.Instance).Consume(context.Object);
 
         repository.VerifyAll();
+        repository.VerifyNoOtherCalls();
     }
 
     [Test]

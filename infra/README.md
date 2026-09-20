@@ -49,6 +49,8 @@ for prerequisites, phase gates, and operational verification.
 
 ## CI/CD selection
 
-`.github/workflows/deploy.yml` is the common delivery entry point. It never assumes a provider: dispatches require a target input, and push deployments require `DEPLOYMENT_TARGETS=azure`, `aws`, or `both`. The entry workflow calls the reusable `deploy-azure.yml` and `deploy-aws.yml` adapters and passes one normalized change set to each selected target.
+`.github/workflows/deploy.yml` is the cloud delivery entry point. It never assumes a provider: dispatches require a target input, and push deployments require `DEPLOYMENT_TARGETS=none`, `azure`, `aws`, or `both`. `none` skips both cloud adapters successfully without provider credentials. Otherwise, the workflow calls the selected reusable `deploy-azure.yml` and `deploy-aws.yml` adapters with one normalized change set.
+
+Manual dispatch explicitly selects a provider and works while push policy is `none`. Neither dispatch nor AWS onboarding changes that repository variable. Set it separately when intentionally enabling or disabling cloud push deployment. Disabling deployment does not remove running resources or stop their charges.
 
 Deployment jobs use the logical `dev` and `production` GitHub Environments. Provider adapters read only their own credential, state, and identity inputs from the selected environment or repository scope; sharing an environment name does not make Azure and AWS identity resources interchangeable. The separately dispatched image-cleanup workflow uses provider-qualified environments because registry maintenance targets one provider at a time. Common scripts require `TF_ROOT`; they do not default to either provider.

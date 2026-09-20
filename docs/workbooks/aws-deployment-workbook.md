@@ -2,6 +2,8 @@
 
 ## Purpose and status
 
+**Current portfolio operating profile:** AWS is deployed on demand for demonstrations and then removed. Application and identity data is disposable. Backup, restore, redundancy, and retention requirements below describe optional hardening for a future durable production service; they do not gate the current demo. Rebuild and reseed when data is lost. Historical readiness statements below do not indicate that a cloud deployment is currently running.
+
 This workbook records the evidence, risks, rollback points, and production gates for the AWS implementation. The command sequence lives in the scripted [AWS deployment runbook](../runbooks/aws-deployment.md); this document remains CLI-first so another operator can reproduce and review the result without an ad hoc console procedure.
 
 Current status: **development implementation deployed and repeatedly verified**. The dedicated account, IAM Identity Center administrator, remote state, GitHub OIDC trust, Terraform application stack, generated CloudFront HTTPS origin, migrations, smoke tests, and Google plus Microsoft/Outlook browser SSO are implemented. Production remains blocked on the unchecked readiness gates in section 11, particularly least-privilege review, recovery exercises, load/capacity evidence, and operational handoff.
@@ -120,7 +122,7 @@ Record all four image digests and ECR scan findings. Deploy digests/tags from on
 
 ## 8. Apply and migrate
 
-After reviewing the saved plan, rerun the same onboarding command with `--deploy`. It dispatches the cloud-neutral `deploy.yml` workflow with an explicit AWS target. The AWS adapter performs registry-first apply, four-image build/push, full apply with an AWS-generated CloudFront URL, migration task, smoke test, and retention. The onboarding config also sets `DEPLOYMENT_TARGETS`: non-`main` pushes deploy dev, and `main` pushes deploy production.
+After reviewing the saved plan, rerun the same onboarding command with `--deploy`. It dispatches the cloud-neutral `deploy.yml` workflow with an explicit AWS target. The AWS adapter performs registry-first apply, four-image build/push, full apply with an AWS-generated CloudFront URL, migration task, smoke test, and retention. Onboarding preserves the repository's `DEPLOYMENT_TARGETS` push policy. Set that variable separately: `none` permits manual-only cloud deployment; enabled non-`main` pushes deploy dev, and enabled `main` pushes deploy production.
 
 Gate: migration exit code is zero before application smoke tests. Never automatically roll back a successfully applied database migration by redeploying an older image; use forward-compatible migrations and the documented database recovery decision.
 

@@ -2,6 +2,8 @@
 
 This procedure applies only to the Azure Terraform root. AWS state and resources are independent.
 
+The current operating profile is an on-demand portfolio demo. Loss of application and identity data is accepted, and rebuilding/reseeding is the recovery model. Backup/restore procedures below are optional references when retention is explicitly requested, not gates for demo teardown. Continue to verify target scope because the account can contain unrelated resources.
+
 ## Safety boundary
 
 Do not use `az group delete` or an unreviewed full `terraform destroy` as a cost-control shortcut. The Azure root owns the application resource group plus Entra External ID application objects. A blanket destroy can remove customer identity configuration along with runtime resources.
@@ -122,7 +124,7 @@ Run the normal Azure deployment workflow. Its registry-first phase recreates ACR
 
 ### PostgreSQL recovery
 
-Do not delete or replace the server without an approved backup/restore decision. Validate a restore into a separate server before changing the application connection secret. Database migrations are forward-fix by default; do not deploy an older application image blindly after a successful schema migration.
+For the disposable demo, recreate the selected application database and seed it when state is unusable. If retention is explicitly requested for a particular demonstration, use a backup/restore procedure for that case. Database migrations are forward-fix by default; check schema compatibility before deploying an older application image.
 
 ### Identity or OIDC failure
 

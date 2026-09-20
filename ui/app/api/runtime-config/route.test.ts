@@ -56,4 +56,41 @@ describe('runtime configuration', () => {
 
     expect(() => GET()).toThrow("Unsupported DEPLOYMENT_TARGET 'unknown-cloud'.");
   });
+
+  it('supports Coolify OIDC with guests and excludes upstream credentials', async () => {
+    process.env.DEPLOYMENT_TARGET = 'coolify';
+    process.env.API_URL = 'https://app.example.test/';
+    process.env.AUTH_PROVIDER = 'oidc';
+    process.env.AUTH_AUTHORITY = 'https://auth.example.test/realms/enterprise-app';
+    process.env.AUTH_CLIENT_ID = 'ea-ui';
+    process.env.AUTH_API_SCOPE = 'access_as_user';
+    process.env.ENABLE_DEV_AUTH = 'false';
+    process.env.ENABLE_GUEST_AUTH = 'true';
+    process.env.GOOGLE_CLIENT_SECRET = 'upstream-secret';
+    process.env.KEYCLOAK_ADMIN_PASSWORD = 'admin-secret';
+
+    const body = await GET().json();
+
+    expect(body).toMatchObject({
+      deploymentTarget: 'coolify',
+      apiUrl: 'https://app.example.test',
+      auth: {
+        provider: 'oidc',
+        authority: 'https://auth.example.test/realms/enterprise-app',
+        clientId: 'ea-ui',
+        apiScope: 'access_as_user',
+      },
+      enableDevAuth: false,
+      enableGuestAuth: true,
+    });
+    expect(JSON.stringify(body)).not.toContain('upstream-secret');
+    expect(JSON.stringify(body)).not.toContain('admin-secret');
+  });
+
+  it('rejects an unauthenticated provider for Coolify', () => {
+    process.env.DEPLOYMENT_TARGET = 'coolify';
+    process.env.AUTH_PROVIDER = 'none';
+
+    expect(() => GET()).toThrow('AUTH_PROVIDER cannot be none');
+  });
 });

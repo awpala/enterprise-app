@@ -28,6 +28,7 @@ on:
       - ".github/scripts/azure-clean-images.sh"
       - ".github/scripts/azure-run-migrations-job.sh"
       - ".github/scripts/compute-context.sh"
+      - ".github/scripts/resolve-deployment-context.sh"
       - ".github/scripts/smoke-test.sh"
       - "!**/*.md"
   workflow_dispatch:
@@ -81,57 +82,7 @@ jobs:
           MANUAL_TARGET: ${{ inputs.target }}
           MANUAL_ENVIRONMENT: ${{ inputs.environment }}
           PUSH_BEFORE: ${{ github.event.before }}
-        run: |
-          set -euo pipefail
-
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            selected="${MANUAL_TARGET}"
-            environment="${MANUAL_ENVIRONMENT}"
-          else
-            selected="${CONFIGURED_TARGETS}"
-            environment=$([[ "${GITHUB_REF}" == "refs/heads/main" ]] && echo production || echo dev)
-          fi
-
-          if [[ -z "$selected" ]]; then
-            echo "DEPLOYMENT_TARGETS must explicitly be azure, aws, or both for push deployments." >&2
-            exit 2
-          fi
-
-          azure_enabled=false
-          aws_enabled=false
-          case "${selected,,}" in
-            azure) azure_enabled=true ;;
-            aws) aws_enabled=true ;;
-            both|azure,aws|aws,azure) azure_enabled=true; aws_enabled=true ;;
-            *) echo "Unsupported deployment target selection: $selected" >&2; exit 2 ;;
-          esac
-
-          api_changed=true
-          data_engine_changed=true
-          ui_changed=true
-          if [[ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]]; then
-            base="$PUSH_BEFORE"
-            if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
-              if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-                base="${GITHUB_SHA}~1"
-              else
-                base=$(git merge-base origin/main HEAD)
-              fi
-            fi
-            changed=$(git diff --name-only "$base" "$GITHUB_SHA" --)
-            api_changed=$(grep -q '^api/' <<<"$changed" && echo true || echo false)
-            data_engine_changed=$(grep -q '^data-engine/' <<<"$changed" && echo true || echo false)
-            ui_changed=$(grep -q '^ui/' <<<"$changed" && echo true || echo false)
-          fi
-
-          {
-            echo "environment=$environment"
-            echo "azure_enabled=$azure_enabled"
-            echo "aws_enabled=$aws_enabled"
-            echo "api_changed=$api_changed"
-            echo "data_engine_changed=$data_engine_changed"
-            echo "ui_changed=$ui_changed"
-          } >> "$GITHUB_OUTPUT"
+        run: bash .github/scripts/resolve-deployment-context.sh
 
   deploy-azure:
     name: Azure

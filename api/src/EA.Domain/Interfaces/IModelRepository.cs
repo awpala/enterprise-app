@@ -93,12 +93,13 @@ public interface IModelRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Atomically records successful completion while preserving the earliest start timestamp.
+    /// Commits successful completion and its metrics in one transaction while preserving the earliest start timestamp.
     /// </summary>
     /// <param name="runId">The run identifier.</param>
     /// <param name="completedAtUtc">The worker-reported completion timestamp.</param>
     /// <param name="resultSummary">The computed result summary.</param>
     /// <param name="sampleData">The computed histogram data.</param>
+    /// <param name="metrics">The computed metrics belonging to this run.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>True when the run exists.</returns>
     Task<bool> MarkModelRunCompletedAsync(
@@ -106,6 +107,7 @@ public interface IModelRepository
         DateTime completedAtUtc,
         JsonDocument? resultSummary,
         JsonDocument? sampleData,
+        IReadOnlyCollection<ModelMetric> metrics,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -121,13 +123,6 @@ public interface IModelRepository
         DateTime completedAtUtc,
         string errorMessage,
         CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Adds a collection of model metric entities to the data store.
-    /// </summary>
-    /// <param name="metrics">The metrics to add.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    Task AddModelMetricsAsync(IEnumerable<ModelMetric> metrics, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Saves all pending changes to the data store.

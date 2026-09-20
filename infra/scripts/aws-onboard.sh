@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # One-time AWS onboarding and optional deployment dispatch. All container builds
 # run on GitHub-hosted runners; this script does not require or invoke Docker.
+# Repository push-deployment policy is managed separately and is never changed.
 set -euo pipefail
 
 usage() {
@@ -63,7 +64,6 @@ required_variables=(
   AWS_NAME_SUFFIX
   GITHUB_OWNER
   GITHUB_REPO
-  DEPLOYMENT_TARGETS
   COGNITO_DOMAIN_PREFIX
   AWS_MONTHLY_BUDGET_USD
   DEPLOY_REF
@@ -74,13 +74,9 @@ for variable_name in "${required_variables[@]}"; do
     exit 2
   fi
 done
-case "${DEPLOYMENT_TARGETS,,}" in
-  aws|both|azure,aws|aws,azure) ;;
-  *)
-    echo "DEPLOYMENT_TARGETS must include aws: use aws, both, azure,aws, or aws,azure." >&2
-    exit 2
-    ;;
-esac
+if [[ -n "${DEPLOYMENT_TARGETS:-}" ]]; then
+  echo "DEPLOYMENT_TARGETS in the local environment/config is ignored; onboarding preserves repository push policy."
+fi
 if [[ "$ENVIRONMENT" == "production" && -z "${GITHUB_PRODUCTION_REVIEWER:-}" ]]; then
   echo "GITHUB_PRODUCTION_REVIEWER is required for production." >&2
   exit 2
@@ -469,8 +465,7 @@ configure_github() {
     --env "$GITHUB_ENVIRONMENT" --repo "$GITHUB_REPOSITORY" --body "$STATE_BUCKET"
   gh variable set COGNITO_DOMAIN_PREFIX \
     --env "$GITHUB_ENVIRONMENT" --repo "$GITHUB_REPOSITORY" --body "$COGNITO_DOMAIN_PREFIX"
-  gh variable set DEPLOYMENT_TARGETS \
-    --repo "$GITHUB_REPOSITORY" --body "$DEPLOYMENT_TARGETS"
+  echo "Repository DEPLOYMENT_TARGETS is unchanged; select push deployment separately."
 }
 
 plan_application() {

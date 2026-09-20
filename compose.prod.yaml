@@ -1,0 +1,221 @@
+# Production-only Coolify portfolio stack. The application is intentionally
+# disposable; named volumes retain demo state during ordinary redeployments.
+# Coolify domains route UI/API on one host and Keycloak on its companion host.
+# Disable Strip Prefix in Coolify so /api/v1 and /health reach the API intact.
+# exclude_from_hc is a Coolify extension for the completed migration job.
+name: enterprise-app
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  ea-db:
+    <<: *service-defaults
+    build:
+      context: ./deploy/coolify/postgres
+    environment:
+      POSTGRES_USER: ea_admin
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD is required}
+    volumes:
+      - ea-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "ea_admin", "-d", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    mem_limit: 512m
+
+  ea-rabbitmq:
+    <<: *service-defaults
+    image: rabbitmq:4-management
+    hostname: ea-rabbitmq
+    user: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ea_app
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+    volumes:
+      - ea-rabbitmq-data:/var/lib/rabbitmq
+    expose:
+      - "15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    mem_limit: 512m
+
+  ea-pgadmin:
+    <<: *service-defaults
+    build:
+      context: ./deploy/coolify/pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@portfolio-projects.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?PGADMIN_PASSWORD is required}
+      PGADMIN_DISABLE_POSTFIX: "true"
+      PGADMIN_LISTEN_PORT: "8080"
+      PGADMIN_CONFIG_PROXY_X_PROTO_COUNT: "1"
+      PGADMIN_CONFIG_PROXY_X_HOST_COUNT: "1"
+      PGADMIN_CONFIG_SESSION_COOKIE_SECURE: "True"
+    volumes:
+      - ea-pgadmin-data:/var/lib/pgadmin
+    expose:
+      - "8080"
+    depends_on:
+      ea-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/misc/ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    mem_limit: 512m
+
+  ea-migrations:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.migrations
+    exclude_from_hc: true
+    restart: "no"
+    environment:
+      RELEASE_REVISION: ${SOURCE_COMMIT:-local}
+      ConnectionStrings__DefaultConnection: "Host=ea-db;Port=5432;Database=ea_app;Username=ea_app;Password=${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}"
+    depends_on:
+      ea-db:
+        condition: service_healthy
+    mem_limit: 512m
+
+  ea-keycloak:
+    <<: *service-defaults
+    build:
+      context: ./deploy/coolify/keycloak
+    environment:
+      KC_DB_URL: jdbc:postgresql://ea-db:5432/ea_keycloak
+      KC_DB_USERNAME: ea_keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD is required}
+      KC_HOSTNAME: ${AUTH_ORIGIN:-https://ent-app-auth.portfolio-projects.dev}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_MANAGEMENT_SCHEME: http
+      KC_PROXY_HEADERS: xforwarded
+      KC_CACHE: local
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
+      APP_ORIGIN: ${APP_ORIGIN:-https://ent-app.portfolio-projects.dev}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID is required}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET is required}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:?MICROSOFT_CLIENT_ID is required}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:?MICROSOFT_CLIENT_SECRET is required}
+    expose:
+      - "8080"
+    depends_on:
+      ea-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/opt/keycloak/bin/ea-healthcheck.sh"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 90s
+    mem_limit: 1g
+
+  ea-api:
+    <<: *service-defaults
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8000"
+      ConnectionStrings__DefaultConnection: "Host=ea-db;Port=5432;Database=ea_app;Username=ea_app;Password=${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}"
+      RabbitMQ__Host: ea-rabbitmq
+      RabbitMQ__Username: ea_app
+      RabbitMQ__Password: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      Authentication__Enabled: "true"
+      Authentication__Provider: oidc
+      Authentication__Authority: ${AUTH_ORIGIN:-https://ent-app-auth.portfolio-projects.dev}/realms/enterprise-app
+      Authentication__Audience: ea-api
+      Authentication__RequiredScope: access_as_user
+      Authentication__AllowGuest: "true"
+      Authentication__AllowDev: "false"
+      Cors__AllowedOrigins__0: ${APP_ORIGIN:-https://ent-app.portfolio-projects.dev}
+      Seeding__Enabled: "true"
+      Seeding__SeedPath: /app/seed
+      Observability__Exporter: none
+    expose:
+      - "8000"
+    depends_on:
+      ea-db:
+        condition: service_healthy
+      ea-rabbitmq:
+        condition: service_healthy
+      ea-migrations:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8000/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    mem_limit: 512m
+
+  ea-data-engine:
+    <<: *service-defaults
+    build:
+      context: ./data-engine
+      dockerfile: Dockerfile
+    environment:
+      RABBITMQ_HOST: ea-rabbitmq
+      RABBITMQ_USER: ea_app
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      OBSERVABILITY_EXPORTER: none
+      LOG_LEVEL: INFO
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+    depends_on:
+      ea-rabbitmq:
+        condition: service_healthy
+      ea-migrations:
+        condition: service_completed_successfully
+    mem_limit: 512m
+
+  ea-ui:
+    <<: *service-defaults
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    environment:
+      DEPLOYMENT_TARGET: coolify
+      API_URL: ${APP_ORIGIN:-https://ent-app.portfolio-projects.dev}
+      AUTH_PROVIDER: oidc
+      AUTH_AUTHORITY: ${AUTH_ORIGIN:-https://ent-app-auth.portfolio-projects.dev}/realms/enterprise-app
+      AUTH_CLIENT_ID: ea-ui
+      AUTH_API_SCOPE: access_as_user
+      ENABLE_GUEST_AUTH: "true"
+      ENABLE_DEV_AUTH: "false"
+    expose:
+      - "3000"
+    depends_on:
+      ea-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    mem_limit: 384m
+
+volumes:
+  ea-db-data:
+  ea-rabbitmq-data:
+  ea-pgadmin-data:

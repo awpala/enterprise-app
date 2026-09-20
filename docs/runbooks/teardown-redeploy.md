@@ -7,7 +7,7 @@ Select the provider explicitly before changing infrastructure. There is no defau
 | Azure | [Azure teardown and redeploy](./azure-teardown-redeploy.md) |
 | AWS | [AWS workbook: failure, rollback, and teardown](../workbooks/aws-deployment-workbook.md#10-failure-rollback-and-teardown) |
 
-For either provider, capture Terraform outputs and backups first, run a reviewed destroy plan against `infra/{provider}`, preserve the provider bootstrap/state backend, and confirm that the other provider state is untouched.
+For either provider, identify the target resources and state first, review the provider-specific teardown procedure, preserve the bootstrap/state needed to deploy again, and confirm that the other provider state is untouched. This portfolio application accepts complete demo data loss; backups and retention are optional, not teardown gates.
 
 > **Azure exception — do not blanket-destroy.** On Azure, a full `terraform destroy`
 > or `az group delete` also removes the CIAM directories (which are resources

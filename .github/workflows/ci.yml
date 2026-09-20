@@ -111,31 +111,14 @@ jobs:
           terraform -chdir="infra/${{ matrix.target }}/bootstrap" validate
 
   container-builds:
-    name: Container (${{ matrix.image }})
+    name: Production containers and Compose smoke
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - image: api
-            context: api
-            dockerfile: api/Dockerfile
-          - image: migrations
-            context: api
-            dockerfile: api/Dockerfile.migrations
-          - image: data-engine
-            context: data-engine
-            dockerfile: data-engine/Dockerfile
-          - image: ui
-            context: ui
-            dockerfile: ui/Dockerfile
-
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Build cloud-portable image
-        run: docker build --file "${{ matrix.dockerfile }}" --tag "ea-${{ matrix.image }}:ci" "${{ matrix.context }}"
+      - name: Build and exercise the independent production stack
+        run: python3 .github/scripts/check-coolify-stack.py
 
   delivery-script-validation:
     name: Delivery script syntax
@@ -145,5 +128,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Validate shell adapters
         run: |
-          bash -n .github/scripts/*.sh .github/scripts/tests/*.sh infra/scripts/*.sh docs/runbooks/scripts/*.sh
+          for script in .github/scripts/*.sh .github/scripts/tests/*.sh infra/scripts/*.sh docs/runbooks/scripts/*.sh deploy/coolify/*/*.sh; do
+            bash -n "$script"
+          done
           bash .github/scripts/tests/aws-image-retention.test.sh
+          bash .github/scripts/tests/deployment-context.test.sh

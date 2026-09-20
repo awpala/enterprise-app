@@ -35,6 +35,7 @@ export function useAuthSession(): AuthSession {
 
   useEffect(() => {
     let active = true;
+    let disposeManager: (() => void) | undefined;
     void fetch('/api/runtime-config', { cache: 'no-store' })
       .then(async response => {
         if (!response.ok) throw new Error('Runtime configuration is unavailable.');
@@ -46,14 +47,28 @@ export function useAuthSession(): AuthSession {
         if (runtimeConfig.auth.provider !== 'none' && runtimeConfig.auth.authority && runtimeConfig.auth.clientId) {
           const manager = createOidcManager(runtimeConfig, window.location.origin, window.localStorage);
           managerRef.current = manager;
-          setUser(await manager.getUser());
+          const updateUser = (loadedUser: User) => { if (active) setUser(loadedUser); };
+          const clearUser = () => { if (active) setUser(null); };
+          manager.events.addUserLoaded(updateUser);
+          manager.events.addUserUnloaded(clearUser);
+          manager.events.addAccessTokenExpired(clearUser);
+          disposeManager = () => {
+            manager.events.removeUserLoaded(updateUser);
+            manager.events.removeUserUnloaded(clearUser);
+            manager.events.removeAccessTokenExpired(clearUser);
+            manager.stopSilentRenew();
+            if (managerRef.current === manager) managerRef.current = null;
+          };
+          const storedUser = await manager.getUser();
+          if (!active) return;
+          setUser(storedUser);
         }
         if (runtimeConfig.enableDevAuth && localStorage.getItem(DEV_SESSION_KEY) === 'true') setSynthetic('dev');
         else if (runtimeConfig.enableGuestAuth && localStorage.getItem(GUEST_SESSION_KEY) === 'true') setSynthetic('guest');
       })
       .catch(error => console.error('[AuthProvider] initialization failed', error))
       .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    return () => { active = false; disposeManager?.(); };
   }, []);
 
   const login = useCallback(async () => {

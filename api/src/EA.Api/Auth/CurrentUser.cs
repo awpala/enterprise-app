@@ -116,8 +116,8 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
             if (!string.IsNullOrWhiteSpace(emails))
                 return emails;
 
-            return Principal.FindFirst("preferred_username")?.Value
-                   ?? Principal.FindFirst("email")?.Value
+            return Principal.FindFirst("email")?.Value
+                   ?? Principal.FindFirst("preferred_username")?.Value
                    ?? Principal.FindFirst(ClaimTypes.Email)?.Value;
         }
     }

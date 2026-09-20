@@ -1,14 +1,14 @@
 # UI — Next.js 16
 
-Next.js App Router application for managing models and runs. It uses a server-side runtime-configuration endpoint so the same container image can target Azure or AWS without a rebuild.
+Next.js App Router application for managing models and runs. It uses a server-side runtime-configuration endpoint so the same container image can target Coolify, Azure, or AWS without a rebuild.
 
 ## Runtime configuration
 
 | Variable | Purpose |
 |---|---|
-| `DEPLOYMENT_TARGET` | `local`, `azure`, or `aws`; displayed in the shell and available to diagnostics. |
+| `DEPLOYMENT_TARGET` | `local`, `coolify`, `azure`, or `aws`; displayed in the shell and available to diagnostics. |
 | `API_URL` | Public API origin. |
-| `AUTH_PROVIDER` | `none`, `entra`, or `cognito`. |
+| `AUTH_PROVIDER` | `none` (local only), `oidc` (Keycloak), `entra`, or `cognito`. |
 | `AUTH_AUTHORITY` | OIDC issuer/authority. |
 | `AUTH_CLIENT_ID` | Public browser client ID. |
 | `AUTH_API_SCOPE` | API access scope requested during Authorization Code + PKCE. |

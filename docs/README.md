@@ -32,6 +32,7 @@ Architectural decisions, operational runbooks, and cross-cutting references for 
 | `azure-sso-manual-bootstrap.md` | Markdown | Step-by-step Entra External ID bootstrap procedure (click-by-click portal steps plus CLI). |
 | `azure-observability.md` | Markdown | Azure Monitor/App Insights adapter operations and KQL queries. |
 | `aws-deployment.md` | Markdown | Short AWS operational sequence and rollback entry point. |
+| `coolify-deployment.md` | Markdown | Independent production Compose deployment, provider setup, Keycloak, guest access, RabbitMQ Management, pgAdmin, native auto-deploy, and cloud opt-out. |
 | `azure-teardown-redeploy.md` | Markdown | Azure-specific safe suspension, redeploy, and recovery boundaries. |
 | `scripts/az-delete-acr.sh` | Script | Subscription-verified deletion of explicitly configured Azure registries. |
 | `scripts/az-teardown.sh` | Script | Legacy runtime-suspension helper for explicitly configured Azure resource groups. |

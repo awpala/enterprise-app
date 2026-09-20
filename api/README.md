@@ -17,7 +17,7 @@ System of record for the model domain. Owns the PostgreSQL schema via EF Core, a
 |---|---|---|
 | `MassTransit.RabbitMQ` | Messaging | Publishes run requests and consumes worker lifecycle events through durable RabbitMQ exchanges and queues. |
 | `Npgsql.EntityFrameworkCore.PostgreSQL` | EF Core provider | First-class Postgres support including `JsonDocument` columns (used for `audit_events.details`). |
-| `Microsoft.AspNetCore.Authentication.JwtBearer` | OIDC access-token validation | Validates Entra or Cognito tokens through one normalized configuration contract. |
+| `Microsoft.AspNetCore.Authentication.JwtBearer` | OIDC access-token validation | Validates Keycloak, Entra, or Cognito tokens through one normalized configuration contract. |
 | `Scalar.AspNetCore` | OpenAPI UI | Modern replacement for Swagger UI; renders the spec produced by `Microsoft.AspNetCore.OpenApi`. |
 | OpenTelemetry exporters | Telemetry | Selects Azure Monitor, standard OTLP, or no exporter at deployment time. |
 | `AspNetCore.HealthChecks.NpgSql` | Readiness | Backs `/health/ready` with a real DB probe — Container Apps uses this to gate traffic. |
@@ -68,6 +68,15 @@ On a Docker-capable host, use the full Compose stack described in [`../deploy/RE
 | Integration (PostgreSQL Testcontainer + MassTransit in-memory harness) | `EA.Api.IntegrationTests` | `dotnet test api/tests/EA.Api.IntegrationTests/` |
 
 Integration tests spin up a real PostgreSQL container and replace RabbitMQ transport with the MassTransit in-memory test harness. They require a working Docker socket for PostgreSQL and run automatically for pull requests and `main` pushes via `ci.yml`; do not run them inside `ea-dev-env`.
+
+The focused `ModelRunCompletionTests` fixture can also use an existing development PostgreSQL server through `EA_TEST_POSTGRES_CONNECTION`. It creates and removes its own uniquely named database; the supplied account needs database-creation permission. This allows the completion visibility and rollback regressions to run inside `ea-dev-env` without Docker:
+
+```bash
+# Supply the development connection string through the environment first.
+dotnet test api/tests/EA.Api.IntegrationTests/ --filter FullyQualifiedName~ModelRunCompletionTests
+```
+
+Set `EA_TEST_POSTGRES_CONNECTION` explicitly for this command; without it, this fixture also uses a Testcontainer.
 
 ## Gotchas
 
