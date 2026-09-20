@@ -4,7 +4,7 @@
 
 Coolify is the evergreen home for this disposable portfolio demo. Every push to `main` deploys through Coolify's native GitHub App integration. AWS and Azure are independent, optional demonstrations, selected explicitly. Coolify requires no Terraform execution, state, cloud hosting credentials, GitHub Actions deployment workflow, or deployment enablement flag.
 
-**Current checkpoint:** PR 24 is merged to `main` at `bbf9503`, and CI, including the production Compose smoke check, passed. After the Dockerfile rewrite workaround, service-domain setup, and **Advanced → Proxy → Path prefixes → Keep paths as-is**, the full live smoke test passed on September 20, 2026. All four domains have valid HTTPS; UI/API health, runtime configuration, Keycloak discovery and provider buttons, administrative endpoint reachability, invalid-bearer rejection, and a guest job completing with computed metrics are verified. The operator confirms the Google workflow works. Microsoft rejected a client ID copied with literal surrounding quotes; the live Keycloak provider and local `.env` are corrected, and a fresh authorization redirect now contains the exact registered ID. The operator is updating Coolify's copies; a fresh personal Microsoft sign-in, operator logins, and a subsequent push-triggered deployment remain to be verified.
+**Current checkpoint:** the evergreen Coolify deployment is live. The operator's push of `c245d92` to `main` automatically deployed successfully, and all six [CI checks passed](https://github.com/awpala/enterprise-app/actions/runs/35542960516). The full live smoke test passed again after that deployment on September 20, 2026: valid HTTPS on all four domains, UI/API health, runtime configuration, Keycloak discovery and provider buttons, administrative endpoint reachability, invalid-bearer rejection, and a guest job completing with computed metrics. The operator confirms Google and personal Microsoft sign-in both work. RabbitMQ operator authentication and queue visibility, plus pgAdmin operator authentication and server-group listing, are verified. AWS/Azure hosting remains inactive and `DEPLOYMENT_TARGETS=none`.
 
 All deployments own separate databases and queues. Complete loss of demo data and local identities is acceptable on all targets. Named volumes preserve state during routine redeploys; backups, replication, restoration exercises, and high availability are outside scope. Recovery recreates this application and seeds fresh data.
 
@@ -166,6 +166,14 @@ CI builds the repository Dockerfiles directly and therefore does not exercise Co
 
 ### Operator visibility
 
+| Service | Login URL | Username / email |
+|---|---|---|
+| Keycloak Admin | [ent-app-auth.portfolio-projects.dev/admin/](https://ent-app-auth.portfolio-projects.dev/admin/) | `admin` — authenticate in the **master** realm |
+| RabbitMQ Management | [ent-app-mq.portfolio-projects.dev](https://ent-app-mq.portfolio-projects.dev/) | `ea_app` |
+| pgAdmin 4 | [ent-app-db.portfolio-projects.dev](https://ent-app-db.portfolio-projects.dev/) | `admin@portfolio-projects.dev` (`PGADMIN_EMAIL`) |
+
+Inside pgAdmin, the PostgreSQL connection uses database username **`ea_admin`**, separately from the UI login.
+
 - **RabbitMQ:** open `https://ent-app-mq.portfolio-projects.dev`, sign in as `ea_app` with `RABBITMQ_PASSWORD`, and inspect **Queues and Streams**, consumers, unacknowledged/ready messages, and message rates. The initial broker account has administrator permissions. Queue depth often returns to zero immediately for this small workload. [RabbitMQ management](https://www.rabbitmq.com/docs/management)
 - **pgAdmin:** open `https://ent-app-db.portfolio-projects.dev`, sign in with `PGADMIN_EMAIL` / `PGADMIN_PASSWORD`, then expand the preconfigured **Coolify → Enterprise App** server. Enter `POSTGRES_PASSWORD` for database user `ea_admin`. Browse `ea_app → Schemas → public → Tables` for models and runs. The same server also contains `ea_keycloak`. The database password is not embedded in the tracked server definition. [pgAdmin container configuration](https://www.pgadmin.org/docs/pgadmin4/latest/container_deployment.html)
 - **Keycloak:** open `https://ent-app-auth.portfolio-projects.dev/admin/`, sign in as `admin`, and select realm `enterprise-app` to inspect identity providers, sessions, and users.
@@ -197,7 +205,7 @@ A running worker without a health check is not proof of successful processing: v
 
 ## 5. Routine delivery, cloud demonstrations, and resets
 
-Push to `main` to deploy Coolify through the existing GitHub App webhook. Every push is eligible; there are no watch-path filters, special enablement flags, CI dependency, or Terraform invocation in this path. Keep native **Auto Deploy** enabled. The first live deployment and the next push-triggered deployment are separate verification steps.
+Push to `main` to deploy Coolify through the existing GitHub App webhook. Every push is eligible; there are no watch-path filters, special enablement flags, CI dependency, or Terraform invocation in this path. Keep native **Auto Deploy** enabled. The initial live deployment and a subsequent push-triggered deployment at `c245d92` have both been verified.
 
 The independent [cloud workflow](../../.github/workflows/deploy.yml) uses `DEPLOYMENT_TARGETS=none` to skip both cloud adapters successfully. The repository variable has already been set to `none`. Older workflow revisions reject this value until the new resolver is published, so they fail validation without deploying. Missing/invalid selection never defaults to a provider.
 
@@ -219,13 +227,14 @@ For a fresh demo, stop only this Coolify application, remove its selected persis
 | Local implementation | Compose, realm/database bootstrap, admin UIs, OIDC adapter, cloud opt-out, and runbook present |
 | Local secrets | Ignored `.env` contains service passwords and provider credentials; no values tracked |
 | Provider setup | Operator supplied Google client credentials; dedicated Microsoft app created and verified through Azure CLI (credential expires September 20, 2027) |
-| Publication and container validation | Operator merged PR 24 to `main` at `bbf9503`; CI passed, including container builds, Compose smoke, and API integration tests. The completion/metrics transaction fix is included |
+| Publication and container validation | Operator merged PR 24 at `bbf9503`, then pushed helper/runbook updates at `c245d92`; all six CI checks passed for the latter, including container builds, Compose smoke, and API integration tests. The completion/metrics transaction fix is included |
 | Coolify variables | Operator confirms values copied and Build time restored; deployment log confirms Docker 29.8.1 with BuildKit secrets enabled |
-| Git review | Further staging, commits, pushes, merges, and PR changes require explicit operator approval; deployment troubleshooting leaves helper and documentation edits unstaged |
+| Git review | Further staging, commits, pushes, merges, and PR changes require explicit operator approval; final runbook verification notes are left unstaged for operator review |
 | First live deployment | Running after the Dockerfile rewrite workaround and service-domain setup; valid HTTPS verified on all four domains |
 | Live endpoints | UI health/configuration, Keycloak discovery/PKCE and both provider buttons, RabbitMQ Management, and pgAdmin ping passed |
 | API routing | Operator selected Keep paths as-is and redeployed; normal API routes and readiness now pass |
-| Guest workflow | `python3 deploy/coolify/smoke.py` passed against the public domains: invalid bearer rejected and a guest model run completed with computed metrics through the live API, queue, and worker |
+| Guest workflow | `python3 deploy/coolify/smoke.py` passed against the public domains before and after the automatic `c245d92` deployment: invalid bearer rejected and a guest model run completed with computed metrics through the live API, queue, and worker |
 | Google browser workflow | Operator confirms it works without issue |
-| Microsoft browser workflow | Personal-account audience verified through Azure CLI; quoted client ID reproduced in the live authorization redirect. Keycloak credentials corrected from local values, local `.env` quotes removed, and corrected redirect verified. Operator updating Coolify; fresh browser retry pending |
-| Operator UI logins / subsequent push auto-deploy | Pending |
+| Microsoft browser workflow | Personal-account audience verified through Azure CLI; literal client-ID quotes diagnosed and removed from live Keycloak, local `.env`, and Coolify. Corrected authorization redirect verified; operator confirms personal Microsoft sign-in now works |
+| Operator access | RabbitMQ accepts the configured operator and lists four queues. pgAdmin accepts its configured login and returns two server groups. Keycloak administrator access was verified during the provider correction |
+| Native push auto-deploy | Operator confirms `c245d92` automatically triggered and completed in Coolify; subsequent live smoke passed |
