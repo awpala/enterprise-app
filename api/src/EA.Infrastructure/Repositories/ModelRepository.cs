@@ -136,8 +136,15 @@ public class ModelRepository(AppDbContext dbContext) : IModelRepository
         DateTime completedAtUtc,
         System.Text.Json.JsonDocument? resultSummary,
         System.Text.Json.JsonDocument? sampleData,
+        IReadOnlyCollection<ModelMetric> metrics,
         CancellationToken cancellationToken = default)
     {
+        if (metrics.Any(metric => metric.ModelRunId != runId))
+            throw new ArgumentException("All completion metrics must belong to the completed run.", nameof(metrics));
+
+        // ExecuteUpdate writes immediately. Keep that update and SaveChanges in
+        // one transaction so readers cannot see Completed before its results.
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var affected = await dbContext.ModelRuns
             .Where(run => run.Id == runId)
             .ExecuteUpdateAsync(setters => setters
@@ -148,7 +155,13 @@ public class ModelRepository(AppDbContext dbContext) : IModelRepository
                 .SetProperty(run => run.SampleData, sampleData),
                 cancellationToken);
 
-        return affected > 0;
+        if (affected == 0)
+            return false;
+
+        await dbContext.ModelMetrics.AddRangeAsync(metrics, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     /// <inheritdoc />
@@ -168,12 +181,6 @@ public class ModelRepository(AppDbContext dbContext) : IModelRepository
                 cancellationToken);
 
         return affected > 0;
-    }
-
-    /// <inheritdoc />
-    public async Task AddModelMetricsAsync(IEnumerable<ModelMetric> metrics, CancellationToken cancellationToken = default)
-    {
-        await dbContext.ModelMetrics.AddRangeAsync(metrics, cancellationToken);
     }
 
     /// <inheritdoc />

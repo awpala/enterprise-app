@@ -180,6 +180,7 @@ The generated `.sql` pairs with the C# migration of the same stem (e.g. `2026041
 
 ### General
 
+- **Operator-controlled Git review.** Leave edits in the working tree for manual staging review. Do not stage, unstage, commit, push, merge, or create/modify pull requests without explicit operator approval. Preserve pre-existing staged changes. Read-only CI monitoring does not authorize repository changes.
 - **American English throughout.** All code, comments, commit messages, documentation, and any other written text must use American English spelling and grammar (e.g., `color` not `colour`, `behavior` not `behaviour`, `initialize` not `initialise`, `serialize` not `serialise`).
 - **No `// TODO` without a linked issue.** Use `// HACK:` only with justification.
 - **All public APIs must have XML doc comments** (API project) or JSDoc (UI project).

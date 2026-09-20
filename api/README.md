@@ -69,6 +69,15 @@ On a Docker-capable host, use the full Compose stack described in [`../deploy/RE
 
 Integration tests spin up a real PostgreSQL container and replace RabbitMQ transport with the MassTransit in-memory test harness. They require a working Docker socket for PostgreSQL and run automatically for pull requests and `main` pushes via `ci.yml`; do not run them inside `ea-dev-env`.
 
+The focused `ModelRunCompletionTests` fixture can also use an existing development PostgreSQL server through `EA_TEST_POSTGRES_CONNECTION`. It creates and removes its own uniquely named database; the supplied account needs database-creation permission. This allows the completion visibility and rollback regressions to run inside `ea-dev-env` without Docker:
+
+```bash
+# Supply the development connection string through the environment first.
+dotnet test api/tests/EA.Api.IntegrationTests/ --filter FullyQualifiedName~ModelRunCompletionTests
+```
+
+Set `EA_TEST_POSTGRES_CONNECTION` explicitly for this command; without it, this fixture also uses a Testcontainer.
+
 ## Gotchas
 
 - **Run creation is not transactionally coupled to publication.** A broker publish failure after the database save can leave a pending run without a delivered command. Do not claim outbox guarantees unless the EF outbox is configured, migrated, and covered by recovery tests.
