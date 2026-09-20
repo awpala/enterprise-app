@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 from urllib.parse import urlencode
@@ -143,8 +144,13 @@ def main() -> None:
         raise RuntimeError("Microsoft fields changed during setup; existing local values preserved.")
     lines = current.splitlines()
     for key, value in values.items():
-        escaped = value.replace("\\", "\\\\").replace("'", "\\'")
-        replacement = f"{key}='{escaped}'"
+        # Keep simple credentials directly copyable into Coolify value fields.
+        # Quote only when dotenv syntax requires it.
+        if re.fullmatch(r"[A-Za-z0-9._~-]+", value):
+            replacement = f"{key}={value}"
+        else:
+            escaped = value.replace("\\", "\\\\").replace("'", "\\'")
+            replacement = f"{key}='{escaped}'"
         indexes = [i for i, line in enumerate(lines) if line.partition("=")[0].strip() == key]
         if indexes:
             lines[indexes[0]] = replacement

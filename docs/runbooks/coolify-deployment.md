@@ -4,7 +4,7 @@
 
 Coolify is the evergreen home for this disposable portfolio demo. Every push to `main` deploys through Coolify's native GitHub App integration. AWS and Azure are independent, optional demonstrations, selected explicitly. Coolify requires no Terraform execution, state, cloud hosting credentials, GitHub Actions deployment workflow, or deployment enablement flag.
 
-**Current checkpoint:** the operator has created the Coolify Compose application with `/compose.prod.yaml`. DNS for all four domains is verified, and provider credentials have been copied into Coolify. The feature branch and draft PR are published. A completion-visibility race exposed by the Compose smoke check is fixed and tested locally, awaiting operator Git review and publication. The first live deployment remains to be completed.
+**Current checkpoint:** PR 24 is merged to `main` at `bbf9503`, and CI, including the production Compose smoke check, passed. After the Dockerfile rewrite workaround, service-domain setup, and **Advanced → Proxy → Path prefixes → Keep paths as-is**, the full live smoke test passed on September 20, 2026. All four domains have valid HTTPS; UI/API health, runtime configuration, Keycloak discovery and provider buttons, administrative endpoint reachability, invalid-bearer rejection, and a guest job completing with computed metrics are verified. The operator confirms the Google workflow works. Microsoft rejected a client ID copied with literal surrounding quotes; the live Keycloak provider and local `.env` are corrected, and a fresh authorization redirect now contains the exact registered ID. The operator is updating Coolify's copies; a fresh personal Microsoft sign-in, operator logins, and a subsequent push-triggered deployment remain to be verified.
 
 All deployments own separate databases and queues. Complete loss of demo data and local identities is acceptable on all targets. Named volumes preserve state during routine redeploys; backups, replication, restoration exercises, and high availability are outside scope. Recovery recreates this application and seeds fresh data.
 
@@ -45,9 +45,10 @@ The operator has already installed the dedicated GitHub App using Coolify's auto
 | Auto Deploy | Enabled |
 | Watch Paths | Empty, so every push to `main` deploys |
 | Preview deployments | Disabled |
-| Strip Prefix | **Disabled**; API paths must reach ASP.NET Core intact |
+| Advanced → Proxy → Path prefixes | **Keep paths as-is** (Strip Prefix disabled); API paths must reach ASP.NET Core intact |
 | HTTPS | Enabled for every public domain |
 | Use Docker Build Secrets | Enabled; required when making credentials available to Compose's build-phase parsing |
+| Advanced → Build → Build arguments | **Managed manually in Dockerfile**; avoids the Dockerfile rewriting defect in Coolify 4.3.23 |
 
 The GitHub App supplies repository access and push webhooks. No additional Coolify API token or GitHub Actions deployment secret is needed. Native Coolify behavior skips commits containing `[skip ci]` or `[skip cd]`; avoid those markers when a deployment is wanted. CI runs independently and does not gate Coolify. [GitHub App setup](https://coolify.io/docs/applications/sources/github/app), [native auto-deploy](https://coolify.io/docs/applications/sources/github/auto-deploy)
 
@@ -61,7 +62,9 @@ python3 deploy/coolify/init-env.py
 
 This creates the ignored `deploy/coolify/.env` with randomly generated service passwords and owner-only file permissions. An existing file is preserved. The file has already been generated in the current workspace, including the pgAdmin password. Enter provider credentials there as setup progresses; do not paste them into chat. Copy its values into the application's **production** environment variables in Coolify before deployment. No duplicate application credentials are needed in GitHub: native Coolify deployment owns them, and CI uses synthetic values.
 
-For this Compose stack on Coolify **4.3.23**, enable both **Build time** and **Runtime** for these variables, and enable **Use Docker Build Secrets** in the application's advanced settings. The Dockerfiles do not consume application credentials, but Coolify invokes `docker compose build` with a separate build-time environment file. Compose parses the required `${VAR:?}` expressions during that command, so runtime-only values are insufficient. BuildKit secrets keep credentials out of ordinary build arguments; verify BuildKit secret support in the deployment logs rather than accepting a fallback to build arguments. [Versioned build implementation](https://github.com/coollabsio/coolify/blob/v4.3.23/app/Jobs/ApplicationDeploymentJob.php#L737), [Coolify variable scopes and build secrets](https://coolify.io/docs/applications/configuration/environment-variables)
+When copying an individual value into Coolify, omit any surrounding dotenv quotes: they are file syntax, not part of the credential. The Microsoft setup helper emits unquoted values when their characters allow it; values that require dotenv escaping remain quoted in the file.
+
+For this Compose stack on Coolify **4.3.23**, enable both **Build time** and **Runtime** for these variables, enable **Use Docker Build Secrets**, and select **Advanced → Build → Build arguments → Managed manually in Dockerfile**. The Dockerfiles do not consume application credentials, but Coolify invokes `docker compose build` with a separate build-time environment file. Compose parses the required `${VAR:?}` expressions during that command, so runtime-only values are insufficient. The secrets setting prevents Coolify from passing ordinary credential build arguments; the manual setting prevents automatic Dockerfile rewriting. No credential `ARG` declarations or secret mounts need to be added to our Dockerfiles. Verify that deployment logs report build-secret support and skipped Docker Compose Dockerfile ARG injection. [Versioned build implementation](https://github.com/coollabsio/coolify/blob/v4.3.23/app/Jobs/ApplicationDeploymentJob.php#L737), [rewrite bypass](https://github.com/coollabsio/coolify/blob/v4.3.23/app/Jobs/ApplicationDeploymentJob.php#L4687), [Coolify variable scopes and build secrets](https://coolify.io/docs/applications/configuration/environment-variables)
 
 | Variable | Purpose |
 |---|---|
@@ -126,25 +129,40 @@ Once the directory is available:
 
 Existing AWS/Azure provider registrations can remain in their projects. These dedicated clients use only the Coolify broker callbacks. The UI callback is separately fixed at `https://ent-app.portfolio-projects.dev/auth/callback`.
 
+If Microsoft reports `unauthorized_client` or says the client is not enabled for consumers, verify both the registration audience and the exact `client_id` in a fresh authorization request. During first setup, the audience was correct but literal quotes copied into Coolify reached Keycloak's stored provider configuration. Correct both Microsoft values in Coolify and the existing **enterprise-app → Identity providers → Microsoft** configuration; changing bootstrap environment variables alone does not overwrite an imported realm. Retry from the application's sign-in flow, since the previous Microsoft error URL retains the old client ID.
+
 ## 4. Domain routing and first deployment
 
 The root [compose.prod.yaml](../../compose.prod.yaml) builds the existing UI, API, worker, and EF migration images plus small PostgreSQL, Keycloak, and pgAdmin image wrappers. RabbitMQ uses its Management image. Bootstrap configuration is packaged into images; there are no runtime repository bind mounts.
 
-In Coolify, attach these domain values to the corresponding Compose services. The port in each setting selects the **internal destination port**; visitors use ordinary HTTPS without a port suffix.
+In Coolify 4.3.23, open **Domains** (also linked from **General → Manage domains**), select **Add domain**, and choose the corresponding Compose service. DNS records and the `APP_ORIGIN` / `AUTH_ORIGIN` environment variables do not create these proxy routes. The port in each setting selects the **internal destination port**; visitors use ordinary HTTPS without a port suffix. In a form with separate fields, use scheme `https`, the hostname, the internal port, and the path shown below. Save the domain settings and redeploy to apply them to the containers.
 
 | Compose service | Coolify domain field |
 |---|---|
 | `ea-ui` | `https://ent-app.portfolio-projects.dev:3000` |
-| `ea-api` | `https://ent-app.portfolio-projects.dev:8000/api/v1,https://ent-app.portfolio-projects.dev:8000/health` |
+| `ea-api` | `https://ent-app.portfolio-projects.dev:8000/api/v1` |
+| `ea-api` | `https://ent-app.portfolio-projects.dev:8000/health` |
 | `ea-keycloak` | `https://ent-app-auth.portfolio-projects.dev:8080` |
 | `ea-rabbitmq` | `https://ent-app-mq.portfolio-projects.dev:15672` |
 | `ea-pgadmin` | `https://ent-app-db.portfolio-projects.dev:8080` |
 
-Disable **Strip Prefix**. Coolify generates Traefik routing for the longer API paths while `/api/runtime-config`, `/api/health`, and all pages remain with Next.js. Use managed domains without adding competing custom Traefik labels. PostgreSQL port 5432 and RabbitMQ AMQP port 5672 remain private to the application network. [Coolify Compose routing](https://coolify.io/docs/applications/builds/docker-compose)
+The API needs two domain entries, one for each path. The Service dropdown scrolls internally; `ea-ui` is the last entry, below `ea-data-engine`.
+
+Set **Advanced → Proxy → Path prefixes → Keep paths as-is**. This is the Coolify 4.3.23 control for disabling **Strip Prefix**. Coolify generates Traefik routing for the longer API paths while `/api/runtime-config`, `/api/health`, and all pages remain with Next.js. Use managed domains without adding competing custom Traefik labels. PostgreSQL port 5432 and RabbitMQ AMQP port 5672 remain private to the application network. [Coolify Compose routing](https://coolify.io/docs/applications/builds/docker-compose), [versioned proxy controls](https://github.com/coollabsio/coolify/blob/v4.3.23/resources/views/livewire/project/application/advanced.blade.php#L124)
+
+If the UI loads but guest API calls return 404, verify this prefix setting and redeploy after changing it. During first deployment, `/api/v1/models` and `/health/ready` returned API 404 responses while `/api/v1/api/v1/models` and `/health/health/ready` succeeded, confirming that the proxy was stripping the required prefixes.
 
 Deploy once the selected revision and all credentials are available. PostgreSQL initializes separate application and Keycloak databases/users. EF migrations must finish before API/worker startup; the API then seeds demo data. The completed migration container is excluded from Coolify's aggregate health with `exclude_from_hc`, while a failure still blocks its dependents. RabbitMQ retains a stable node hostname and named volume.
 
 The services have initial memory limits suited to this small demo; actual available memory depends on the other projects on the shared 8 GB server. Build-time memory is additional. Inspect Coolify logs and host utilization if a build or service is killed. Do not add Docker inside the development container; image/Compose execution belongs in CI or on a Docker-capable host.
+
+### Coolify 4.3.23 build-stage failure
+
+If a build fails pulling `docker.io/library/build:latest` at `COPY --from=build`, check **Advanced → Build → Build arguments**. Select **Managed manually in Dockerfile**, keep **Use Docker Build Secrets** enabled and variables enabled for both **Build time** and **Runtime**, then redeploy the same revision. This recovery requires no repository change or registry credentials.
+
+Source inspection and a local reproduction traced the first deployment failure to Coolify's secret injector: it reuses the `dockerfile_content` output buffer across Compose services, while command output appends by default. The preceding ARG rewrite removes the final newline, so successive Dockerfiles concatenate and swallow later `FROM ... AS build` declarations. The reproduction matched the logged API failure at line 196. The manual build-argument setting skips this rewrite path while preserving Compose environment parsing. [Secret injector](https://github.com/coollabsio/coolify/blob/v4.3.23/app/Jobs/ApplicationDeploymentJob.php#L4590), [command output accumulation](https://github.com/coollabsio/coolify/blob/v4.3.23/app/Traits/ExecuteRemoteCommand.php#L238)
+
+CI builds the repository Dockerfiles directly and therefore does not exercise Coolify's rewriting. A passing Compose smoke check still requires the Coolify settings above for live deployment.
 
 ### Operator visibility
 
@@ -201,7 +219,13 @@ For a fresh demo, stop only this Coolify application, remove its selected persis
 | Local implementation | Compose, realm/database bootstrap, admin UIs, OIDC adapter, cloud opt-out, and runbook present |
 | Local secrets | Ignored `.env` contains service passwords and provider credentials; no values tracked |
 | Provider setup | Operator supplied Google client credentials; dedicated Microsoft app created and verified through Azure CLI (credential expires September 20, 2027) |
-| Publication and container validation | Feature branch / PR 24 published; container builds/startup and login endpoints verified. Later smoke exposed completion-before-metrics visibility; transactional fix passes API unit tests and two PostgreSQL regressions locally, awaiting publication and CI |
-| Coolify variables | Operator confirms values copied and Build time restored; BuildKit secret setting accepted; Docker Engine recently updated per operator |
-| Git review | Main remains unchanged; further staging, commits, pushes, and PR changes require explicit operator approval |
-| Live deployment / browser verification / push auto-deploy | Pending |
+| Publication and container validation | Operator merged PR 24 to `main` at `bbf9503`; CI passed, including container builds, Compose smoke, and API integration tests. The completion/metrics transaction fix is included |
+| Coolify variables | Operator confirms values copied and Build time restored; deployment log confirms Docker 29.8.1 with BuildKit secrets enabled |
+| Git review | Further staging, commits, pushes, merges, and PR changes require explicit operator approval; deployment troubleshooting leaves helper and documentation edits unstaged |
+| First live deployment | Running after the Dockerfile rewrite workaround and service-domain setup; valid HTTPS verified on all four domains |
+| Live endpoints | UI health/configuration, Keycloak discovery/PKCE and both provider buttons, RabbitMQ Management, and pgAdmin ping passed |
+| API routing | Operator selected Keep paths as-is and redeployed; normal API routes and readiness now pass |
+| Guest workflow | `python3 deploy/coolify/smoke.py` passed against the public domains: invalid bearer rejected and a guest model run completed with computed metrics through the live API, queue, and worker |
+| Google browser workflow | Operator confirms it works without issue |
+| Microsoft browser workflow | Personal-account audience verified through Azure CLI; quoted client ID reproduced in the live authorization redirect. Keycloak credentials corrected from local values, local `.env` quotes removed, and corrected redirect verified. Operator updating Coolify; fresh browser retry pending |
+| Operator UI logins / subsequent push auto-deploy | Pending |
