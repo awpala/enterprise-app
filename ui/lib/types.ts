@@ -1,7 +1,7 @@
 /** Runtime hosting target selected by deployment configuration. */
-export type DeploymentTarget = 'local' | 'azure' | 'aws';
+export type DeploymentTarget = 'local' | 'azure' | 'aws' | 'coolify';
 /** Browser authentication adapter selected by deployment configuration. */
-export type AuthProvider = 'entra' | 'cognito' | 'none';
+export type AuthProvider = 'entra' | 'cognito' | 'oidc' | 'none';
 
 /** Public, non-secret configuration returned by `/api/runtime-config`. */
 export interface RuntimeConfig {

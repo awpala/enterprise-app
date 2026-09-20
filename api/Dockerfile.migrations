@@ -13,4 +13,5 @@ RUN dotnet tool run dotnet-ef migrations bundle -p src/EA.Infrastructure/EA.Infr
 FROM mcr.microsoft.com/dotnet/runtime:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/efbundle .
+USER $APP_UID
 ENTRYPOINT ["./efbundle"]

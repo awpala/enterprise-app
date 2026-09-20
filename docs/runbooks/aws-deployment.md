@@ -2,6 +2,8 @@
 
 This is the operational path for onboarding and deploying the application to AWS. The detailed [AWS deployment workbook](../workbooks/aws-deployment-workbook.md) is an evidence and production-readiness checklist, not a command sequence.
 
+The current operating profile is an on-demand portfolio demo. Application and identity data is disposable; rebuild and reseed after loss. Backup, restore, high-availability, and retention gates in the historical workbook are optional hardening references, not prerequisites for these demos. Verify the selected account/environment and keep changes scoped to this application.
+
 ## One-time interactive prerequisites
 
 Complete only the identity steps that require a browser:
@@ -53,7 +55,6 @@ AWS_REGION=us-east-1
 AWS_NAME_SUFFIX=replace1
 GITHUB_OWNER=replace-with-repository-owner
 GITHUB_REPO=replace-with-repository-name
-DEPLOYMENT_TARGETS=aws
 COGNITO_DOMAIN_PREFIX=replace-with-globally-unique-prefix
 AWS_MONTHLY_BUDGET_USD=100
 AWS_BUDGET_EMAIL=
@@ -141,11 +142,12 @@ local Cognito user is provisioned. Real federated sign-in, callback,
 authenticated API access, refresh, and logout are mandatory dev acceptance
 gates; `Log in as Dev` is not a substitute.
 
-The onboarding script sets the repository variable `DEPLOYMENT_TARGETS` from
-the deployment config. With `DEPLOYMENT_TARGETS=aws`, every non-`main` push
-deploys to the protected `dev` environment, while every `main` push deploys to
-the protected `production` environment.
-Manual dispatch remains available for an explicitly selected environment.
+Onboarding preserves the repository variable `DEPLOYMENT_TARGETS`; any legacy
+entry in the local config is ignored with a notice. Set the repository variable
+separately: `none` disables cloud push deployment, while `aws`, `azure`, or `both`
+enables the chosen providers. Enabled non-`main` pushes target `dev`, and enabled
+`main` pushes target `production`. Manual dispatch, including `--deploy`, still
+works with push policy `none` and does not change it.
 
 ## Production
 
@@ -156,7 +158,7 @@ infra/scripts/aws-onboard.sh production \
   --config infra/aws/envs/production.deploy.env
 ```
 
-Set `GITHUB_PRODUCTION_REVIEWER` to `user:<github-login>` or `team:<organization-team-slug>`. The script configures that reviewer and prevents self-review on the `production` GitHub Environment. Review `infra/aws/aws-production.tfplan` and satisfy every production gate in the workbook before rerunning with `--deploy`. The bootstrap IAM policy is intentionally broad for the first account-backed dev deployment and must be reduced from CloudTrail evidence before production.
+Set `GITHUB_PRODUCTION_REVIEWER` to `user:<github-login>` or `team:<organization-team-slug>`. The script configures that reviewer and prevents self-review on the `production` GitHub Environment. Review `infra/aws/aws-production.tfplan` before rerunning with `--deploy`. The workbook's recovery and availability gates are optional for this disposable demo. The bootstrap IAM policy is intentionally broad; select only the intended demo account.
 
 ## Failure behavior
 

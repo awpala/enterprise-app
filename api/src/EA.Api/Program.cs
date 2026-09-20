@@ -178,8 +178,8 @@ builder.Services.AddOpenApi();
 // ---------------------------------------------------------------------------
 // Authentication / Authorization
 // ---------------------------------------------------------------------------
-// Authentication uses one deployment-neutral OIDC contract. Terraform selects
-// Entra External ID for Azure or Cognito for AWS and supplies normalized values.
+// Authentication uses one deployment-neutral OIDC contract. Each deployment
+// supplies normalized values for Entra External ID, Cognito, or another OIDC issuer.
 //
 // When Authentication:Enabled=true AND Authentication:AllowGuest=true, a
 // policy scheme "JwtOrGuest" is registered as the default
@@ -229,9 +229,9 @@ if (authenticationEnabled)
     var requiredScope = authentication["RequiredScope"];
     var isCognito = authenticationProvider == "cognito";
 
-    if (authenticationProvider is not ("entra" or "cognito"))
+    if (authenticationProvider is not ("entra" or "cognito" or "oidc"))
         throw new InvalidOperationException(
-            $"Unsupported Authentication:Provider '{authenticationProvider}'. Expected entra or cognito.");
+            $"Unsupported Authentication:Provider '{authenticationProvider}'. Expected entra, cognito, or oidc.");
 
     authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {

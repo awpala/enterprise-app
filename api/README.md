@@ -17,7 +17,7 @@ System of record for the model domain. Owns the PostgreSQL schema via EF Core, a
 |---|---|---|
 | `MassTransit.RabbitMQ` | Messaging | Publishes run requests and consumes worker lifecycle events through durable RabbitMQ exchanges and queues. |
 | `Npgsql.EntityFrameworkCore.PostgreSQL` | EF Core provider | First-class Postgres support including `JsonDocument` columns (used for `audit_events.details`). |
-| `Microsoft.AspNetCore.Authentication.JwtBearer` | OIDC access-token validation | Validates Entra or Cognito tokens through one normalized configuration contract. |
+| `Microsoft.AspNetCore.Authentication.JwtBearer` | OIDC access-token validation | Validates Keycloak, Entra, or Cognito tokens through one normalized configuration contract. |
 | `Scalar.AspNetCore` | OpenAPI UI | Modern replacement for Swagger UI; renders the spec produced by `Microsoft.AspNetCore.OpenApi`. |
 | OpenTelemetry exporters | Telemetry | Selects Azure Monitor, standard OTLP, or no exporter at deployment time. |
 | `AspNetCore.HealthChecks.NpgSql` | Readiness | Backs `/health/ready` with a real DB probe — Container Apps uses this to gate traffic. |

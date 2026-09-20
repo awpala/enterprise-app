@@ -72,6 +72,29 @@ public class CurrentUserTests
     }
 
     [Test]
+    public void BrokerClaims_PreserveUpstreamIdentityAndPreferEmailOverUsername()
+    {
+        var subject = Guid.NewGuid();
+        var principal = BuildPrincipal(
+            isAuthenticated: true,
+            new Claim("sub", subject.ToString()),
+            new Claim("iss", "https://auth.example.test/realms/enterprise-app"),
+            new Claim("idp", "google"),
+            new Claim("name", "Demo Visitor"),
+            new Claim("preferred_username", "google_123"),
+            new Claim("email", "visitor@example.test"));
+
+        var current = BuildSut(principal);
+
+        current.SubjectId.Should().Be(subject);
+        current.TenantId.Should().NotBeNull();
+        current.TenantId.Should().Be(BuildSut(principal).TenantId);
+        current.IdentityProvider.Should().Be("google");
+        current.Name.Should().Be("Demo Visitor");
+        current.Email.Should().Be("visitor@example.test");
+    }
+
+    [Test]
     public void IsAuthenticated_FalseWhenNoUser()
     {
         // Empty principal: no identity, no claims, no HttpContext.User flag.

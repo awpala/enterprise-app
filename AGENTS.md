@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-A containerized, event-driven enterprise demo application focused around a generic "model," deployable to Azure or AWS through peer Terraform roots and provider CLIs. The system demonstrates SSO, async job processing, observability, and repeatable infrastructure-as-code deployments.
+A containerized, event-driven enterprise demo application focused around a generic "model," hosted continuously on Coolify through Docker Compose, with optional Azure or AWS deployments through peer Terraform roots and provider CLIs. The system demonstrates SSO, async job processing, observability, and repeatable deployments.
 
 The development occurs within a VS Code-based Devcontainer, as defined in `.devcontainer`. Any missing CLIs, dependencies, should be updated accordingly in setup script `.devcontainer/scripts/setup-env.sh`.
 
@@ -104,7 +104,7 @@ Deeper structure (individual components, feature folders, migration files, etc.)
 | ORM | EF Core + Npgsql | latest stable | Npgsql.EntityFrameworkCore.PostgreSQL |
 | Messaging (.NET) | MassTransit | latest stable | RabbitMQ transport and lifecycle consumers; EF outbox package referenced |
 | Frontend | Next.js / React | 16 / 19 | App Router, standalone server output |
-| Frontend auth | oidc-client-ts | latest stable | Auth code flow + PKCE via Entra or Cognito |
+| Frontend auth | oidc-client-ts | latest stable | Auth code flow + PKCE via Keycloak, Entra, or Cognito |
 | Database | PostgreSQL | 16 | Azure Flexible Server, AWS RDS, or `postgres:16` locally |
 | Message broker | RabbitMQ | 4 | `rabbitmq:4-management` image |
 | IaC | Terraform | ≥1.9 | AzureRM/AzureAD or AWS providers; Blob/S3 state |
@@ -251,17 +251,25 @@ The generated `.sql` pairs with the C# migration of the same stem (e.g. `2026041
 
 ## Deployment Pipeline
 
+### Operating profile
+
+All deployment targets are ephemeral portfolio demos. Coolify is the intended continuously available host; AWS and Azure are provisioned only for a specific demonstration and then removed. Complete loss of application and identity data is acceptable. Backups, restore exercises, redundancy, and retention are not deployment or teardown gates for this project. Rebuilding and reseeding is the recovery model. Keep operations scoped to the selected project/provider so unrelated workloads and shared infrastructure are not affected.
+
 ### CI (`ci.yml`)
-- **Every push/PR** → API/UI unit checks, both Terraform roots and bootstraps, shell adapters, and all four portable container builds. Data-engine tests are run locally today; add them to CI before claiming full automated test coverage.
+- **Every push/PR** → API/UI unit checks, both Terraform roots and bootstraps, shell adapters, and the production Compose build/smoke (including all four portable application images). Data-engine tests are run locally today; add them to CI before claiming full automated test coverage.
 - **Pull requests and `main`** → integration tests (Testcontainers) after unit tests pass.
 
 ### Deploy (`deploy.yml`)
-1. **Require an explicit target** → manual runs select `azure`, `aws`, or `both`; push runs require the repository variable `DEPLOYMENT_TARGETS` with one of those values. There is no default provider.
-2. **Detect changes once** → `git diff` identifies changes under `api/`, `data-engine/`, and `ui/`.
+1. **Require an explicit target** → manual runs select `azure`, `aws`, or `both`; push runs require `DEPLOYMENT_TARGETS=none`, `azure`, `aws`, or `both`. `none` skips both cloud adapters successfully. There is no default provider. Manual dispatch and AWS onboarding do not change the repository's push policy.
+2. **Detect changes once** → for enabled cloud pushes, `git diff` identifies changes under `api/`, `data-engine/`, and `ui/`. Cloud opt-out requires no commit-history or provider-credential lookup.
 3. **Call provider adapters** → reusable `deploy-azure.yml` and `deploy-aws.yml` workflows run only for selected targets and use protected logical `dev` / `production` GitHub Environments so customer identity-provider registrations are reused across cloud targets.
 4. **Apply registry phase** → create the selected provider registry before image publication.
 5. **Build or copy immutable images** → publish the same four images to ACR or ECR.
 6. **Apply full stack, migrate, and smoke test** → use the provider-native one-off migration workload, then poll the normalized `api_url` output.
+
+### Coolify (native GitHub App)
+
+Every push to `main` deploys root `compose.prod.yaml` using Coolify's native Auto Deploy, independently of CI, Terraform, and cloud target selection. Keep Watch Paths empty and previews disabled. No additional deployment workflow or enablement flag is needed. Keycloak brokers public Google/Microsoft accounts; guest access remains enabled. RabbitMQ Management and pgAdmin have separate operator logins. Setup, credentials, routing, and verification are documented in [the Coolify runbook](docs/runbooks/coolify-deployment.md).
 
 ### Image tagging
 - `main` → `sha-<sha7>`

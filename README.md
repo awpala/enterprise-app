@@ -171,16 +171,17 @@ Google and Microsoft/Outlook are federated through the selected cloud identity a
 
 [`deploy.yml`](./.github/workflows/deploy.yml) is the only cloud-neutral deployment entry point.
 
-- Every non-`main` push that matches deployment paths targets the protected `dev` GitHub Environment.
-- Every matching `main` push targets the protected `production` GitHub Environment.
-- Push deployments require the repository variable `DEPLOYMENT_TARGETS` to be `azure`, `aws`, or `both`.
-- Manual dispatch requires an explicit provider and environment.
+- When cloud push deployment is enabled, matching non-`main` pushes target the protected `dev` GitHub Environment and matching `main` pushes target `production`.
+- Push deployments require an explicit repository variable `DEPLOYMENT_TARGETS`: `none` skips both clouds, while `azure`, `aws`, or `both` enables the selected adapters.
+- Manual dispatch requires an explicit provider and environment, works with push policy `none`, and does not change that policy. AWS onboarding also preserves the repository's push policy.
 - Documentation-only and unrelated script changes do not trigger a deployment.
 - Provider adapters create the registry, publish four immutable images, apply the full stack, run migrations, smoke-test the normalized API URL, and enforce image retention.
 
 Provider credentials and customer identity secrets live in the logical `dev` and `production` GitHub Environments. They are never committed or exposed by runtime configuration.
 
 ## Repository guides
+
+The independent, production-only Coolify deployment uses root [`compose.prod.yaml`](./compose.prod.yaml) and native GitHub App auto-deploy on every push to `main`, without Terraform. The [Coolify runbook](./docs/runbooks/coolify-deployment.md) covers Keycloak SSO, guest access, RabbitMQ Management, pgAdmin, and the first-deployment checkpoint. AWS/Azure remain optional, separate deployments.
 
 | Area | Guide |
 |---|---|

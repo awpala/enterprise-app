@@ -181,7 +181,6 @@ cp infra/aws/envs/dev.deploy.env.example infra/aws/envs/dev.deploy.env
 | `AWS_NAME_SUFFIX` | Yes | Four-to-ten-character lowercase suffix that makes the state bucket globally unique | No |
 | `GITHUB_OWNER` | Yes | Repository owner used by GitHub CLI and OIDC trust | No |
 | `GITHUB_REPO` | Yes | Repository name used by GitHub CLI and OIDC trust | No |
-| `DEPLOYMENT_TARGETS` | Yes | Push-routing selection containing `aws` | No |
 | `COGNITO_DOMAIN_PREFIX` | Yes | Globally unique lowercase Cognito managed-login prefix | No |
 | `AWS_MONTHLY_BUDGET_USD` | Yes | Positive monthly budget amount | No |
 | `AWS_BUDGET_EMAIL` | No | Optional email subscriber for the 80% actual-spend notification | Personal; keep only in the ignored file |
@@ -198,7 +197,7 @@ The copied `*.deploy.env` file and generated `*.tfplan` files are ignored. Never
 | `COGNITO_DOMAIN_PREFIX` | `MICROSOFT_OIDC_CLIENT_SECRET` |
 | `MICROSOFT_OIDC_ISSUER` | — |
 
-The repository-level `DEPLOYMENT_TARGETS` variable controls which provider adapters run on pushes.
+The repository-level `DEPLOYMENT_TARGETS` variable controls which provider adapters run on pushes: `none`, `azure`, `aws`, or `both`. Configure it separately; onboarding never changes it. Legacy `DEPLOYMENT_TARGETS` entries in local onboarding configuration are ignored with a notice. Manual AWS deployment remains available with repository push policy `none`.
 
 ## First deployment
 

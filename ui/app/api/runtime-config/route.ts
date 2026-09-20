@@ -10,13 +10,13 @@ function asBoolean(value: string | undefined): boolean {
 
 function deploymentTarget(value: string | undefined): DeploymentTarget {
   const target = value?.trim().toLowerCase() ?? 'local';
-  if (target === 'local' || target === 'azure' || target === 'aws') return target;
+  if (target === 'local' || target === 'azure' || target === 'aws' || target === 'coolify') return target;
   throw new Error(`Unsupported DEPLOYMENT_TARGET '${value}'.`);
 }
 
 function authProvider(value: string | undefined): AuthProvider {
   const provider = value?.trim().toLowerCase() ?? 'none';
-  if (provider === 'none' || provider === 'entra' || provider === 'cognito') return provider;
+  if (provider === 'none' || provider === 'entra' || provider === 'cognito' || provider === 'oidc') return provider;
   throw new Error(`Unsupported AUTH_PROVIDER '${value}'.`);
 }
 
