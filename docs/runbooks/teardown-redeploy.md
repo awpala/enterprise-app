@@ -5,7 +5,7 @@ Select the provider explicitly before changing infrastructure. There is no defau
 | Target | Procedure |
 |---|---|
 | Azure | [Azure teardown and redeploy](./azure-teardown-redeploy.md) |
-| AWS | [AWS workbook: failure, rollback, and teardown](../workbooks/aws-deployment-workbook.md#10-failure-rollback-and-teardown) |
+| AWS | [AWS state-backed teardown and verification](./aws-deployment.md#decommission-both-application-environments) |
 
 For either provider, identify the target resources and state first, review the provider-specific teardown procedure, preserve the bootstrap/state needed to deploy again, and confirm that the other provider state is untouched. This portfolio application accepts complete demo data loss; backups and retention are optional, not teardown gates.
 

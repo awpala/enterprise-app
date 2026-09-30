@@ -159,7 +159,7 @@ In CloudWatch/X-Ray, capture a correlated trace spanning ALB/API, RabbitMQ publi
 - **Broker failure:** capture logs and EFS state before replacement. Validate queue durability and replay semantics.
 - **RDS recovery:** restore to a new instance, validate it, then rotate the connection-string secret and redeploy tasks.
 
-There is not yet a supported scripted teardown adapter that rehydrates the exact backend and protected identity-provider inputs. Do not substitute an ad hoc sequence of partial AWS/Terraform commands. Adding and exercising that script is a production gate. Production teardown also requires an explicit change record, retained RDS snapshot, retained logs as required, and Secrets Manager recovery-window review.
+Use the [state-backed AWS teardown procedure](../runbooks/aws-deployment.md#decommission-both-application-environments) to plan, review, delete, and verify both application environments. The adapter rehydrates the selected backend and protected identity-provider inputs from remote state. The current disposable-demo policy permits database deletion without retained snapshots. Bootstrap and state storage remain. Stopping RDS or disabling push deployment does not complete teardown; require empty application states and live inventory verification.
 
 ## 11. Production readiness checklist
 

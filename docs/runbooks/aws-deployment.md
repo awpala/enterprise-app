@@ -165,3 +165,61 @@ Set `GITHUB_PRODUCTION_REVIEWER` to `user:<github-login>` or `team:<organization
 The script and workflow use `set -euo pipefail` and stop at the first failed gate. Rerun the same command after correcting the reported condition. Do not manually continue with later Terraform or AWS commands.
 
 If an application revision fails after a successful database migration, use a forward-compatible application fix or the migration recovery decision in the workbook. Do not deploy an older image blindly against a changed schema.
+
+
+## Decommission both application environments
+
+Stopping RDS is not decommissioning: AWS automatically restarts a stopped database after seven days, and stopped database storage remains billable. Setting `DEPLOYMENT_TARGETS=none` prevents push deployments but does not delete resources. Check both `aws/dev.tfstate` and `aws/production.tfstate`.
+
+Use `infra/scripts/aws-teardown.py` with explicit account, profile, region, bucket, and environment. Run `plan` first, review its deletion list, then run `apply` with the same arguments and work directory. This deletes application and identity data, including database automated backups and ECR images, under the disposable-demo policy. Bootstrap IAM and the versioned state bucket remain; S3 storage and requests can still incur small charges.
+
+```bash
+# Replace these values with the selected account and bootstrap outputs.
+account=123456789012
+profile=ea-bootstrap
+region=us-east-1
+bucket=your-state-bucket
+environment=dev # Repeat with production to remove both environments.
+work_dir="__logs/aws-teardown-$(date -u +%Y%m%dT%H%M%SZ)-${environment}"
+
+python3 infra/scripts/aws-teardown.py plan \
+  --account "$account" --profile "$profile" --region "$region" \
+  --bucket "$bucket" --environment "$environment" --work-dir "$work_dir"
+
+cat "$work_dir/approved-addresses.json"
+terraform -chdir="$work_dir/root" show "$PWD/$work_dir/review.tfplan"
+
+python3 infra/scripts/aws-teardown.py apply \
+  --account "$account" --profile "$profile" --region "$region" \
+  --bucket "$bucket" --environment "$environment" --work-dir "$work_dir"
+```
+
+The script copies the AWS Terraform root into the private work directory and rehydrates protected identity-provider inputs from the selected remote state. It rejects another account, mismatched environment tags, changed state, and plans containing creates or updates. Live ownership checks precede database deletion, ECR image removal, and load-balancer protection removal. Database deletion skips final snapshots and removes automated backups; Terraform refreshes and destroys the remaining state-owned resources. It never uses the Azure or bootstrap state.
+
+Keep deployments and other Terraform writers idle during teardown. API preparation steps run between Terraform operations and do not hold the Terraform lock continuously. If teardown fails or is interrupted, inspect the error, then prepare a fresh plan in a new work directory; do not blindly reuse a stale plan. Existing manual snapshots and resources outside Terraform state require separate ownership review.
+
+Work directories contain secrets in state, variable files, and binary plans. Keep them under ignored `__logs/`, restrict access, and never publish them. The script uses owner-only permissions for newly created files and directories.
+
+After both environments finish, verify live inventory across all enabled regions:
+
+```bash
+python3 infra/scripts/aws-teardown-check.py \
+  --account "$account" --profile "$profile"
+```
+
+The verifier fails if project databases, snapshots, retained automated backups, registries, EFS, alarms, logs, active secrets, clusters, load balancers, VPCs, NAT gateways, tagged public IPs or volumes, private namespaces, hosted zones, or CloudFront distributions remain. API failures also fail verification. It is scoped to the project's names and tags, not an exhaustive account billing audit. Historical ECS task-definition revisions and secrets pending deletion are not runtime workloads. Secrets scheduled for deletion are not charged during their recovery window.
+
+Confirm that both remote application states contain no managed resources. Review Cost Explorer by service and region after its next refresh; it updates at least daily and some usage arrives later. Historical charges remain on the bill after deletion. Do not claim a zero account bill while preserving billable state storage or other account resources.
+
+References: [RDS stop behavior](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.html), [Secrets Manager deletion billing](https://docs.aws.amazon.com/secretsmanager/latest/userguide/manage_delete-secret.html), [Cost Explorer refresh timing](https://docs.aws.amazon.com/cost-management/latest/userguide/ce-what-is.html).
+
+
+### September 30, 2026 incident evidence
+
+CloudTrail recorded `StopDBInstance` for both `ea-dev-postgres` and `ea-prod-postgres` on August 17 at approximately 19:07 UTC. Cost Explorer showed storage-only RDS charges on August 18–23, instance charges returning on August 24, and full-day instance charges from August 25. Both databases were `available` on September 30. This matches the seven-day automatic restart behavior; the previous shutdown was incomplete decommissioning.
+
+Estimated unblended account cost for September 1–29 was $30.29, including $26.72 for RDS. Recent daily cost was approximately $1.04. Other charges included Secrets Manager, private Route 53 zones, CloudWatch alarms, ECR, EFS, and S3. Push deployment policy was already `none`, no deployment was running, and the September 20 workflow skipped AWS. The backend application states had last been written on August 16, before the manual stop operation.
+
+Teardown completed September 30, 2026: the dev state was finalized at 12:40:10 UTC and production at 12:41:31 UTC. Both databases were deleted without retained backups, and Terraform destroyed another 84 managed resources per environment with no creates or updates. The final live verifier passed across all 17 enabled regions plus global CloudFront and Route 53 inventory at 12:43 UTC. Both application states contain zero managed resources. The bootstrap state remained unchanged from August 15; the versioned state bucket retained 28,622,015 bytes across 230 object versions. Production secrets remain marked for deletion under their existing recovery policy, without secret-storage charges during that window. Historical inactive-workload task-definition revisions can remain without running compute. This is resource-deletion evidence, not a claim that historical bills disappear or that preserved S3 state storage is free.
+
+Private evidence is under ignored `__logs/aws-decommission-20260930/`, including billing responses, before/after state, reviewed plans, apply logs, and `inventory-final.json`. Do not publish the directory: state and plans contain credentials. Repository changes were left unstaged for operator review.

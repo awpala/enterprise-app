@@ -211,7 +211,7 @@ The independent [cloud workflow](../../.github/workflows/deploy.yml) uses `DEPLO
 
 For a cloud-specific prospect, leave `DEPLOYMENT_TARGETS=none` and manually dispatch `deploy.yml`, choosing `aws`, `azure`, or `both` and the existing cloud environment. AWS onboarding preserves push policy. If automatic cloud pushes are wanted temporarily, set the repository variable explicitly and return it to `none` afterward. These choices never affect Coolify. CI may validate Terraform without provisioning anything.
 
-The operator confirms both cloud deployments are currently torn down. No teardown is needed for this setup. End later cloud demonstrations using the selected provider's teardown procedure; disabling push deployment itself does not delete resources. All demo data is disposable on every target.
+The September 20 operator report that both clouds were torn down was not live verification. On September 30, both AWS databases were still running after an August 17 stop operation; RDS stops are temporary. Use the AWS teardown procedure and current inventory evidence before claiming decommissioning is complete. End later cloud demonstrations using the selected provider's teardown procedure; disabling push deployment itself does not delete resources. All demo data is disposable on every target.
 
 For a failed Coolify release, inspect the service logs and push a fix. PostgreSQL initialization and Keycloak realm import happen on empty state only. Updating the realm JSON does not overwrite an existing realm; apply later client/provider changes in Keycloak's admin console as well as the tracked bootstrap configuration. Rotate provider secrets in both Coolify and the established identity-provider configuration.
 
